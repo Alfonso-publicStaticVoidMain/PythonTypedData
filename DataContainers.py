@@ -5,8 +5,8 @@ from typing import TypeVar, Generic, Callable, Any, Iterable
 
 import frozendict
 
-from Mixins import _validate_value, _validate_values, _validate_types, FunctionalMixin, ContainerMixin, SequenceMixin, \
-    SetMixin, DictMixin
+from Mixins import _validate_value, _validate_values, _validate_types, FunctionalMethods, Collection, Sequence, \
+    Set, Dictionary
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -15,16 +15,16 @@ U = TypeVar("U")
 
 
 @dataclass(slots=True, repr=False)
-class TypedList(FunctionalMixin, ContainerMixin, SequenceMixin, Generic[T]):
+class TypedList(FunctionalMethods, Collection, Sequence, Generic[T]):
 
     item_type: type[T]
-    values: list[T] = field(default_factory=list)
+    values: list[T]
 
     def __init__(self, item_type: type[T], values: Iterable[T] | None = None):
         if isinstance(values, (set, frozenset, TypedSet, TypedFrozenSet)):
             raise TypeError("TypedList does not accept a set or frozenset because their order is not guaranteed")
         self.item_type = item_type
-        self.values = _validate_values(list(values) if values is not None else (), item_type)
+        self.values = _validate_values(values, item_type) if values is not None else ()
 
     def append(self: TypedList[T], value: T) -> None:
         self.values.append(_validate_value(value, self.item_type))
@@ -47,20 +47,20 @@ class TypedList(FunctionalMixin, ContainerMixin, SequenceMixin, Generic[T]):
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class TypedTuple(FunctionalMixin, ContainerMixin, SequenceMixin, Generic[T]):
+class TypedTuple(FunctionalMethods, Collection, Sequence, Generic[T]):
 
     item_type: type[T]
-    values: tuple[T, ...] = field(default_factory=tuple)
+    values: tuple[T, ...]
 
     def __init__(self, item_type: type[T], values: Iterable[T] = ()):
         if isinstance(values, (set, frozenset)):
-            raise TypeError("StaticTuple does not accept set or frozenset because their order is not guaranteed")
+            raise TypeError("TypedTuple does not accept set or frozenset because their order is not guaranteed.")
         object.__setattr__(self, 'item_type', item_type)
         object.__setattr__(self, 'values', _validate_values(values, item_type))
 
 
-@dataclass(slots=True)
-class TypedDict(DictMixin, Generic[K, V]):
+@dataclass(slots=True, repr=False)
+class TypedDict(Dictionary, Generic[K, V]):
 
     key_type: type[K]
     value_type: type[V]
@@ -157,7 +157,7 @@ class TypedDict(DictMixin, Generic[K, V]):
 
 
 @dataclass(frozen=True, slots=True)
-class TypedFrozenDict(DictMixin, Generic[K, V]):
+class TypedFrozenDict(Dictionary, Generic[K, V]):
     key_type: type[K]
     value_type: type[V]
     data: dict[K, V]
@@ -197,7 +197,7 @@ class TypedFrozenDict(DictMixin, Generic[K, V]):
 
 
 @dataclass(slots=True, repr=False)
-class TypedSet(FunctionalMixin, ContainerMixin, SetMixin, Generic[T]):
+class TypedSet(FunctionalMethods, Collection, Set, Generic[T]):
     item_type: type[T]
     values: set[T]
 
@@ -216,7 +216,7 @@ class TypedSet(FunctionalMixin, ContainerMixin, SetMixin, Generic[T]):
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class TypedFrozenSet(FunctionalMixin, ContainerMixin, SetMixin, Generic[T]):
+class TypedFrozenSet(FunctionalMethods, Collection, Set, Generic[T]):
     item_type: type[T]
     values: set[T]
 

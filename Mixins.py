@@ -7,6 +7,8 @@ T = TypeVar("T")
 K = TypeVar("K")
 V = TypeVar("V")
 U = TypeVar("U")
+A = TypeVar("A")
+R = TypeVar("R")
 
 
 def _validate_value(value: object, item_type: type) -> object:
@@ -48,6 +50,8 @@ def _validate_values(actual_values: Iterable, item_type: type) -> list:
     Checks if all elements of the given Iterable are of the given type or a subclass thereof. If not, raises a TypeError.
     :param actual_values: Iterable of values of possibly different types.
     :param item_type: Type to check for.
+    :return: A list of values validated as per the _validate_value function, coercing certain types like int to float
+    and str to int or float if possible.
     :raise: TypeError if not all elements of the actual_values list are of type item_type.
     """
     validated_values = []
@@ -78,7 +82,7 @@ def _validate_types(self, other, valid_typed_types: tuple[type, ...], valid_buil
     return other_values
 
 
-class FunctionalMixin:
+class FunctionalMethods:
     """
     Mixin class that defines common functional methods for classes to inherit. The class should have a values attribute,
     usually a list, tuple or set, and an item_type describing the type of the values. Currently, the functional methods
@@ -138,8 +142,26 @@ class FunctionalMixin:
         unique = [v for v in self.values if not (v in seen or seen.add(v))]
         return self.__class__(self.item_type, unique)
 
+    def collect(
+        self,
+        supplier: Callable[[], A],
+        accumulator: Callable[[A, T], None],
+        finisher: Callable[[A], R] = lambda x: x
+    ) -> R:
+        """
+        Generalized collector, replicating Java's Stream API .collect method.
+        :param supplier: A function that provides the initial container.
+        :param accumulator: A function that adds one item into the container.
+        :param finisher: Optional function to finalize the container into another form.
+        :return: The collected result.
+        """
+        acc = supplier()
+        for item in self.values:
+            accumulator(acc, item)
+        return finisher(acc)
 
-class ContainerMixin:
+
+class Collection:
 
     values: Any
     item_type: type
@@ -188,7 +210,7 @@ class ContainerMixin:
             return sum(1 for v in self.values if v == value)
 
 
-class SequenceMixin:
+class Sequence:
 
     values: Any
     item_type: type
@@ -202,29 +224,29 @@ class SequenceMixin:
             raise TypeError("Invalid index type: must be int or slice")
 
     def __lt__(self, other):
-        if isinstance(other, (SequenceMixin, list, tuple)):
-            return tuple(self.values) < tuple(other.values if isinstance(other, SequenceMixin) else other)
+        if isinstance(other, (Sequence, list, tuple)):
+            return tuple(self.values) < tuple(other.values if isinstance(other, Sequence) else other)
         return NotImplemented
 
     def __gt__(self, other):
-        if isinstance(other, (SequenceMixin, list, tuple)):
-            return tuple(self.values) > tuple(other.values if isinstance(other, SequenceMixin) else other)
+        if isinstance(other, (Sequence, list, tuple)):
+            return tuple(self.values) > tuple(other.values if isinstance(other, Sequence) else other)
         return NotImplemented
 
     def __le__(self, other):
-        if isinstance(other, (SequenceMixin, list, tuple)):
-            return tuple(self.values) <= tuple(other.values if isinstance(other, SequenceMixin) else other)
+        if isinstance(other, (Sequence, list, tuple)):
+            return tuple(self.values) <= tuple(other.values if isinstance(other, Sequence) else other)
         return NotImplemented
 
     def __ge__(self, other):
-        if isinstance(other, (SequenceMixin, list, tuple)):
-            return tuple(self.values) >= tuple(other.values if isinstance(other, SequenceMixin) else other)
+        if isinstance(other, (Sequence, list, tuple)):
+            return tuple(self.values) >= tuple(other.values if isinstance(other, Sequence) else other)
         return NotImplemented
 
     def __add__(self, other):
         return self.__class__(
             self.item_type,
-            self.values + _validate_types(self, other, (SequenceMixin), (list, tuple))
+            self.values + _validate_types(self, other, (Sequence), (list, tuple))
         )
 
     def __mul__(self, n):
@@ -233,7 +255,7 @@ class SequenceMixin:
         return self.__class__(self.item_type, self.values * n)
 
     def __sub__(self, other):
-        other_values = _validate_types(self, other, (SequenceMixin), (list, tuple))
+        other_values = _validate_types(self, other, (Sequence), (list, tuple))
         filtered_values = [value for value in self.values if value not in other_values]
         return self.__class__(self.item_type, filtered_values)
 
@@ -247,44 +269,45 @@ class SequenceMixin:
         return self.__class__(self.item_type, sorted(self.values, key=key, reverse=reverse))
 
 
-class SetMixin:
+class Set:
 
     values: Any
     item_type: type
 
     def union(self, other):
-        other_values = _validate_types(other, self, (SetMixin), (set, frozenset))
+        other_values = _validate_types(other, self, (Set), (set, frozenset))
         return self.__class__(self.item_type, set.union(self.values, other_values))
 
     def intersection(self, other):
-        other_values = _validate_types(other, self, (SetMixin), (set, frozenset))
+        other_values = _validate_types(other, self, (Set), (set, frozenset))
         return self.__class__(self.item_type, set.intersection(self.values, other_values))
 
     def difference(self, other):
-        other_values = _validate_types(other, self, (SetMixin), (set, frozenset))
+        other_values = _validate_types(other, self, (Set), (set, frozenset))
         return self.__class__(self.item_type, set.difference(self.values, other_values))
 
     def symmetric_difference(self, other):
-        other_values = _validate_types(other, self, (SetMixin), (set, frozenset))
+        other_values = _validate_types(other, self, (Set), (set, frozenset))
         return self.__class__(self.item_type, set.symmetric_difference(self.values, other_values))
 
     def is_subset(self, other):
-        other_values = _validate_types(other, self, (SetMixin), (set, frozenset))
+        other_values = _validate_types(other, self, (Set), (set, frozenset))
         return set.issubset(self.values, other_values)
 
     def is_superset(self, other):
-        other_values = _validate_types(other, self, (SetMixin), (set, frozenset))
+        other_values = _validate_types(other, self, (Set), (set, frozenset))
         return set.issuperset(self.values, other_values)
 
     def is_disjoint(self, other):
-        other_values = _validate_types(other, self, (SetMixin), (set, frozenset))
+        other_values = _validate_types(other, self, (Set), (set, frozenset))
         return set.isdisjoint(self.values, other_values)
 
 
-class DictMixin:
+class Dictionary:
 
     data: Any
-    item_type: type
+    key_type: type
+    value_type: type
 
     def __getitem__(self, key):
         return self.data[key]
@@ -316,6 +339,9 @@ class DictMixin:
             and self.data == other.data
         )
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}<{self.key_type.__name__}, {self.value_type.__name__}>{self.values}"
+
     def copy(self):
         return self.__class__(self.key_type, self.value_type, self.data.copy())
 
@@ -338,5 +364,5 @@ class DictMixin:
         except TypeError:
             raise TypeError("Keys must support ordering for subdict slicing.")
 
-        sliced = {k: v for k, v in self.data.data() if start <= k <= end}
-        return self.__class__(self.key_type, self.value_type, sliced)
+        sliced_data = {key : value for key, value in self.data.data() if start <= key <= end}
+        return self.__class__(self.key_type, self.value_type, sliced_data)
