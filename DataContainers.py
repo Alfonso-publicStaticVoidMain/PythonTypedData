@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TypeVar, Generic, Iterator, Callable, Any, Iterable, ClassVar
+from typing import TypeVar, Generic, Callable, Any, Iterable
 
 import frozendict
+
+from Mixins import _validate_value, _validate_values, _validate_types, FunctionalMixin, ContainerMixin, SequenceMixin, \
+    SetMixin, DictMixin
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -11,317 +14,9 @@ V = TypeVar("V")
 U = TypeVar("U")
 
 
-def _validate_value(value: object, item_type: type) -> object:
-    """
-    Checks if a single value is of a given type, or if it can be safely converted to that type. Valid conversions for
-    now are int -> float, str -> (int, float) and Any -> str provided no error is raised.
-    :param value: Value to check validity of.
-    :param item_type: Type to check match for the value.
-    :return: The value itself if it's of type item_type, or its conversion to item_type if it can safely converted to it.
-    :raise: TypeError if the value isn't of item_type and can't be safely converted to it.
-    """
-    if isinstance(value, item_type):
-        return value
+@dataclass(slots=True, repr=False)
+class TypedList(FunctionalMixin, ContainerMixin, SequenceMixin, Generic[T]):
 
-    converted = None
-
-    if item_type is float and isinstance(value, int):
-        converted = float(value)
-    elif (item_type is int or item_type is float) and isinstance(value, str):
-        try:
-            converted = item_type(value)
-        except ValueError:
-            pass
-    elif item_type is str:
-        try:
-            converted = str(value)
-        except ValueError:
-            pass
-
-    if converted is not None:
-        return converted
-    else:
-        raise TypeError(f"Element {value!r} is not of type {item_type.__name__} and cannot be converted safely.")
-
-
-def _validate_values(actual_values: Iterable, item_type: type) -> list:
-    """
-    Checks if all elements of the given Iterable are of the given type or a subclass thereof. If not, raises a TypeError.
-    :param actual_values: Iterable of values of possibly different types.
-    :param item_type: Type to check for.
-    :raise: TypeError if not all elements of the actual_values list are of type item_type.
-    """
-    validated_values = []
-    for value in actual_values:
-        validated_values.append(_validate_value(value, item_type))
-    return validated_values
-
-
-def _validate_types(self, other, valid_typed_types: tuple[type, ...], valid_built_in_types: tuple[type, ...]) -> list:
-    """
-    Checks that two objects self and other hold compatible types. Self will always be assumed a typed class, while other
-    will be of the parameter tuples valid_typed_typed and valid_built_in_types.
-    :param self: Typed object to compare the type against.
-    :param other: Typed or not object to check its contained type.
-    :param valid_typed_types: Types from my typed classes that should be accepted.
-    :param valid_built_in_types: Typed from Python's built ins that should be accepted.
-    :return: A list containing the values contained on the other object after validating its type and converting it to
-    self.item_type if necessary.
-    """
-    if isinstance(other, valid_typed_types):
-        if not issubclass(other.item_type, self.item_type):
-            raise ValueError(f"Different types for self ({self.item_type.__name__}) and other ({other.item_type.__name__})")
-        other_values = other.values
-    elif isinstance(other, valid_built_in_types):
-        other_values = _validate_values(other, self.item_type)
-    else:
-        raise TypeError(f"{other} must be a valid type.")
-    return other_values
-
-
-def functional_methods(cls):
-
-    def map(self, f: Callable[[T], U]):
-        mapped = [f(v) for v in self.values]
-        item_type = type(mapped[0]) if mapped else object
-        return self.__class__(item_type, mapped)
-
-    def flatmap(self, f: Callable[[T], Iterable[U]]):
-        flattened = []
-        for v in self.values:
-            result = f(v)
-            if not isinstance(result, Iterable) or isinstance(result, (str, bytes)):
-                raise TypeError("flatmap function must return a non-string iterable")
-            flattened.extend(result)
-        return self.__class__(type(flattened[0]) if flattened else object, flattened)
-
-    def filter(self, pred: Callable[[T], bool]):
-        return self.__class__(self.item_type, [v for v in self.values if pred(v)])
-
-    def all_match(self, pred: Callable[[T], bool]) -> bool:
-        return all(pred(v) for v in self.values)
-
-    def any_match(self, pred: Callable[[T], bool]) -> bool:
-        return any(pred(v) for v in self.values)
-
-    def none_match(self, pred: Callable[[T], bool]) -> bool:
-        return not any(pred(v) for v in self.values)
-
-    for name, func in locals().items():
-        if callable(func):
-            setattr(cls, name, func)
-
-    return cls
-
-
-def shared_container_methods(cls):
-
-    def __len__(self):
-        return len(self.values)
-
-    def __iter__(self):
-        return iter(self.values)
-
-    def __contains__(self, item):
-        return item in self.values
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, cls)
-            and self.item_type == other.item_type
-            and self.values == other.values
-        )
-
-    def __repr__(self):
-        return f"{cls.__name__}<{self.item_type.__name__}>{self.values}"
-
-    def __bool__(self):
-        return bool(self.values)
-
-    def copy(self):
-        return cls(self.item_type, self.values.copy() if hasattr(self.values, 'copy') else self.values)
-
-    def to_list(self):
-        return list(self.values)
-
-    def to_tuple(self):
-        return tuple(self.values)
-
-    def to_set(self):
-        return set(self.values)
-
-    def to_frozen_set(self):
-        return frozenset(self.values)
-
-    def count(self, value):
-        try:
-            return self.values.count(value)
-        except AttributeError:
-            return sum(1 for v in self.values if v == value)
-
-    for name, func in locals().items():
-        if callable(func):
-            setattr(cls, name, func)
-
-    return cls
-
-
-def shared_sequence_methods(cls):
-
-    def __getitem__(self, index: int | slice):
-        if isinstance(index, slice):
-            return cls(self.item_type, self.values[index])
-        elif isinstance(index, int):
-            return self.values[index]
-        else:
-            raise TypeError("Invalid index type: must be int or slice")
-
-    def __lt__(self, other):
-        if isinstance(other, (cls, list, tuple)):
-            return tuple(self.values) < tuple(other.values if isinstance(other, cls) else other)
-        return NotImplemented
-
-    def __gt__(self, other):
-        if isinstance(other, (cls, list, tuple)):
-            return tuple(self.values) > tuple(other.values if isinstance(other, cls) else other)
-        return NotImplemented
-
-    def __le__(self, other):
-        if isinstance(other, (cls, list, tuple)):
-            return tuple(self.values) <= tuple(other.values if isinstance(other, cls) else other)
-        return NotImplemented
-
-    def __ge__(self, other):
-        if isinstance(other, (cls, list, tuple)):
-            return tuple(self.values) >= tuple(other.values if isinstance(other, cls) else other)
-        return NotImplemented
-
-    def __add__(self, other):
-        return cls(self.item_type, self.values + _validate_types(self, other, (TypedList, TypedTuple), (list, tuple)))
-
-    def __mul__(self, n):
-        if not isinstance(n, int):
-            return NotImplemented
-        return cls(self.item_type, self.values * n)
-
-    def __sub__(self, other):
-        other_values = _validate_types(self, other, (TypedList, TypedTuple), (list, tuple))
-        filtered_values = [value for value in self.values if value not in other_values]
-        return cls(self.item_type, filtered_values)
-
-    def __reversed__(self):
-        return reversed(self.values)
-
-    def index(self, value):
-        return self.values.index(value)
-
-    def sorted(self, key=None, reverse=False):
-        return cls(self.item_type, sorted(self.values, key=key, reverse=reverse))
-
-    for name, func in locals().items():
-        if callable(func) and (not name.startswith("_") or (name.startswith("__") and name.endswith("__"))):
-            setattr(cls, name, func)
-
-    return cls
-
-
-def shared_set_methods(cls):
-
-    set_operations_names = {
-        "union": set.union,
-        "intersection": set.intersection,
-        "difference": set.difference,
-        "symmetric_difference": set.symmetric_difference,
-        "is_subset": set.issubset,
-        "is_superset": set.issuperset,
-        "is_disjoint": set.isdisjoint,
-    }
-
-    for name, operation in set_operations_names.items():
-        if name.startswith("is_"):
-            # Boolean-returning methods
-            def method(self, other, _op=operation):
-                other_values = _validate_types(other, self, (TypedSet, TypedFrozenSet), (set, frozenset))
-                return _op(self.values, other_values)
-        else:
-            # Set-returning methods
-            def method(self, other, _op=operation):
-                other_values = _validate_types(other, self, (TypedSet, TypedFrozenSet), (set, frozenset))
-                return cls(self.item_type, _op(self.values, other_values))
-        setattr(cls, name, method)
-
-    return cls
-
-
-def shared_dict_methods(cls):
-
-    def __getitem__(self, key):
-        return self.data[key]
-
-    def __iter__(self):
-        return iter(self.data)
-
-    def keys(self):
-        return self.data.keys()
-
-    def values(self):
-        return self.data.values()
-
-    def items(self):
-        return self.data.data()
-
-    def __len__(self):
-        return len(self.data)
-
-    def __contains__(self, key):
-        return key in self.data
-
-    def __eq__(self, other):
-        if type(self) != type(other):
-            return NotImplemented
-        return (
-            self.key_type == other.key_type
-            and self.value_type == other.value_type
-            and self.data == other.data
-        )
-
-    def copy(self):
-        return cls(self.key_type, self.value_type, self.data.copy())
-
-    def get(self, key, fallback=None):
-        return self.data.get(key, fallback)
-
-    def map_values(self, f):
-        new_data = {k : f(v) for k, v in self.data.data()}
-        new_value_type = type(next(iter(new_data.values()), object))
-        return cls(self.key_type, new_value_type, new_data)
-
-    def filter_items(self, predicate):
-        filtered = {k : v for k, v in self.data.data() if predicate(k, v)}
-        return cls(self.key_type, self.value_type, filtered)
-
-    def subdict(self, start, end):
-        try:
-            if start > end:
-                raise TypeError("Start must be lower than end.")
-        except TypeError:
-            raise TypeError("Keys must support ordering for subdict slicing.")
-
-        sliced = {k : v for k, v in self.data.data() if start <= k <= end}
-        return cls(self.key_type, self.value_type, sliced)
-
-    for name, func in locals().items():
-        if callable(func):
-            setattr(cls, name, func)
-
-    return cls
-
-
-@shared_container_methods
-@shared_sequence_methods
-@functional_methods
-@dataclass(slots=True)
-class TypedList(Generic[T]):
     item_type: type[T]
     values: list[T] = field(default_factory=list)
 
@@ -351,26 +46,22 @@ class TypedList(Generic[T]):
         self.values.sort(key=key, reverse=reverse)
 
 
-@shared_container_methods
-@shared_sequence_methods
-@functional_methods
-@dataclass(frozen=True, slots=True)
-class TypedTuple(Generic[T]):
+@dataclass(frozen=True, slots=True, repr=False)
+class TypedTuple(FunctionalMixin, ContainerMixin, SequenceMixin, Generic[T]):
+
     item_type: type[T]
     values: tuple[T, ...] = field(default_factory=tuple)
 
     def __init__(self, item_type: type[T], values: Iterable[T] = ()):
         if isinstance(values, (set, frozenset)):
             raise TypeError("StaticTuple does not accept set or frozenset because their order is not guaranteed")
-        actual_values = tuple(values)
-        _validate_values(actual_values, item_type)
         object.__setattr__(self, 'item_type', item_type)
-        object.__setattr__(self, 'values', actual_values)
+        object.__setattr__(self, 'values', _validate_values(values, item_type))
 
 
-@shared_dict_methods
 @dataclass(slots=True)
-class TypedDict(Generic[K, V]):
+class TypedDict(DictMixin, Generic[K, V]):
+
     key_type: type[K]
     value_type: type[V]
     data: dict[K, V]
@@ -427,18 +118,18 @@ class TypedDict(Generic[K, V]):
                 raise TypeError(f"Cannot update with StaticDict of values {other.value_type.__name__}")
             other_items = other.data.items()
 
-        elif isinstance(other, dict):
-            _validate_values(other.keys(), self.key_type)
-            _validate_values(other.values(), self.value_type)
-            other_items = other.items()
+        elif isinstance(other, (dict, frozendict)):
+            validated_keys = _validate_values(other.keys(), self.key_type)
+            validated_values = _validate_values(other.values(), self.value_type)
+            other_items = dict(zip(validated_keys, validated_values)).items()
 
         else:
             raise TypeError("'other' argument must be dict or StaticDict")
 
-        for k, v in other_items:
-            self[k] = v
+        for key, value in other_items:
+            self[key] = value
 
-    def map_values(self: TypedDict[K, V], f: Callable[[V], U]) -> 'TypedDict[K, U]':
+    def map_values(self: TypedDict[K, V], f: Callable[[V], U]) -> TypedDict[K, U]:
         new_items = {k: f(v) for k, v in self.data.items()}
         return TypedDict(self.key_type, type(next(iter(new_items.values()), object)), new_items)
 
@@ -465,9 +156,8 @@ class TypedDict(Generic[K, V]):
         return TypedDict(self.key_type, self.value_type, new_items)
 
 
-@shared_dict_methods
 @dataclass(frozen=True, slots=True)
-class TypedFrozenDict(Generic[K, V]):
+class TypedFrozenDict(DictMixin, Generic[K, V]):
     key_type: type[K]
     value_type: type[V]
     data: dict[K, V]
@@ -506,11 +196,8 @@ class TypedFrozenDict(Generic[K, V]):
             actual_dict[key] = value
 
 
-@shared_container_methods
-@shared_set_methods
-@functional_methods
-@dataclass(slots=True)
-class TypedSet(Generic[T]):
+@dataclass(slots=True, repr=False)
+class TypedSet(FunctionalMixin, ContainerMixin, SetMixin, Generic[T]):
     item_type: type[T]
     values: set[T]
 
@@ -528,11 +215,8 @@ class TypedSet(Generic[T]):
         self.values.discard(value)
 
 
-@shared_container_methods
-@shared_set_methods
-@functional_methods
-@dataclass(frozen=True, slots=True)
-class TypedFrozenSet(Generic[T]):
+@dataclass(frozen=True, slots=True, repr=False)
+class TypedFrozenSet(FunctionalMixin, ContainerMixin, SetMixin, Generic[T]):
     item_type: type[T]
     values: set[T]
 
