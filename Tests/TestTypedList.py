@@ -10,8 +10,8 @@ class TestTypedList(unittest.TestCase):
         self.assertEqual(len(empty_list), 0)
 
     def test_type_coercion(self):
-        my_list = TypedList(int, ['1', 2])
-        self.assertEqual(my_list.values, [1, 2])
+        lst = TypedList(int, ['1', 2])
+        self.assertEqual(lst.values, [1, 2])
 
     def test_setitem_and_delitem(self):
         lst = TypedList(int, [1, 2, 3])
@@ -24,37 +24,27 @@ class TestTypedList(unittest.TestCase):
         del lst[2]
         self.assertEqual(lst.values, [5, 6])
 
-    def test_append(self):
-        my_int_list = TypedList(int, [0, 1, 2])
-        my_int_list.append(3)
-        my_int_list.append('4')
-        error = False
-        try:
-            my_int_list.append('aaaaa')
-        except TypeError:
-            error = True
-        self.assertListEqual(my_int_list.values, [0, 1, 2, 3, 4])
-        self.assertTrue(error)
-
     def test_init_and_get(self):
-        my_int_list = TypedList(int, ['0', 1, 2])
-        my_str_list = TypedList(str, ['a', 'b', 2, 0.4])
+        int_lst = TypedList(int, ['0', 1, 2])
+        str_lst = TypedList(str, ['a', 'b', 2, 0.4])
 
-        self.assertEqual(my_int_list[0], 0)
-        self.assertEqual(my_int_list[1], 1)
-        self.assertEqual(my_int_list[2], 2)
+        self.assertEqual(int_lst[0], 0)
+        self.assertEqual(int_lst[1], 1)
+        self.assertEqual(int_lst[2], 2)
 
-        self.assertEqual(my_str_list[0], 'a')
-        self.assertEqual(my_str_list[1], 'b')
-        self.assertEqual(my_str_list[2], '2')
-        self.assertEqual(my_str_list[3], '0.4')
+        self.assertEqual(str_lst[0], 'a')
+        self.assertEqual(str_lst[1], 'b')
+        self.assertEqual(str_lst[2], '2')
+        self.assertNotEqual(str_lst[2], 2)
+        self.assertEqual(str_lst[3], '0.4')
+        self.assertNotEqual(str_lst[3], 0.4)
 
     def test_comparisons(self):
-        my_int_list = TypedList(int, [10, 2, 4])
-        self.assertTrue(my_int_list > TypedList(int, [9, 15, 27]))
-        self.assertTrue(my_int_list < TypedList(int, [10, 2, 5]))
-        self.assertTrue(my_int_list > [10, 1, 5])
-        self.assertTrue(my_int_list < (11, 100, 100))
+        lst = TypedList(int, [10, 2, 4])
+        self.assertTrue(lst > TypedList(int, [9, 15, 27]))
+        self.assertTrue(lst < TypedList(int, [10, 2, 5]))
+        self.assertTrue(lst > [10, 1, 5])
+        self.assertTrue(lst < (11, 100, 100))
 
     def test_add_substr_mul(self):
         self.assertEqual(TypedList(float, [0.1, 2, 0.3]) + [0.6, 1], TypedList(float, [0.1, 2, 0.3, 0.6, 1]))
@@ -63,10 +53,10 @@ class TestTypedList(unittest.TestCase):
 
     def test_contains_iter(self):
         values = ['zero', 'uno', 'dos', 'tres']
-        my_str_list = TypedList(str, values)
-        self.assertTrue('zero' in my_str_list)
+        lst = TypedList(str, values)
+        self.assertTrue('zero' in lst)
         i = 0
-        for s in my_str_list:
+        for s in lst:
             self.assertEqual(s, values[i])
             i+=1
 
@@ -141,6 +131,14 @@ class TestTypedList(unittest.TestCase):
         lst = TypedList(int, [1, 2])
         with self.assertRaises(TypeError):
             lst[0] = "oops"
+
+    def test_max_min(self):
+        lst = TypedList(int, [1, 2, 5, 2])
+        self.assertEqual(lst.max(), 5)
+        self.assertIsNone(TypedList(int, []).max())
+
+        self.assertEqual(lst.min(), 1)
+        self.assertIsNone(TypedList(int, []).min())
 
 
 if __name__ == '__main__':

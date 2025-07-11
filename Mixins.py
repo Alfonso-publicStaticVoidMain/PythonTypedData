@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Iterable, Any, Callable, TypeVar
+from typing import Iterable, Any, Callable, TypeVar, Protocol, runtime_checkable
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -9,6 +9,10 @@ V = TypeVar("V")
 U = TypeVar("U")
 A = TypeVar("A")
 R = TypeVar("R")
+
+
+def get_class_name(self: object) -> str:
+    return self.__class__.__name__
 
 
 def _validate_value(value: object, item_type: type) -> object:
@@ -82,7 +86,24 @@ def _validate_types(self, other, valid_typed_types: tuple[type, ...], valid_buil
     return other_values
 
 
-class FunctionalMethods:
+@runtime_checkable
+class TypedCollection(Protocol[T]):
+    item_type: type[T]
+    values: Any
+
+    def __init__(self, item_type, values): ...
+
+
+@runtime_checkable
+class TypedDictionary(Protocol[K, V]):
+    key_type: type[K]
+    value_type: type[V]
+    data: dict
+
+    def __init__(self, key_type, value_type, keys_values = None): ...
+
+
+class FunctionalMethods(TypedCollection[T]):
     """
     Mixin class that defines common functional methods for classes to inherit. The class should have a values attribute,
     usually a list, tuple or set, and an item_type describing the type of the values. Currently, the functional methods
@@ -99,15 +120,13 @@ class FunctionalMethods:
         <li>distinct</li>
     </ul>
     """
-    values: Any
-    item_type: type
 
-    def map(self, f: Callable[[T], U]):
+    def map(self: TypedCollection[T], f: Callable[[T], U]) -> TypedCollection[U]:
         mapped = [f(value) for value in self.values]
         item_type = type(mapped[0]) if mapped else object
         return self.__class__(item_type, mapped)
 
-    def flatmap(self, f: Callable[[T], Iterable[U]]):
+    def flatmap(self: TypedCollection[T], f: Callable[[T], Iterable[U]]) -> TypedCollection[U]:
         flattened = []
         for value in self.values:
             result = f(value)
@@ -116,34 +135,53 @@ class FunctionalMethods:
             flattened.extend(result)
         return self.__class__(type(flattened[0]) if flattened else object, flattened)
 
-    def filter(self, predicate: Callable[[T], bool]):
+    def filter(self: TypedCollection[T], predicate: Callable[[T], bool]) -> TypedCollection[T]:
         return self.__class__(self.item_type, [value for value in self.values if predicate(value)])
 
-    def all_match(self, predicate: Callable[[T], bool]) -> bool:
+    def all_match(self: TypedCollection[T], predicate: Callable[[T], bool]) -> bool:
         return all(predicate(value) for value in self.values)
 
-    def any_match(self, predicate: Callable[[T], bool]) -> bool:
+    def any_match(self: TypedCollection[T], predicate: Callable[[T], bool]) -> bool:
         return any(predicate(value) for value in self.values)
 
-    def none_match(self, predicate: Callable[[T], bool]) -> bool:
+    def none_match(self: TypedCollection[T], predicate: Callable[[T], bool]) -> bool:
         return not any(predicate(value) for value in self.values)
 
-    def reduce(self, f: Callable[[T, T], T], initializer: T | None = None) -> T:
+    def reduce(self: TypedCollection[T], f: Callable[[T, T], T], initializer: T | None = None) -> T:
         if initializer is not None:
             return reduce(f, self.values, initializer)
         return reduce(f, self.values)
 
-    def for_each(self, consumer: Callable[[T], None]) -> None:
+    def for_each(self: TypedCollection[T], consumer: Callable[[T], None]) -> None:
         for value in self.values:
             consumer(value)
 
-    def distinct(self):
+    def distinct(self: TypedCollection[T], key: Callable[[T], K] | None = None) -> TypedCollection[T]:
         seen = set()
-        unique = [v for v in self.values if not (v in seen or seen.add(v))]
-        return self.__class__(self.item_type, unique)
+        result = []
+        for value in self.values:
+            key_of_value = value if key is None else key(value)
+            if key_of_value not in seen:
+                seen.add(key_of_value)
+                result.append(value)
+        return self.__class__(self.item_type, result)
+
+    def max(self: TypedCollection[T], *, default=None, key=None) -> T | None:
+        if default is not None:
+            return max(self.values, default=default, key=key)
+        if not self.values:
+            return None
+        return max(self.values, key=key)
+
+    def min(self: TypedCollection[T], *, default=None, key=None) -> T | None:
+        if default is not None:
+            return min(self.values, default=default, key=key)
+        if not self.values:
+            return None
+        return min(self.values, key=key)
 
     def collect(
-        self,
+        self: TypedCollection[T],
         supplier: Callable[[], A],
         accumulator: Callable[[A, T], None],
         finisher: Callable[[A], R] = lambda x: x
@@ -161,61 +199,55 @@ class FunctionalMethods:
         return finisher(acc)
 
 
-class Collection:
+class Collection(TypedCollection[T]):
 
-    values: Any
-    item_type: type
-
-    def __len__(self):
+    def __len__(self: TypedCollection[T]) -> int:
         return len(self.values)
 
-    def __iter__(self):
+    def __iter__(self: TypedCollection[T]) -> Iterable[T]:
         return iter(self.values)
 
-    def __contains__(self, item):
+    def __contains__(self: TypedCollection[T], item) -> bool:
         return item in self.values
 
-    def __eq__(self, other):
+    def __eq__(self: TypedCollection[T], other) -> bool:
         return (
             isinstance(other, self.__class__)
             and self.item_type == other.item_type
             and self.values == other.values
         )
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}<{self.item_type.__name__}>{self.values}"
+    def __repr__(self: TypedCollection[T]) -> str:
+        return f"{get_class_name(self)}<{self.item_type.__name__}>{self.values}"
 
-    def __bool__(self):
+    def __bool__(self: TypedCollection[T]) -> bool:
         return bool(self.values)
 
-    def copy(self):
+    def copy(self: TypedCollection[T]) -> TypedCollection[T]:
         return self.__class__(self.item_type, self.values.copy() if hasattr(self.values, 'copy') else self.values)
 
-    def to_list(self):
+    def to_list(self: TypedCollection[T]) -> list[T]:
         return list(self.values)
 
-    def to_tuple(self):
+    def to_tuple(self: TypedCollection[T]) -> tuple[T]:
         return tuple(self.values)
 
-    def to_set(self):
+    def to_set(self: TypedCollection[T]) -> set[T]:
         return set(self.values)
 
-    def to_frozen_set(self):
+    def to_frozen_set(self: TypedCollection[T]) -> frozenset[T]:
         return frozenset(self.values)
 
-    def count(self, value):
+    def count(self: TypedCollection[T], value) -> int:
         try:
             return self.values.count(value)
         except AttributeError:
             return sum(1 for v in self.values if v == value)
 
 
-class Sequence:
+class Sequence(Collection[T]):
 
-    values: Any
-    item_type: type
-
-    def __getitem__(self, index: int | slice):
+    def __getitem__(self: Sequence[T], index: int | slice) -> T | Sequence[T]:
         if isinstance(index, slice):
             return self.__class__(self.item_type, self.values[index])
         elif isinstance(index, int):
@@ -223,114 +255,113 @@ class Sequence:
         else:
             raise TypeError("Invalid index type: must be int or slice")
 
-    def __lt__(self, other):
+    def __lt__(self: Sequence[T], other) -> bool:
         if isinstance(other, (Sequence, list, tuple)):
-            return tuple(self.values) < tuple(other.values if isinstance(other, Sequence) else other)
+            return tuple(self.values) < tuple(other.values if isinstance(other, TypedCollection) else other)
         return NotImplemented
 
-    def __gt__(self, other):
+    def __gt__(self: Sequence[T], other) -> bool:
         if isinstance(other, (Sequence, list, tuple)):
-            return tuple(self.values) > tuple(other.values if isinstance(other, Sequence) else other)
+            return tuple(self.values) > tuple(other.values if isinstance(other, TypedCollection) else other)
         return NotImplemented
 
-    def __le__(self, other):
+    def __le__(self: Sequence[T], other) -> bool:
         if isinstance(other, (Sequence, list, tuple)):
-            return tuple(self.values) <= tuple(other.values if isinstance(other, Sequence) else other)
+            return tuple(self.values) <= tuple(other.values if isinstance(other, TypedCollection) else other)
         return NotImplemented
 
-    def __ge__(self, other):
+    def __ge__(self: Sequence[T], other) -> bool:
         if isinstance(other, (Sequence, list, tuple)):
             return tuple(self.values) >= tuple(other.values if isinstance(other, Sequence) else other)
         return NotImplemented
 
-    def __add__(self, other):
+    def __add__(self: Sequence[T], other) -> Sequence[T]:
         return self.__class__(
             self.item_type,
             self.values + _validate_types(self, other, (Sequence), (list, tuple))
         )
 
-    def __mul__(self, n):
+    def __mul__(self: Sequence[T], n) -> Sequence[T]:
         if not isinstance(n, int):
             return NotImplemented
         return self.__class__(self.item_type, self.values * n)
 
-    def __sub__(self, other):
+    def __sub__(self: Sequence[T], other) -> Sequence[T]:
         other_values = _validate_types(self, other, (Sequence), (list, tuple))
         filtered_values = [value for value in self.values if value not in other_values]
         return self.__class__(self.item_type, filtered_values)
 
-    def __reversed__(self):
+    def __reversed__(self: Sequence[T]):
         return reversed(self.values)
 
-    def index(self, value):
+    def index(self: Sequence[T], value) -> int:
         return self.values.index(value)
 
-    def sorted(self, key=None, reverse=False):
+    def sorted(self: Sequence[T], key=None, reverse=False) -> Sequence[T]:
         return self.__class__(self.item_type, sorted(self.values, key=key, reverse=reverse))
 
 
-class Set:
+class Set(Collection[T]):
 
-    values: Any
-    item_type: type
-
-    def union(self, other):
-        other_values = _validate_types(other, self, (Set), (set, frozenset))
+    def union(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> Set[T]:
+        other_values = _validate_types(self, other, (Set), (set, frozenset))
         return self.__class__(self.item_type, set.union(self.values, other_values))
 
-    def intersection(self, other):
-        other_values = _validate_types(other, self, (Set), (set, frozenset))
+    def intersection(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> Set[T]:
+        other_values = _validate_types(self, other, (Set), (set, frozenset))
         return self.__class__(self.item_type, set.intersection(self.values, other_values))
 
-    def difference(self, other):
-        other_values = _validate_types(other, self, (Set), (set, frozenset))
+    def difference(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> Set[T]:
+        other_values = _validate_types(self, other, (Set), (set, frozenset))
         return self.__class__(self.item_type, set.difference(self.values, other_values))
 
-    def symmetric_difference(self, other):
-        other_values = _validate_types(other, self, (Set), (set, frozenset))
+    def symmetric_difference(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> Set[T]:
+        other_values = _validate_types(self, other, (Set), (set, frozenset))
         return self.__class__(self.item_type, set.symmetric_difference(self.values, other_values))
 
-    def is_subset(self, other):
-        other_values = _validate_types(other, self, (Set), (set, frozenset))
+    def is_subset(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> bool:
+        if isinstance(other, Set) and other.item_type != self.item_type:
+            return False
+        other_values = _validate_types(self, other, (Set), (set, frozenset))
         return set.issubset(self.values, other_values)
 
-    def is_superset(self, other):
-        other_values = _validate_types(other, self, (Set), (set, frozenset))
+    def is_superset(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> bool:
+        if isinstance(other, Set) and other.item_type != self.item_type:
+            return False
+        other_values = _validate_types(self, other, (Set), (set, frozenset))
         return set.issuperset(self.values, other_values)
 
-    def is_disjoint(self, other):
-        other_values = _validate_types(other, self, (Set), (set, frozenset))
+    def is_disjoint(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> bool:
+        if isinstance(other, Set) and other.item_type != self.item_type:
+            return False
+        other_values = _validate_types(self, other, (Set), (set, frozenset))
         return set.isdisjoint(self.values, other_values)
 
 
-class Dictionary:
+class Dictionary(TypedDictionary[K, V]):
 
-    data: Any
-    key_type: type
-    value_type: type
-
-    def __getitem__(self, key):
+    def __getitem__(self: Dictionary[K, V], key: K) -> V:
         return self.data[key]
 
-    def __iter__(self):
+    def __iter__(self: Dictionary[K, V]) -> Iterable[K]:
         return iter(self.data)
 
-    def keys(self):
+    def keys(self: Dictionary[K, V]):
         return self.data.keys()
 
-    def values(self):
+    def values(self: Dictionary[K, V]):
         return self.data.values()
 
-    def items(self):
+    def items(self: Dictionary[K, V]):
         return self.data.items()
 
-    def __len__(self):
+    def __len__(self: Dictionary[K, V]):
         return len(self.data)
 
-    def __contains__(self, key):
+    def __contains__(self: Dictionary[K, V], key: K) -> bool:
         return key in self.data
 
-    def __eq__(self, other):
+    def __eq__(self: Dictionary[K, V], other) -> bool:
         if type(self) != type(other):
             return NotImplemented
         return (
@@ -339,25 +370,25 @@ class Dictionary:
             and self.data == other.data
         )
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}<{self.key_type.__name__}, {self.value_type.__name__}>{self.values}"
+    def __repr__(self: Dictionary[K, V]) -> str:
+        return f"{get_class_name(self)}<{self.key_type.__name__}, {self.value_type.__name__}>{self.values}"
 
-    def copy(self):
+    def copy(self: Dictionary[K, V]) -> Dictionary[K, V]:
         return self.__class__(self.key_type, self.value_type, self.data.copy())
 
-    def get(self, key, fallback=None):
+    def get(self: Dictionary[K, V], key: K, fallback: V | None = None) -> V | None:
         return self.data.get(key, fallback)
 
-    def map_values(self, f):
+    def map_values(self: Dictionary[K, V], f: Callable[[V], R]) -> Dictionary[K, R]:
         new_data = {key : f(value) for key, value in self.data.items()}
         new_value_type = type(next(iter(new_data.values()), object))
         return self.__class__(self.key_type, new_value_type, new_data)
 
-    def filter_items(self, predicate):
+    def filter_items(self: Dictionary[K, V], predicate: Callable[[K, V], bool]) -> Dictionary[K, V]:
         filtered = {key : value for key, value in self.data.items() if predicate(key, value)}
         return self.__class__(self.key_type, self.value_type, filtered)
 
-    def subdict(self, start, end):
+    def subdict(self: Dictionary[K, V], start: K, end: K) -> Dictionary[K, V]:
         try:
             if start > end:
                 raise TypeError("Start must be lower than end.")

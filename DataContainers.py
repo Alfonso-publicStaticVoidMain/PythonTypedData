@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TypeVar, Generic, Callable, Any, Iterable
 
 import frozendict
 
-from Mixins import _validate_value, _validate_values, _validate_types, FunctionalMethods, Collection, Sequence, \
-    Set, Dictionary
+from Mixins import _validate_value, _validate_values, _validate_types, FunctionalMethods, Sequence, \
+    Set, Dictionary, get_class_name
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -15,16 +15,17 @@ U = TypeVar("U")
 
 
 @dataclass(slots=True, repr=False)
-class TypedList(FunctionalMethods, Collection, Sequence, Generic[T]):
+class TypedList(FunctionalMethods[T], Sequence[T]):
 
     item_type: type[T]
     values: list[T]
 
-    def __init__(self, item_type: type[T], values: Iterable[T] | None = None):
+    # noinspection PyMissingConstructor
+    def __init__(self, item_type: type[T], values: Iterable[T] = []):
         if isinstance(values, (set, frozenset, TypedSet, TypedFrozenSet)):
             raise TypeError("TypedList does not accept a set or frozenset because their order is not guaranteed")
         self.item_type = item_type
-        self.values = _validate_values(values, item_type) if values is not None else ()
+        self.values = _validate_values(values, item_type) if values is not None else []
 
     def append(self: TypedList[T], value: T) -> None:
         self.values.append(_validate_value(value, self.item_type))
@@ -47,30 +48,32 @@ class TypedList(FunctionalMethods, Collection, Sequence, Generic[T]):
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class TypedTuple(FunctionalMethods, Collection, Sequence, Generic[T]):
+class TypedTuple(FunctionalMethods[T], Sequence[T]):
 
     item_type: type[T]
     values: tuple[T, ...]
 
+    # noinspection PyMissingConstructor
     def __init__(self, item_type: type[T], values: Iterable[T] = ()):
         if isinstance(values, (set, frozenset)):
             raise TypeError("TypedTuple does not accept set or frozenset because their order is not guaranteed.")
         object.__setattr__(self, 'item_type', item_type)
-        object.__setattr__(self, 'values', _validate_values(values, item_type))
+        object.__setattr__(self, 'values', tuple(_validate_values(values, item_type)))
 
 
 @dataclass(slots=True, repr=False)
-class TypedDict(Dictionary, Generic[K, V]):
+class TypedDict(Dictionary[K, V]):
 
     key_type: type[K]
     value_type: type[V]
     data: dict[K, V]
 
+    # noinspection PyMissingConstructor
     def __init__(
         self: TypedDict[K, V],
         key_type: type[K],
         value_type: type[V],
-        keys_values: dict | frozendict | Iterable[tuple[K, V]] | None = None
+        keys_values: dict[K, V] | frozendict[K, V] | Iterable[tuple[K, V]] | None = None
     ) -> None:
         self.key_type = key_type
         self.value_type = value_type
@@ -129,39 +132,15 @@ class TypedDict(Dictionary, Generic[K, V]):
         for key, value in other_items:
             self[key] = value
 
-    def map_values(self: TypedDict[K, V], f: Callable[[V], U]) -> TypedDict[K, U]:
-        new_items = {k: f(v) for k, v in self.data.items()}
-        return TypedDict(self.key_type, type(next(iter(new_items.values()), object)), new_items)
-
-    def filter_items(self: TypedDict[K, V], predicate: Callable[[K, V], bool]) -> 'TypedDict[K, V]':
-        filtered = {k: v for k, v in self.data.items() if predicate(k, v)}
-        return TypedDict(self.key_type, self.value_type, filtered)
-
-    def subdict(self: TypedDict[K, V], start: K, end: K) -> TypedDict[K, V]:
-        """
-        Return a new StaticDict containing items with keys k where start <= k <= end,
-        assuming keys are ordered.
-        """
-
-        validate: bool = True
-        try:
-            validate = start <= end
-        except TypeError:
-            raise TypeError("Keys must support ordering for subdict slicing.")
-
-        if not validate:
-            raise TypeError("Start must be lower than end.")
-
-        new_items = {k: v for k, v in self.data.items() if start <= k <= end}
-        return TypedDict(self.key_type, self.value_type, new_items)
-
 
 @dataclass(frozen=True, slots=True)
-class TypedFrozenDict(Dictionary, Generic[K, V]):
+class TypedFrozenDict(Dictionary[K, V]):
+
     key_type: type[K]
     value_type: type[V]
     data: dict[K, V]
 
+    # noinspection PyMissingConstructor
     def __init__(
             self: TypedDict[K, V],
             key_type: type[K],
@@ -197,10 +176,12 @@ class TypedFrozenDict(Dictionary, Generic[K, V]):
 
 
 @dataclass(slots=True, repr=False)
-class TypedSet(FunctionalMethods, Collection, Set, Generic[T]):
+class TypedSet(FunctionalMethods[T], Set[T]):
+
     item_type: type[T]
     values: set[T]
 
+    # noinspection PyMissingConstructor
     def __init__(self: TypedSet[T], item_type: type[T], values: Iterable[T] | None = None) -> None:
         self.item_type = item_type
         self.values = set(_validate_values(values if values is not None else [], item_type))
@@ -216,10 +197,12 @@ class TypedSet(FunctionalMethods, Collection, Set, Generic[T]):
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class TypedFrozenSet(FunctionalMethods, Collection, Set, Generic[T]):
+class TypedFrozenSet(FunctionalMethods[T], Set[T]):
+
     item_type: type[T]
     values: set[T]
 
+    # noinspection PyMissingConstructor
     def __init__(self, item_type: type[T], values: Iterable[T] | None = None):
         object.__setattr__(self, 'item_type', item_type)
         object.__setattr__(self, 'values', set(_validate_values(values if values is not None else [], item_type)))
@@ -227,6 +210,7 @@ class TypedFrozenSet(FunctionalMethods, Collection, Set, Generic[T]):
 
 @dataclass(frozen=True, slots=True)
 class TypedOptional(Generic[T]):
+
     item_type: type[T]
     value: T | None
 
@@ -316,4 +300,5 @@ class TypedOptional(Generic[T]):
         return bool(self.value) if self.is_present() else False
 
     def __repr__(self: TypedOptional[T]) -> str:
-        return f"StaticOptional.of({self.value!r})" if self.is_present() else f"StaticOptional.empty({self.item_type.__name__})"
+        class_name: str = get_class_name(self)
+        return f"{class_name}.of({self.value!r})" if self.is_present() else f"{class_name}.empty({self.item_type.__name__})"
