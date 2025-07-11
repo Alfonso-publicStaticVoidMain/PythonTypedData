@@ -5,8 +5,7 @@ from typing import TypeVar, Generic, Callable, Any, Iterable
 
 import frozendict
 
-from Mixins import _validate_value, _validate_values, _validate_types, FunctionalMethods, Sequence, \
-    Set, Dictionary, get_class_name
+from Mixins import _validate_value, _validate_values, _validate_types, Sequence, Set, Dictionary, class_name
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -15,7 +14,7 @@ U = TypeVar("U")
 
 
 @dataclass(slots=True, repr=False)
-class TypedList(FunctionalMethods[T], Sequence[T]):
+class TypedList(Sequence[T]):
 
     item_type: type[T]
     values: list[T]
@@ -48,7 +47,7 @@ class TypedList(FunctionalMethods[T], Sequence[T]):
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class TypedTuple(FunctionalMethods[T], Sequence[T]):
+class TypedTuple(Sequence[T]):
 
     item_type: type[T]
     values: tuple[T, ...]
@@ -114,7 +113,7 @@ class TypedDict(Dictionary[K, V]):
         self.data.clear()
 
     def update(self: TypedDict[K, V], other: dict[K, V] | TypedDict[K, V]) -> None:
-        if isinstance(other, TypedDict):
+        if isinstance(other, (TypedDict, TypedFrozenDict)):
             if not issubclass(other.key_type, self.key_type):
                 raise TypeError(f"Cannot update with StaticDict of keys {other.key_type.__name__}")
             if not issubclass(other.value_type, self.value_type):
@@ -127,7 +126,7 @@ class TypedDict(Dictionary[K, V]):
             other_items = dict(zip(validated_keys, validated_values)).items()
 
         else:
-            raise TypeError("'other' argument must be dict or StaticDict")
+            raise TypeError("'other' argument must be a dict or TypedDict")
 
         for key, value in other_items:
             self[key] = value
@@ -142,10 +141,10 @@ class TypedFrozenDict(Dictionary[K, V]):
 
     # noinspection PyMissingConstructor
     def __init__(
-            self: TypedDict[K, V],
-            key_type: type[K],
-            value_type: type[V],
-            keys_values: dict | frozendict | Iterable[tuple[K, V]] | None = None
+        self: TypedDict[K, V],
+        key_type: type[K],
+        value_type: type[V],
+        keys_values: dict | frozendict | Iterable[tuple[K, V]] | None = None
     ) -> None:
         object.__setattr__(self, "key_type", key_type)
         object.__setattr__(self, "value_type", value_type)
@@ -176,7 +175,7 @@ class TypedFrozenDict(Dictionary[K, V]):
 
 
 @dataclass(slots=True, repr=False)
-class TypedSet(FunctionalMethods[T], Set[T]):
+class TypedSet(Set[T]):
 
     item_type: type[T]
     values: set[T]
@@ -197,7 +196,7 @@ class TypedSet(FunctionalMethods[T], Set[T]):
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class TypedFrozenSet(FunctionalMethods[T], Set[T]):
+class TypedFrozenSet(Set[T]):
 
     item_type: type[T]
     values: set[T]
@@ -300,5 +299,5 @@ class TypedOptional(Generic[T]):
         return bool(self.value) if self.is_present() else False
 
     def __repr__(self: TypedOptional[T]) -> str:
-        class_name: str = get_class_name(self)
-        return f"{class_name}.of({self.value!r})" if self.is_present() else f"{class_name}.empty({self.item_type.__name__})"
+        cls_name: str = class_name(self)
+        return f"{cls_name}.of({self.value!r})" if self.is_present() else f"{cls_name}.empty({self.item_type.__name__})"
