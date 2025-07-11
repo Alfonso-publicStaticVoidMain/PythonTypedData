@@ -6,7 +6,6 @@ from typing import Iterable, Any, Callable, TypeVar, Protocol, runtime_checkable
 T = TypeVar("T")
 K = TypeVar("K")
 V = TypeVar("V")
-U = TypeVar("U")
 A = TypeVar("A")
 R = TypeVar("R")
 
@@ -121,12 +120,12 @@ class FunctionalMethods(TypedCollection[T]):
     </ul>
     """
 
-    def map(self: TypedCollection[T], f: Callable[[T], U]) -> TypedCollection[U]:
+    def map(self: TypedCollection[T], f: Callable[[T], R]) -> TypedCollection[R]:
         mapped = [f(value) for value in self.values]
         item_type = type(mapped[0]) if mapped else object
         return self.__class__(item_type, mapped)
 
-    def flatmap(self: TypedCollection[T], f: Callable[[T], Iterable[U]]) -> TypedCollection[U]:
+    def flatmap(self: TypedCollection[T], f: Callable[[T], Iterable[R]]) -> TypedCollection[R]:
         flattened = []
         for value in self.values:
             result = f(value)
