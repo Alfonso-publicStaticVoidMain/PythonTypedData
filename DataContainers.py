@@ -5,7 +5,7 @@ from typing import TypeVar, Generic, Callable, Any, Iterable
 
 import frozendict
 
-from Mixins import _validate_value, _validate_values, _validate_types, Sequence, Set, Dictionary, class_name
+from Mixins import _validate_value, _validate_values, _validate_types, Sequence, Set, Dictionary, class_name, Collection
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -19,12 +19,10 @@ class TypedList(Sequence[T]):
     item_type: type[T]
     values: list[T]
 
-    # noinspection PyMissingConstructor
-    def __init__(self, item_type: type[T], values: Iterable[T] = []):
+    def __init__(self: TypedList[T], item_type: type[T], values: Iterable[T] | None = None):
         if isinstance(values, (set, frozenset, TypedSet, TypedFrozenSet)):
             raise TypeError("TypedList does not accept a set or frozenset because their order is not guaranteed")
-        self.item_type = item_type
-        self.values = _validate_values(values, item_type) if values is not None else []
+        Collection.__init__(self, item_type, values)
 
     def append(self: TypedList[T], value: T) -> None:
         self.values.append(_validate_value(value, self.item_type))
@@ -52,12 +50,10 @@ class TypedTuple(Sequence[T]):
     item_type: type[T]
     values: tuple[T, ...]
 
-    # noinspection PyMissingConstructor
-    def __init__(self, item_type: type[T], values: Iterable[T] = ()):
+    def __init__(self: TypedTuple[T], item_type: type[T], values: Iterable[T] | None = None):
         if isinstance(values, (set, frozenset)):
             raise TypeError("TypedTuple does not accept set or frozenset because their order is not guaranteed.")
-        object.__setattr__(self, 'item_type', item_type)
-        object.__setattr__(self, 'values', tuple(_validate_values(values, item_type)))
+        Collection.__init__(self, item_type, values, tuple)
 
 
 @dataclass(slots=True, repr=False)
@@ -67,37 +63,13 @@ class TypedDict(Dictionary[K, V]):
     value_type: type[V]
     data: dict[K, V]
 
-    # noinspection PyMissingConstructor
     def __init__(
         self: TypedDict[K, V],
         key_type: type[K],
         value_type: type[V],
         keys_values: dict[K, V] | frozendict[K, V] | Iterable[tuple[K, V]] | None = None
     ) -> None:
-        self.key_type = key_type
-        self.value_type = value_type
-        actual_dict = self.data = {}
-
-        if keys_values is None:
-            return
-
-        if isinstance(keys_values, Iterable):
-            keys = [key for (key, _) in keys_values]
-            values = [value for (_, value) in keys_values]
-        elif isinstance(keys_values, (dict, frozendict)):
-            keys = list(keys_values.keys())
-            values = list(keys_values.values())
-        else:
-            raise TypeError(f"The values aren't a dict or Iterable.")
-
-        if len(keys) != len(values):
-            raise ValueError(f"The number of keys and values aren't equal.")
-
-        actual_keys = _validate_values(keys, key_type)
-        actual_values = _validate_values(values, value_type)
-
-        for key, value in zip(actual_keys, actual_values):
-            actual_dict[key] = value
+        Dictionary.__init__(self, key_type, value_type, keys_values)
 
     def __setitem__(self: TypedDict[K, V], key: K, value: V) -> None:
         if not isinstance(key, self.key_type):
@@ -139,39 +111,13 @@ class TypedFrozenDict(Dictionary[K, V]):
     value_type: type[V]
     data: dict[K, V]
 
-    # noinspection PyMissingConstructor
     def __init__(
         self: TypedDict[K, V],
         key_type: type[K],
         value_type: type[V],
         keys_values: dict | frozendict | Iterable[tuple[K, V]] | None = None
     ) -> None:
-        object.__setattr__(self, "key_type", key_type)
-        object.__setattr__(self, "value_type", value_type)
-        object.__setattr__(self, "data", {})
-
-        actual_dict = self.data
-
-        if keys_values is None:
-            return
-
-        if isinstance(keys_values, Iterable):
-            keys = [key for (key, _) in keys_values]
-            values = [value for (_, value) in keys_values]
-        elif isinstance(keys_values, (dict, frozendict)):
-            keys = list(keys_values.keys())
-            values = list(keys_values.values())
-        else:
-            raise TypeError(f"The values aren't a dict or Iterable.")
-
-        if len(keys) != len(values):
-            raise ValueError(f"The number of keys and values aren't equal.")
-
-        actual_keys = _validate_values(keys, key_type)
-        actual_values = _validate_values(values, value_type)
-
-        for key, value in zip(actual_keys, actual_values):
-            actual_dict[key] = value
+        Dictionary.__init__(self, key_type, value_type, keys_values, lambda x : frozendict(x))
 
 
 @dataclass(slots=True, repr=False)
@@ -180,10 +126,8 @@ class TypedSet(Set[T]):
     item_type: type[T]
     values: set[T]
 
-    # noinspection PyMissingConstructor
     def __init__(self: TypedSet[T], item_type: type[T], values: Iterable[T] | None = None) -> None:
-        self.item_type = item_type
-        self.values = set(_validate_values(values if values is not None else [], item_type))
+        Collection.__init__(self, item_type, values, set)
 
     def add(self, value: T) -> None:
         self.values.add(_validate_value(value, self.item_type))
@@ -199,12 +143,10 @@ class TypedSet(Set[T]):
 class TypedFrozenSet(Set[T]):
 
     item_type: type[T]
-    values: set[T]
+    values: frozenset[T]
 
-    # noinspection PyMissingConstructor
     def __init__(self, item_type: type[T], values: Iterable[T] | None = None):
-        object.__setattr__(self, 'item_type', item_type)
-        object.__setattr__(self, 'values', set(_validate_values(values if values is not None else [], item_type)))
+        Collection.__init__(self, item_type, values, frozenset)
 
 
 @dataclass(frozen=True, slots=True)

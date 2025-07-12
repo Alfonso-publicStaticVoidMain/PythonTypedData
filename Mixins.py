@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Iterable, Any, Callable, TypeVar, Protocol, runtime_checkable
+from typing import Iterable, Any, Callable, TypeVar, Protocol, runtime_checkable, Generic
+
+from frozendict import frozendict
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -48,7 +50,7 @@ def _validate_value(value: object, item_type: type) -> object:
         raise TypeError(f"Element {value!r} is not of type {item_type.__name__} and cannot be converted safely.")
 
 
-def _validate_values(actual_values: Iterable, item_type: type) -> list:
+def _validate_values(actual_values: Iterable | None, item_type: type) -> list:
     """
     Checks if all elements of the given Iterable are of the given type or a subclass thereof. If not, raises a TypeError.
     :param actual_values: Iterable of values of possibly different types.
@@ -57,6 +59,8 @@ def _validate_values(actual_values: Iterable, item_type: type) -> list:
     and str to int or float if possible.
     :raise: TypeError if not all elements of the actual_values list are of type item_type.
     """
+    if actual_values is None:
+        return []
     validated_values = []
     for value in actual_values:
         validated_values.append(_validate_value(value, item_type))
@@ -85,13 +89,19 @@ def _validate_types(self, other, valid_typed_types: tuple[type, ...], valid_buil
     return other_values
 
 
-@runtime_checkable
-class Collection(Protocol[T]):
+class Collection(Generic[T]):
 
     item_type: type[T]
     values: Any
 
-    def __init__(self, item_type, values): ...
+    def __new__(cls, *args, **kwargs):
+        if cls is Collection:
+            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
+        return super().__new__(cls)
+
+    def __init__(self: Collection[T], item_type: type[T], values: Iterable[T] | None = None, finisher: Callable[[Iterable[T]], Any] = lambda x:x):
+        object.__setattr__(self, 'item_type', item_type)
+        object.__setattr__(self, 'values', finisher(_validate_values(values, item_type)))
 
     def __len__(self: Collection[T]) -> int:
         return len(self.values)
@@ -219,6 +229,11 @@ class Collection(Protocol[T]):
 
 class Sequence(Collection[T]):
 
+    def __new__(cls, *args, **kwargs):
+        if cls is Sequence:
+            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
+        return super().__new__(cls)
+
     def __getitem__(self: Sequence[T], index: int | slice) -> T | Sequence[T]:
         if isinstance(index, slice):
             return self.__class__(self.item_type, self.values[index])
@@ -275,6 +290,11 @@ class Sequence(Collection[T]):
 
 class Set(Collection[T]):
 
+    def __new__(cls, *args, **kwargs):
+        if cls is Set:
+            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
+        return super().__new__(cls)
+
     def union(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> Set[T]:
         other_values = _validate_types(self, other, (Set), (set, frozenset))
         return self.__class__(self.item_type, set.union(self.values, other_values))
@@ -310,14 +330,52 @@ class Set(Collection[T]):
         return set.isdisjoint(self.values, other_values)
 
 
-@runtime_checkable
-class Dictionary(Protocol[K, V]):
+class Dictionary(Generic[K, V]):
 
     key_type: type[K]
     value_type: type[V]
     data: dict
 
-    def __init__(self, key_type, value_type, keys_values=None): ...
+    def __new__(cls, *args, **kwargs):
+        if cls is Dictionary:
+            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
+        return super().__new__(cls)
+
+    def __init__(
+        self: Dictionary[K, V],
+        key_type: type[K],
+        value_type: type[V],
+        keys_values: dict[K, V] | frozendict[K, V] | Iterable[tuple[K, V]] | None = None,
+        finisher: Callable[[dict[K, V]], Any] = lambda x : x
+    ):
+        object.__setattr__(self, "key_type", key_type)
+        object.__setattr__(self, "value_type", value_type)
+        object.__setattr__(self, "data", finisher({}))
+
+        actual_dict = self.data
+
+        if keys_values is None:
+            return
+
+        if isinstance(keys_values, (dict, frozendict)):
+            keys = list(keys_values.keys())
+            values = list(keys_values.values())
+        elif isinstance(keys_values, Iterable):
+            keys = [key for (key, _) in keys_values]
+            values = [value for (_, value) in keys_values]
+        else:
+            raise TypeError(f"The values aren't a dict or Iterable.")
+
+        if len(keys) != len(values):
+            raise ValueError(f"The number of keys and values aren't equal.")
+
+        actual_keys = _validate_values(keys, key_type)
+        actual_values = _validate_values(values, value_type)
+
+        for key, value in zip(actual_keys, actual_values):
+            actual_dict[key] = value
+
+        object.__setattr__(self, "data", finisher(actual_dict))
 
     def __getitem__(self: Dictionary[K, V], key: K) -> V:
         return self.data[key]
