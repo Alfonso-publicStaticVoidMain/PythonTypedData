@@ -1,6 +1,6 @@
 import unittest
 
-from DataContainers import ImmutableSet
+from concrete_classes import ImmutableSet
 
 
 class TestTypedFrozenSet(unittest.TestCase):

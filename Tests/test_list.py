@@ -1,17 +1,44 @@
 import unittest
+from collections import namedtuple
 
-from DataContainers import MutableList
+from concrete_classes import MutableList, ImmutableList
 
 
-class TestTypedList(unittest.TestCase):
+class TestList(unittest.TestCase):
 
-    def test_empty_init(self):
+    def test_init_and_access(self):
+        iml = ImmutableList(int, ['1', 2])
+        self.assertEqual(iml.values, (1, 2))
+        self.assertEqual(iml[0], 1)
+
+        mul = MutableList(int, iml)
+        self.assertEqual(list(iml.values), mul.values)
+        self.assertEqual(iml.values, tuple(mul.values))
+
+    def test_partial_init_parameters(self):
+        mul = MutableList(values=[1, 2, 3])
+        self.assertEqual(mul.item_type, int)
+
+        with self.assertRaises(ValueError):
+            mul = MutableList(values=[1, 2, '3'])
+
         empty_list = MutableList(str)
         self.assertEqual(len(empty_list), 0)
 
     def test_type_coercion(self):
         lst = MutableList(int, ['1', 2])
         self.assertEqual(lst.values, [1, 2])
+
+        iml = ImmutableList(int, ['1', 2])
+        self.assertEqual(iml.values, (1, 2))
+        self.assertEqual(iml[0], 1)
+
+    def test_immutability(self):
+        iml = ImmutableList(str, ['a', 'b'])
+        with self.assertRaises(TypeError):
+            iml[0] = 'c'
+        with self.assertRaises(TypeError):
+            iml.values[0] = 'c'
 
     def test_setitem_and_delitem(self):
         lst = MutableList(int, [1, 2, 3])
@@ -41,8 +68,16 @@ class TestTypedList(unittest.TestCase):
 
     def test_comparisons(self):
         lst = MutableList(int, [10, 2, 4])
+
         self.assertTrue(lst > MutableList(int, [9, 15, 27]))
         self.assertTrue(lst < MutableList(int, [10, 2, 5]))
+
+        self.assertTrue(lst > ImmutableList(int, [9, 15, 27]))
+        self.assertTrue(lst < ImmutableList(int, [10, 2, 5]))
+
+        self.assertTrue(lst <= lst)
+        self.assertTrue(lst >= ImmutableList(int, lst))
+
         self.assertTrue(lst > [10, 1, 5])
         self.assertTrue(lst < (11, 100, 100))
 
@@ -69,9 +104,19 @@ class TestTypedList(unittest.TestCase):
         self.assertEqual(lst.values, [9, 5, 2])
 
     def test_repr_and_bool(self):
-        lst = MutableList(str, ['a', 'b'])
-        self.assertTrue(lst)
-        self.assertIn("MutableList<str>", repr(lst))
+        mul = MutableList(str, ['a', 'b'])
+        self.assertTrue(mul)
+        self.assertIn("MutableList<str>", repr(mul))
+
+        iml = ImmutableList(str, ['x'])
+        self.assertTrue(iml)
+        self.assertIn("ImmutableList<str>", repr(iml))
+
+        empty_lst = MutableList(int)
+        self.assertFalse(empty_lst)
+
+        empty_imlist = ImmutableList(str)
+        self.assertFalse(empty_imlist)
 
     def test_copy(self):
         lst = MutableList(int, [1, 2])
@@ -89,6 +134,8 @@ class TestTypedList(unittest.TestCase):
     def test_count(self):
         lst = MutableList(int, [1, 2, 2, 3])
         self.assertEqual(lst.count(2), 2)
+        self.assertEqual(lst.count(1), 1)
+        self.assertEqual(lst.count(3), 1)
 
     def test_index(self):
         lst = MutableList(int, [10, 20, 30])
@@ -98,19 +145,36 @@ class TestTypedList(unittest.TestCase):
         lst = MutableList(int, [1, 2, 3])
         self.assertEqual(list(reversed(lst)), [3, 2, 1])
 
-    def test_sorted_method(self):
+    def test_sorted_methods(self):
         lst = MutableList(str, ["b", "a", "c"])
         self.assertEqual(lst.sorted(), MutableList(str, ["a", "b", "c"]))
         self.assertEqual(lst.sorted(reverse=True), MutableList(str, ["c", "b", "a"]))
 
-    def test_map_filter(self):
+    def test_map_filter_flatmap(self):
         lst = MutableList(int, [1, 2, 3])
         self.assertEqual(lst.map(lambda x: x * 2), MutableList(int, [2, 4, 6]))
         self.assertEqual(lst.filter(lambda x: x % 2 == 1), MutableList(int, [1, 3]))
+        self.assertEqual(lst.flatmap(lambda x: [x, x + 10]), MutableList(int, [1, 11, 2, 12, 3, 13]))
 
-    def test_flat_map(self):
-        lst = MutableList(int, [1, 2])
-        self.assertEqual(lst.flatmap(lambda x: [x, x + 10]), MutableList(int, [1, 11, 2, 12]))
+        iml = ImmutableList(int, [1, 2, 3])
+        self.assertEqual(iml.map(lambda x: x + 1), ImmutableList(int, [2, 3, 4]))
+        self.assertEqual(iml.filter(lambda x: x % 2), ImmutableList(int, [1, 3]))
+        self.assertEqual(iml.flatmap(lambda x: [x, -x]), ImmutableList(int, [1, -1, 2, -2, 3, -3]))
+
+    def test_any_all_none_match(self):
+        iml = ImmutableList(int, [1, 2, 3, 4, 6, 12])
+        self.assertTrue(iml.all_match(lambda n: 12 % n == 0))
+        self.assertFalse(iml.any_match(lambda n: n < 0))
+        self.assertTrue(iml.none_match(lambda n: n < 0))
+
+    def test_reduce(self):
+        mul = MutableList(int, [0, 1, 2, 3])
+        self.assertEqual(mul.reduce(lambda x, y: x + y), 6)
+
+        self.assertEqual(ImmutableList(int).reduce(lambda x, y: x + y, 0), 0)
+
+        str_lst = ImmutableList(str, ['J', 'A', 'V', 'A'])
+        self.assertEqual(str_lst.reduce(lambda s1, s2: s1 + s2, '_'), '_JAVA')
 
     def test_for_each(self):
         acc = []
@@ -140,6 +204,14 @@ class TestTypedList(unittest.TestCase):
         self.assertEqual(lst.min(), 1)
         self.assertIsNone(MutableList(int, []).min())
 
+    def test_distinct(self):
+        mul = MutableList(str, ['a', 'a', 'b', 'b', 'b', 'c'])
+        self.assertEqual(mul.distinct(), MutableList(values=['a', 'b', 'c']))
+
+        STR_INT = namedtuple("STR_INT", ["string", "integer"])
+
+        iml = ImmutableList(STR_INT, [STR_INT('a', 1), STR_INT('b', 2), STR_INT('c', 1)])
+        self.assertEqual(iml.distinct(lambda tup: tup.integer), ImmutableList(STR_INT, [STR_INT('a', 1), STR_INT('b', 2)]))
 
 if __name__ == '__main__':
     unittest.main()

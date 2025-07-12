@@ -73,7 +73,12 @@ def _validate_values(item_type: type, actual_values: Iterable | None) -> list:
     return validated_values
 
 
-def _validate_types(item_type: type[T], other: Iterable[T] | Collection[T], valid_typed_types: tuple[type[Collection], ...], valid_built_in_types: tuple[type, ...]) -> list:
+def _validate_types(
+    item_type: type[T],
+    other: Iterable[T] | Collection[T],
+    valid_typed_types: tuple[type[Collection], ...],
+    valid_built_in_types: tuple[type, ...]
+) -> list:
     """
     Checks that two objects self and others hold compatible types. Self will always be assumed a typed class, while others
     will be of the parameter tuples valid_typed_typed and valid_built_in_types.
@@ -102,6 +107,19 @@ def _validate_multiple_sets(item_type: type[T], others: Iterable[Iterable[T]]):
     return other_sets
 
 
+def _infer_type(values: Iterable[T]) -> type[T]:
+    if values is None or not values:
+        raise ValueError("Type can't be inferred from an empty iterable or None object.")
+
+    inferred_type: type | None = None
+    for value in values:
+        if inferred_type is None:
+            inferred_type = type(value)
+        elif inferred_type != type(value):
+            raise ValueError(f"There's a type mismatch: value {value} doesn't have type {inferred_type.__name__}, but {type(value).__name__}")
+    return inferred_type
+
+
 class Collection(Generic[T]):
 
     item_type: type[T]
@@ -112,15 +130,20 @@ class Collection(Generic[T]):
 
     def __init__(
         self: Collection[T],
-        item_type: type[T],
-        values: Iterable[T] | None = None,
-        forbidden_types: tuple[type, ...] = (),
+        item_type: type[T] | None = None,
+        values: Iterable[T] | Collection[T] | None = None,
+        forbidden_iterable_types: tuple[type, ...] = (),
         finisher: Callable[[Iterable[T]], Any] = lambda x : x
     ) -> None:
-        if isinstance(values, forbidden_types):
+        obj_type: type[T] | None = None
+        if item_type is None:
+            # This raises a ValueError if the type can't be properly inferred.
+            obj_type = _infer_type(values)
+
+        if isinstance(values, forbidden_iterable_types):
             raise TypeError(f"Invalid type {type(values).__name__} for class {class_name(self)}.")
-        object.__setattr__(self, 'item_type', item_type)
-        object.__setattr__(self, 'values', finisher(_validate_values(item_type, values)))
+        object.__setattr__(self, 'item_type', item_type or obj_type)
+        object.__setattr__(self, 'values', finisher(_validate_values(self.item_type, values)))
 
     def __len__(self: Collection[T]) -> int:
         return len(self.values)
@@ -193,20 +216,20 @@ class Collection(Generic[T]):
     def none_match(self: Collection[T], predicate: Callable[[T], bool]) -> bool:
         return not any(predicate(value) for value in self.values)
 
-    def reduce(self: Collection[T], f: Callable[[T, T], T], initializer: T | None = None) -> T:
-        if initializer is not None:
-            return reduce(f, self.values, initializer)
+    def reduce(self: Collection[T], f: Callable[[T, T], T], unit: T | None = None) -> T:
+        if unit is not None:
+            return reduce(f, self.values, unit)
         return reduce(f, self.values)
 
     def for_each(self: Collection[T], consumer: Callable[[T], None]) -> None:
         for value in self.values:
             consumer(value)
 
-    def distinct(self: Collection[T], key: Callable[[T], K] | None = None) -> Collection[T]:
+    def distinct(self: Collection[T], key: Callable[[T], K] = lambda x: x) -> Collection[T]:
         seen = set()
         result = []
         for value in self.values:
-            key_of_value = value if key is None else key(value)
+            key_of_value = key(value)
             if key_of_value not in seen:
                 seen.add(key_of_value)
                 result.append(value)
@@ -411,7 +434,7 @@ class AbstractDict(Generic[K, V]):
         self: AbstractDict[K, V],
         key_type: type[K],
         value_type: type[V],
-        keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | None = None,
+        keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
         finisher: Callable[[dict[K, V]], Any] = lambda x : x
     ) -> None:
         object.__setattr__(self, "key_type", key_type)
@@ -421,7 +444,7 @@ class AbstractDict(Generic[K, V]):
             object.__setattr__(self, "data", finisher({}))
             return
 
-        if isinstance(keys_values, (dict, Mapping)):
+        if isinstance(keys_values, (dict, Mapping, AbstractDict)):
             keys = keys_values.keys()
             values = keys_values.values()
         elif isinstance(keys_values, Iterable):
@@ -485,6 +508,20 @@ class AbstractDict(Generic[K, V]):
             self.key_type,
             type(next(iter(new_data.values()), object)),
             new_data
+        )
+
+    def filter_keys(self: AbstractDict[K, V], predicate: Callable[[K], bool]) -> AbstractDict[K, V]:
+        return self.__class__(
+            self.key_type,
+            self.value_type,
+            {key: value for key, value in self.data.items() if predicate(key)}
+        )
+
+    def filter_values(self: AbstractDict[K, V], predicate: Callable[[V], bool]) -> AbstractDict[K, V]:
+        return self.__class__(
+            self.key_type,
+            self.value_type,
+            {key: value for key, value in self.data.items() if predicate(value)}
         )
 
     def filter_items(self: AbstractDict[K, V], predicate: Callable[[K, V], bool]) -> AbstractDict[K, V]:
