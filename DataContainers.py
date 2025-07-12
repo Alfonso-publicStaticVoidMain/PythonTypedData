@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Callable, Any, Iterable
+from typing import TypeVar, Generic, Callable, Any, Iterable, Mapping
+from immutabledict import immutabledict
 
 import frozendict
 
@@ -67,7 +68,7 @@ class TypedDict(Dictionary[K, V]):
         self: TypedDict[K, V],
         key_type: type[K],
         value_type: type[V],
-        keys_values: dict[K, V] | frozendict[K, V] | Iterable[tuple[K, V]] | None = None
+        keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | None = None
     ) -> None:
         Dictionary.__init__(self, key_type, value_type, keys_values)
 
@@ -105,15 +106,15 @@ class TypedFrozenDict(Dictionary[K, V]):
 
     key_type: type[K]
     value_type: type[V]
-    data: dict[K, V]
+    data: immutabledict[K, V]
 
     def __init__(
         self: TypedDict[K, V],
         key_type: type[K],
         value_type: type[V],
-        keys_values: dict | frozendict | Iterable[tuple[K, V]] | None = None
+        keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | None = None
     ) -> None:
-        Dictionary.__init__(self, key_type, value_type, keys_values)
+        Dictionary.__init__(self, key_type, value_type, keys_values, immutabledict)
 
 
 @dataclass(slots=True, repr=False)
@@ -145,7 +146,7 @@ class TypedFrozenSet(Set[T]):
         Collection.__init__(self, item_type, values, frozenset)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class TypedOptional(Generic[T]):
 
     item_type: type[T]

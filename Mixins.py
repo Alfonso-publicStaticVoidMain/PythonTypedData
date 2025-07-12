@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Iterable, Any, Callable, TypeVar, Protocol, runtime_checkable, Generic
-
-from frozendict import frozendict
+from typing import Iterable, Any, Callable, TypeVar, Generic, Mapping
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -15,6 +13,13 @@ R = TypeVar("R")
 def class_name(self: object) -> str:
     return type(self).__name__
 
+def _forbid_instantiation(forbidden_type: type[T]) -> Callable[..., T]:
+    def __new__(cls: type[T], *args, **kwargs) -> T:
+        if cls is forbidden_type:
+            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
+        return super(forbidden_type, cls).__new__(cls)
+    return __new__
+
 
 def _validate_value(value: object, item_type: type) -> object:
     """
@@ -22,7 +27,7 @@ def _validate_value(value: object, item_type: type) -> object:
     now are int -> float, str -> (int, float) and Any -> str provided no error is raised.
     :param value: Value to check validity of.
     :param item_type: Type to check match for the value.
-    :return: The value itself if it's of type item_type, or its conversion to item_type if it can safely converted to it.
+    :return: The value itself if it's of item_type, or its conversion to item_type if it can be safely converted to it.
     :raise: TypeError if the value isn't of item_type and can't be safely converted to it.
     """
     if isinstance(value, item_type):
@@ -94,12 +99,15 @@ class Collection(Generic[T]):
     item_type: type[T]
     values: Any
 
-    def __new__(cls, *args, **kwargs):
-        if cls is Collection:
-            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
-        return super().__new__(cls)
+    def __new__(cls, *args, **kwargs) -> Collection[T] | None:
+        return _forbid_instantiation(Collection)(cls, *args, **kwargs)
 
-    def __init__(self: Collection[T], item_type: type[T], values: Iterable[T] | None = None, finisher: Callable[[Iterable[T]], Any] = lambda x:x):
+    def __init__(
+        self: Collection[T],
+        item_type: type[T],
+        values: Iterable[T] | None = None,
+        finisher: Callable[[Iterable[T]], Any] = lambda x : x
+    ) -> None:
         object.__setattr__(self, 'item_type', item_type)
         object.__setattr__(self, 'values', finisher(_validate_values(values, item_type)))
 
@@ -151,8 +159,7 @@ class Collection(Generic[T]):
 
     def map(self: Collection[T], f: Callable[[T], R]) -> Collection[R]:
         mapped = [f(value) for value in self.values]
-        item_type = type(mapped[0]) if mapped else object
-        return self.__class__(item_type, mapped)
+        return self.__class__(type(mapped[0]) if mapped else object, mapped)
 
     def flatmap(self: Collection[T], f: Callable[[T], Iterable[R]]) -> Collection[R]:
         flattened = []
@@ -212,7 +219,7 @@ class Collection(Generic[T]):
         self: Collection[T],
         supplier: Callable[[], A],
         accumulator: Callable[[A, T], None],
-        finisher: Callable[[A], R] = lambda x: x
+        finisher: Callable[[A], R] = lambda x : x
     ) -> R:
         """
         Generalized collector, replicating Java's Stream API .collect method.
@@ -229,10 +236,8 @@ class Collection(Generic[T]):
 
 class Sequence(Collection[T]):
 
-    def __new__(cls, *args, **kwargs):
-        if cls is Sequence:
-            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
-        return super().__new__(cls)
+    def __new__(cls, *args, **kwargs) -> Sequence[T] | None:
+        return _forbid_instantiation(Sequence)(cls, *args, **kwargs)
 
     def __getitem__(self: Sequence[T], index: int | slice) -> T | Sequence[T]:
         if isinstance(index, slice):
@@ -265,16 +270,16 @@ class Sequence(Collection[T]):
     def __add__(self: Sequence[T], other) -> Sequence[T]:
         return self.__class__(
             self.item_type,
-            self.values + _validate_types(self, other, (Sequence), (list, tuple))
+            self.values + _validate_types(self, other, (Sequence,), (list, tuple))
         )
 
-    def __mul__(self: Sequence[T], n) -> Sequence[T]:
+    def __mul__(self: Sequence[T], n: int) -> Sequence[T]:
         if not isinstance(n, int):
             return NotImplemented
         return self.__class__(self.item_type, self.values * n)
 
     def __sub__(self: Sequence[T], other) -> Sequence[T]:
-        other_values = _validate_types(self, other, (Sequence), (list, tuple))
+        other_values = _validate_types(self, other, (Sequence,), (list, tuple))
         filtered_values = [value for value in self.values if value not in other_values]
         return self.__class__(self.item_type, filtered_values)
 
@@ -290,43 +295,41 @@ class Sequence(Collection[T]):
 
 class Set(Collection[T]):
 
-    def __new__(cls, *args, **kwargs):
-        if cls is Set:
-            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
-        return super().__new__(cls)
+    def __new__(cls, *args, **kwargs) -> Set[T] | None:
+        return _forbid_instantiation(Set)(cls, *args, **kwargs)
 
     def union(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> Set[T]:
-        other_values = _validate_types(self, other, (Set), (set, frozenset))
+        other_values = _validate_types(self, other, (Set,), (set, frozenset))
         return self.__class__(self.item_type, set.union(self.values, other_values))
 
     def intersection(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> Set[T]:
-        other_values = _validate_types(self, other, (Set), (set, frozenset))
+        other_values = _validate_types(self, other, (Set,), (set, frozenset))
         return self.__class__(self.item_type, set.intersection(self.values, other_values))
 
     def difference(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> Set[T]:
-        other_values = _validate_types(self, other, (Set), (set, frozenset))
+        other_values = _validate_types(self, other, (Set,), (set, frozenset))
         return self.__class__(self.item_type, set.difference(self.values, other_values))
 
     def symmetric_difference(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> Set[T]:
-        other_values = _validate_types(self, other, (Set), (set, frozenset))
+        other_values = _validate_types(self, other, (Set,), (set, frozenset))
         return self.__class__(self.item_type, set.symmetric_difference(self.values, other_values))
 
     def is_subset(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> bool:
         if isinstance(other, Set) and other.item_type != self.item_type:
             return False
-        other_values = _validate_types(self, other, (Set), (set, frozenset))
+        other_values = _validate_types(self, other, (Set,), (set, frozenset))
         return set.issubset(self.values, other_values)
 
     def is_superset(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> bool:
         if isinstance(other, Set) and other.item_type != self.item_type:
             return False
-        other_values = _validate_types(self, other, (Set), (set, frozenset))
+        other_values = _validate_types(self, other, (Set,), (set, frozenset))
         return set.issuperset(self.values, other_values)
 
     def is_disjoint(self: Set[T], other: Set[T] | set[T] | frozenset[T]) -> bool:
         if isinstance(other, Set) and other.item_type != self.item_type:
             return False
-        other_values = _validate_types(self, other, (Set), (set, frozenset))
+        other_values = _validate_types(self, other, (Set,), (set, frozenset))
         return set.isdisjoint(self.values, other_values)
 
 
@@ -336,30 +339,26 @@ class Dictionary(Generic[K, V]):
     value_type: type[V]
     data: dict
 
-    def __new__(cls, *args, **kwargs):
-        if cls is Dictionary:
-            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
-        return super().__new__(cls)
+    def __new__(cls, *args, **kwargs) -> Dictionary[K, V] | None:
+        return _forbid_instantiation(Dictionary)(cls, *args, **kwargs)
 
     def __init__(
         self: Dictionary[K, V],
         key_type: type[K],
         value_type: type[V],
-        keys_values: dict[K, V] | frozendict[K, V] | Iterable[tuple[K, V]] | None = None,
+        keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | None = None,
         finisher: Callable[[dict[K, V]], Any] = lambda x : x
-    ):
+    ) -> None:
         object.__setattr__(self, "key_type", key_type)
         object.__setattr__(self, "value_type", value_type)
-        object.__setattr__(self, "data", finisher({}))
 
-        actual_dict = self.data
-
-        if keys_values is None:
+        if keys_values is None or not keys_values:
+            object.__setattr__(self, "data", finisher({}))
             return
 
-        if isinstance(keys_values, (dict, frozendict)):
-            keys = list(keys_values.keys())
-            values = list(keys_values.values())
+        if isinstance(keys_values, (dict, Mapping)):
+            keys = keys_values.keys()
+            values = keys_values.values()
         elif isinstance(keys_values, Iterable):
             keys = [key for (key, _) in keys_values]
             values = [value for (_, value) in keys_values]
@@ -369,10 +368,9 @@ class Dictionary(Generic[K, V]):
         if len(keys) != len(values):
             raise ValueError(f"The number of keys and values aren't equal.")
 
-        actual_keys = _validate_values(keys, key_type)
-        actual_values = _validate_values(values, value_type)
+        actual_dict = {}
 
-        for key, value in zip(actual_keys, actual_values):
+        for key, value in zip(_validate_values(keys, key_type), _validate_values(values, value_type)):
             actual_dict[key] = value
 
         object.__setattr__(self, "data", finisher(actual_dict))
@@ -418,19 +416,30 @@ class Dictionary(Generic[K, V]):
 
     def map_values(self: Dictionary[K, V], f: Callable[[V], R]) -> Dictionary[K, R]:
         new_data = {key : f(value) for key, value in self.data.items()}
-        new_value_type = type(next(iter(new_data.values()), object))
-        return self.__class__(self.key_type, new_value_type, new_data)
+        return self.__class__(
+            self.key_type,
+            type(next(iter(new_data.values()), object)),
+            new_data
+        )
 
     def filter_items(self: Dictionary[K, V], predicate: Callable[[K, V], bool]) -> Dictionary[K, V]:
-        filtered = {key : value for key, value in self.data.items() if predicate(key, value)}
-        return self.__class__(self.key_type, self.value_type, filtered)
+        return self.__class__(
+            self.key_type,
+            self.value_type,
+            {key: value for key, value in self.data.items() if predicate(key, value)}
+        )
 
     def subdict(self: Dictionary[K, V], start: K, end: K) -> Dictionary[K, V]:
         try:
             if start > end:
-                raise TypeError("Start must be lower than end.")
+                raise ValueError()
         except TypeError:
             raise TypeError("Keys must support ordering for subdict slicing.")
+        except ValueError:
+            raise ValueError("Start must be lower than end.")
 
-        sliced_data = {key : value for key, value in self.data.data() if start <= key <= end}
-        return self.__class__(self.key_type, self.value_type, sliced_data)
+        return self.__class__(
+            self.key_type,
+            self.value_type,
+            {key: value for key, value in self.data.items() if start <= key <= end}
+        )
