@@ -408,7 +408,7 @@ class Dictionary(Generic[K, V]):
         )
 
     def __repr__(self: Dictionary[K, V]) -> str:
-        return f"{class_name(self)}<{self.key_type.__name__}, {self.value_type.__name__}>{self.values}"
+        return f"{class_name(self)}<{self.key_type.__name__}, {self.value_type.__name__}>{self.data}"
 
     def copy(self: Dictionary[K, V]) -> Dictionary[K, V]:
         return self.__class__(self.key_type, self.value_type, self.data.copy())

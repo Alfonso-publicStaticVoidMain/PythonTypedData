@@ -72,11 +72,7 @@ class TypedDict(Dictionary[K, V]):
         Dictionary.__init__(self, key_type, value_type, keys_values)
 
     def __setitem__(self: TypedDict[K, V], key: K, value: V) -> None:
-        if not isinstance(key, self.key_type):
-            raise TypeError(f"Key must be of type {self.key_type.__name__}")
-        if not isinstance(value, self.value_type):
-            raise TypeError(f"Value must be of type {self.value_type.__name__}")
-        self.data[key] = value
+        self.data[_validate_value(key, self.key_type)] = _validate_value(value, self.value_type)
 
     def __delitem__(self: TypedDict[K, V], key: K) -> None:
         del self.data[key]
@@ -104,7 +100,7 @@ class TypedDict(Dictionary[K, V]):
             self[key] = value
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class TypedFrozenDict(Dictionary[K, V]):
 
     key_type: type[K]
@@ -117,7 +113,7 @@ class TypedFrozenDict(Dictionary[K, V]):
         value_type: type[V],
         keys_values: dict | frozendict | Iterable[tuple[K, V]] | None = None
     ) -> None:
-        Dictionary.__init__(self, key_type, value_type, keys_values, lambda x : frozendict(x))
+        Dictionary.__init__(self, key_type, value_type, keys_values)
 
 
 @dataclass(slots=True, repr=False)
