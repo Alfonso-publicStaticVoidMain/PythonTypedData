@@ -1,6 +1,6 @@
 import unittest
 
-from Mixins import Collection, Dictionary, Sequence, Set
+from Mixins import Collection, AbstractDict, AbstractSequence, AbstractSet
 
 
 class MyTestCase(unittest.TestCase):
@@ -9,11 +9,11 @@ class MyTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             c = Collection(str)
         with self.assertRaises(TypeError):
-            d = Dictionary(int, float)
+            d = AbstractDict(int, float)
         with self.assertRaises(TypeError):
-            seq = Sequence(str)
+            seq = AbstractSequence(str)
         with self.assertRaises(TypeError):
-            st = Set(bool)
+            st = AbstractSet(bool)
 
 if __name__ == '__main__':
     unittest.main()

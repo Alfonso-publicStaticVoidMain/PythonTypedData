@@ -6,7 +6,8 @@ from immutabledict import immutabledict
 
 import frozendict
 
-from Mixins import _validate_value, _validate_values, _validate_types, Sequence, Set, Dictionary, class_name, Collection
+from Mixins import _validate_value, AbstractSequence, AbstractSet, AbstractDict, class_name, Collection, \
+    AbstractMutableSequence, AbstractMutableSet, AbstractMutableDict
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -14,148 +15,100 @@ V = TypeVar("V")
 U = TypeVar("U")
 
 
-@dataclass(slots=True, repr=False)
-class TypedList(Sequence[T]):
+@dataclass(frozen=True, slots=True, repr=False)
+class MutableList(AbstractMutableSequence[T]):
 
     item_type: type[T]
     values: list[T]
 
-    def __init__(self: TypedList[T], item_type: type[T], values: Iterable[T] | None = None):
-        if isinstance(values, (set, frozenset, TypedSet, TypedFrozenSet)):
-            raise TypeError("TypedList does not accept a set or frozenset because their order is not guaranteed")
-        Collection.__init__(self, item_type, values)
-
-    def append(self: TypedList[T], value: T) -> None:
-        self.values.append(_validate_value(value, self.item_type))
-
-    def __setitem__(self: TypedList[T], index: int | slice, value: T | TypedList[T] | TypedTuple[T] | list[T] | tuple[T]) -> None:
-        if isinstance(index, slice):
-            self.values[index] = _validate_types(self, value, (TypedList, TypedTuple), (list, tuple))
-
-        elif isinstance(index, int):
-            self.values[index] = _validate_value(value, self.item_type)
-
-        else:
-            raise TypeError("Invalid index type: must be int or slice")
-
-    def __delitem__(self: TypedList[T], index: int | slice) -> None:
-        del self.values[index]
-
-    def sort(self: TypedList[T], key: Callable[[T], Any] | None = None, reverse: bool = False) -> None:
-        self.values.sort(key=key, reverse=reverse)
+    def __init__(self: MutableList[T], item_type: type[T], values: Iterable[T] | None = None):
+        Collection.__init__(self, item_type, values, (AbstractSet, set, frozenset))
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class TypedTuple(Sequence[T]):
+class ImmutableList(AbstractSequence[T]):
 
     item_type: type[T]
     values: tuple[T, ...]
 
-    def __init__(self: TypedTuple[T], item_type: type[T], values: Iterable[T] | None = None):
-        if isinstance(values, (set, frozenset)):
-            raise TypeError("TypedTuple does not accept set or frozenset because their order is not guaranteed.")
-        Collection.__init__(self, item_type, values, tuple)
+    def __init__(self: ImmutableList[T], item_type: type[T], values: Iterable[T] | None = None):
+        Collection.__init__(self, item_type, values, (AbstractSet, set, frozenset), tuple)
 
 
-@dataclass(slots=True, repr=False)
-class TypedDict(Dictionary[K, V]):
+@dataclass(frozen=True, slots=True, repr=False)
+class MutableDict(AbstractMutableDict[K, V]):
 
     key_type: type[K]
     value_type: type[V]
     data: dict[K, V]
 
     def __init__(
-        self: TypedDict[K, V],
+        self: MutableDict[K, V],
         key_type: type[K],
         value_type: type[V],
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | None = None
     ) -> None:
-        Dictionary.__init__(self, key_type, value_type, keys_values)
-
-    def __setitem__(self: TypedDict[K, V], key: K, value: V) -> None:
-        self.data[_validate_value(key, self.key_type)] = _validate_value(value, self.value_type)
-
-    def __delitem__(self: TypedDict[K, V], key: K) -> None:
-        del self.data[key]
-
-    def clear(self: TypedDict[K, V]) -> None:
-        self.data.clear()
-
-    def update(self: TypedDict[K, V], other: dict[K, V] | TypedDict[K, V]) -> None:
-        if isinstance(other, (TypedDict, TypedFrozenDict)):
-            if not issubclass(other.key_type, self.key_type):
-                raise TypeError(f"Cannot update with StaticDict of keys {other.key_type.__name__}")
-            if not issubclass(other.value_type, self.value_type):
-                raise TypeError(f"Cannot update with StaticDict of values {other.value_type.__name__}")
-            other_items = other.data.items()
-
-        elif isinstance(other, (dict, frozendict)):
-            validated_keys = _validate_values(other.keys(), self.key_type)
-            validated_values = _validate_values(other.values(), self.value_type)
-            other_items = dict(zip(validated_keys, validated_values)).items()
-
-        else:
-            raise TypeError("'other' argument must be a dict or TypedDict")
-
-        for key, value in other_items:
-            self[key] = value
+        AbstractDict.__init__(self, key_type, value_type, keys_values)
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class TypedFrozenDict(Dictionary[K, V]):
+class ImmutableDict(AbstractDict[K, V]):
 
     key_type: type[K]
     value_type: type[V]
     data: immutabledict[K, V]
 
     def __init__(
-        self: TypedDict[K, V],
+        self: MutableDict[K, V],
         key_type: type[K],
         value_type: type[V],
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | None = None
     ) -> None:
-        Dictionary.__init__(self, key_type, value_type, keys_values, immutabledict)
+        AbstractDict.__init__(self, key_type, value_type, keys_values, immutabledict)
 
 
-@dataclass(slots=True, repr=False)
-class TypedSet(Set[T]):
+@dataclass(frozen=True, slots=True, repr=False)
+class MutableSet(AbstractMutableSet[T]):
 
     item_type: type[T]
     values: set[T]
 
-    def __init__(self: TypedSet[T], item_type: type[T], values: Iterable[T] | None = None) -> None:
-        Collection.__init__(self, item_type, values, set)
-
-    def add(self, value: T) -> None:
-        self.values.add(_validate_value(value, self.item_type))
-
-    def remove(self, value: T) -> None:
-        self.values.remove(value)
-
-    def discard(self, value: T) -> None:
-        self.values.discard(value)
+    def __init__(
+        self: MutableSet[T],
+        item_type: type[T],
+        values: Iterable[T] | None = None
+    ) -> None:
+        Collection.__init__(self, item_type, values, finisher=None if type[values] is set else set)
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class TypedFrozenSet(Set[T]):
+class ImmutableSet(AbstractSet[T]):
 
     item_type: type[T]
     values: frozenset[T]
 
-    def __init__(self, item_type: type[T], values: Iterable[T] | None = None):
-        Collection.__init__(self, item_type, values, frozenset)
+    def __init__(
+        self: ImmutableSet[T],
+        item_type: type[T],
+        values: Iterable[T] | None = None
+    ) -> None:
+        Collection.__init__(self, item_type, values, finisher=frozenset)
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class TypedOptional(Generic[T]):
+class Maybe(Generic[T]):
 
     item_type: type[T]
     value: T | None
 
-    def __init__(self: TypedOptional[T], item_type: type[T] | None = None, value: T | None = None) -> None:
+    def __init__(
+        self: Maybe[T],
+        item_type: type[T] | None = None,
+        value: T | None = None
+    ) -> None:
         if value is not None and item_type is not None:
             object.__setattr__(self, 'item_type', item_type)
-            object.__setattr__(self, 'value', _validate_value(value, item_type))
+            object.__setattr__(self, 'value', _validate_value(item_type, value))
         elif value is not None and item_type is None:
             object.__setattr__(self, 'item_type', type(value))
             object.__setattr__(self, 'value', value)
@@ -166,54 +119,54 @@ class TypedOptional(Generic[T]):
             object.__setattr__(self, 'value', None)
 
     @staticmethod
-    def empty(item_type: type[T]) -> TypedOptional[T]:
-        return TypedOptional(item_type, None)
+    def empty(item_type: type[T]) -> Maybe[T]:
+        return Maybe(item_type, None)
 
     @staticmethod
-    def of(value: T) -> TypedOptional[T]:
+    def of(value: T) -> Maybe[T]:
         if value is None:
             raise ValueError("Cannot create StaticOptional.of with None")
-        return TypedOptional(type(value), value)
+        return Maybe(type(value), value)
 
     @staticmethod
-    def of_nullable(value: T | None, item_type: type[T]) -> TypedOptional[T]:
+    def of_nullable(value: T | None, item_type: type[T]) -> Maybe[T]:
         if value is None:
-            return TypedOptional.empty(item_type)
-        return TypedOptional(item_type, value)
+            return Maybe.empty(item_type)
+        return Maybe(item_type, value)
 
-    def is_present(self: TypedOptional[T]) -> bool:
+    def is_present(self: Maybe[T]) -> bool:
         return self.value is not None
 
-    def is_empty(self: TypedOptional[T]) -> bool:
+    def is_empty(self: Maybe[T]) -> bool:
         return self.value is None
 
-    def get(self: TypedOptional[T]) -> T:
+    def get(self: Maybe[T]) -> T:
         if self.is_empty():
             raise ValueError("No value present")
         return self.value
 
-    def or_else(self: TypedOptional[T], fallback: T) -> T:
+    def or_else(self: Maybe[T], fallback: T) -> T:
         return self.value or fallback
 
-    def or_else_get(self: TypedOptional[T], supplier: Callable[[], T]) -> T:
+    def or_else_get(self: Maybe[T], supplier: Callable[[], T]) -> T:
         return self.value or supplier()
 
-    def or_else_raise(self: TypedOptional[T], exception_supplier: Callable[[], Exception]) -> T:
+    def or_else_raise(self: Maybe[T], exception_supplier: Callable[[], Exception]) -> T:
         if self.is_present():
             return self.value
         raise exception_supplier()
 
-    def if_present(self: TypedOptional[T], consumer: Callable[[T], None]) -> None:
+    def if_present(self: Maybe[T], consumer: Callable[[T], None]) -> None:
         if self.is_present():
             consumer(self.value)
 
-    def map(self: TypedOptional[T], f: Callable[[T], U]) -> TypedOptional[U]:
+    def map(self: Maybe[T], f: Callable[[T], U]) -> Maybe[U]:
         if self.value is None:
-            return TypedOptional.empty(object)
+            return Maybe.empty(object)
         result = f(self.value)
         if result is None:
-            return TypedOptional.empty(object)
-        return TypedOptional.of(result)
+            return Maybe.empty(object)
+        return Maybe.of(result)
 
     def map_or_else(self, f: Callable[[T], U], fallback: U) -> U:
         if self.is_present():
@@ -221,22 +174,22 @@ class TypedOptional(Generic[T]):
         else:
             return fallback
 
-    def flatmap(self: TypedOptional[T], f: Callable[[T], TypedOptional[U]]) -> TypedOptional[U]:
+    def flatmap(self: Maybe[T], f: Callable[[T], Maybe[U]]) -> Maybe[U]:
         if self.is_empty():
-            return TypedOptional.empty(self.item_type)
+            return Maybe.empty(self.item_type)
         result = f(self.value)
-        if not isinstance(result, TypedOptional):
+        if not isinstance(result, Maybe):
             raise TypeError("flatmap mapper must return StaticOptional")
         return result
 
-    def filter(self: TypedOptional[T], predicate: Callable[[T], bool]) -> TypedOptional[T]:
+    def filter(self: Maybe[T], predicate: Callable[[T], bool]) -> Maybe[T]:
         if self.is_empty() or not predicate(self.value):
-            return TypedOptional.empty(self.item_type)
+            return Maybe.empty(self.item_type)
         return self
 
-    def __bool__(self: TypedOptional[T]) -> bool:
+    def __bool__(self: Maybe[T]) -> bool:
         return bool(self.value) if self.is_present() else False
 
-    def __repr__(self: TypedOptional[T]) -> str:
+    def __repr__(self: Maybe[T]) -> str:
         cls_name: str = class_name(self)
         return f"{cls_name}.of({self.value!r})" if self.is_present() else f"{cls_name}.empty({self.item_type.__name__})"
