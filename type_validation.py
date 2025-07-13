@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 import collections
+import types
 import typing
 from typing import Iterable, TypeVar, TYPE_CHECKING, Any, get_origin, get_args, Union, Annotated, Literal
 
-if TYPE_CHECKING: from abstract_classes import Collection
+if TYPE_CHECKING:
+    from abstract_classes import Collection, AbstractSequence, AbstractSet, AbstractDict
+    from maybe import Maybe
 
 T = TypeVar("T")
+
+CUSTOM_TYPE_CHECKS = {
+    AbstractSequence: lambda val, args: val.item_type == args[0],
+    AbstractSet: lambda val, args: val.item_type == args[0],
+    AbstractDict: lambda val, args: val.key_type == args[0] and val.value_type == args[1],
+    Maybe: lambda val, args: val.item_type == args[0],
+}
 
 
 def _validate_value(item_type: type, value: object) -> object:
@@ -18,7 +28,7 @@ def _validate_value(item_type: type, value: object) -> object:
     :return: The value itself if it's of item_type, or its conversion to item_type if it can be safely converted to it.
     :raise: TypeError if the value isn't of item_type and can't be safely converted to it.
     """
-    if isinstance(value, item_type):
+    if _validate_generic_class(value, item_type):
         # If the value is of the given type, it's returned unmodified.
         return value
 
@@ -111,7 +121,7 @@ def _infer_type(values: Iterable[T] | Collection[T]) -> type[T]:
     return inferred_type
 
 
-def validate_type(value: Any, expected_type: Any) -> bool:
+def _validate_type(value: Any, expected_type: Any) -> bool:
     if expected_type is Any:
         return True
 
@@ -121,12 +131,12 @@ def validate_type(value: Any, expected_type: Any) -> bool:
     if origin is None:
         return isinstance(value, expected_type)
 
-    if origin is Union:
-        return any(validate_type(value, arg) for arg in args)
+    if origin in (Union, types.UnionType):
+        return any(_validate_type(value, arg) for arg in args)
 
     if origin is Annotated:
         # Ignore metadata for validation purposes
-        return validate_type(value, args[0])
+        return _validate_type(value, args[0])
 
     if origin is Literal:
         return value in args
@@ -153,52 +163,65 @@ def validate_type(value: Any, expected_type: Any) -> bool:
     return isinstance(value, origin)
 
 
-# --- Recursive validators below ---
-
 def _validate_tuple(value: Any, args: tuple) -> bool:
     if not isinstance(value, tuple):
         return False
 
     # Handle Tuple[T, ...] (homogeneous)
     if len(args) == 2 and args[1] is Ellipsis:
-        return all(validate_type(v, args[0]) for v in value)
+        return all(_validate_type(v, args[0]) for v in value)
 
-    # Heterogeneous tuple: Tuple[T1, T2, ...]
+    # Heterogeneous tuple: Tuple[T1, T2, T3]
     if len(value) != len(args):
         return False
-    return all(validate_type(v, t) for v, t in zip(value, args))
+    return all(_validate_type(v, t) for v, t in zip(value, args))
 
 
 def _validate_list(value: Any, args: tuple) -> bool:
     if not isinstance(value, list):
         return False
     (item_type,) = args
-    return all(validate_type(v, item_type) for v in value)
+    return all(_validate_type(v, item_type) for v in value)
 
 
 def _validate_set(value: Any, set_type: type, args: tuple) -> bool:
     if not isinstance(value, set_type):
         return False
     (item_type,) = args
-    return all(validate_type(v, item_type) for v in value)
+    return all(_validate_type(v, item_type) for v in value)
 
 
 def _validate_dict(value: Any, args: tuple) -> bool:
     if not isinstance(value, dict):
         return False
     key_type, val_type = args
-    return all(validate_type(k, key_type) and validate_type(v, val_type) for k, v in value.items())
+    return all(_validate_type(k, key_type) and _validate_type(v, val_type) for k, v in value.items())
 
 
 def _validate_mapping(value: Any, args: tuple) -> bool:
     if not isinstance(value, collections.abc.Mapping):
         return False
     key_type, val_type = args
-    return all(validate_type(k, key_type) and validate_type(v, val_type) for k, v in value.items())
+    return all(_validate_type(k, key_type) and _validate_type(v, val_type) for k, v in value.items())
 
 
 def _validate_sequence(value: Any, args: tuple) -> bool:
     if not isinstance(value, collections.abc.Sequence) or isinstance(value, str):
         return False
     (item_type,) = args
-    return all(validate_type(v, item_type) for v in value)
+    return all(_validate_type(v, item_type) for v in value)
+
+
+def _validate_generic_class(value: Any, expected_type: Any) -> bool:
+    origin = type(expected_type)
+    if not isinstance(value, expected_type):
+        return False
+
+    args = get_args(expected_type)
+
+    for base, checker in CUSTOM_TYPE_CHECKS.items():
+        if isinstance(value, base):
+            return checker(value, args)
+
+    return True
+
