@@ -3,6 +3,8 @@ from __future__ import annotations
 from functools import reduce
 from typing import Iterable, Any, Callable, TypeVar, Generic, Mapping
 
+from type_validation import _validate_value, _validate_values, _validate_types, _validate_multiple_sets, _infer_type
+
 T = TypeVar("T")
 K = TypeVar("K")
 V = TypeVar("V")
@@ -20,104 +22,6 @@ def _forbid_instantiation(forbidden_type: type[T]) -> Callable[..., T]:
             raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
         return super(forbidden_type, cls).__new__(cls)
     return __new__
-
-
-def _validate_value(item_type: type, value: object) -> object:
-    """
-    Checks if a single value is of a given type, or if it can be safely converted to that type. Valid conversions for
-    now are int -> float, str -> (int, float) and Any -> str provided no error is raised.
-    :param value: Value to check validity of.
-    :param item_type: Type to check match for the value.
-    :return: The value itself if it's of item_type, or its conversion to item_type if it can be safely converted to it.
-    :raise: TypeError if the value isn't of item_type and can't be safely converted to it.
-    """
-    if isinstance(value, item_type):
-        # If the value is of the given type, it's returned unmodified.
-        return value
-
-    converted = None
-
-    if item_type is float and isinstance(value, int):
-        converted = float(value)
-    elif (item_type is int or item_type is float) and isinstance(value, str):
-        try:
-            converted = item_type(value)
-        except ValueError:
-            pass
-    elif item_type is str:
-        try:
-            converted = str(value)
-        except ValueError:
-            pass
-
-    if converted is not None:
-        return converted
-    else:
-        raise TypeError(f"Element {value!r} is not of type {item_type.__name__} and cannot be converted safely.")
-
-
-def _validate_values(item_type: type, actual_values: Iterable | None) -> list:
-    """
-    Checks if all elements of the given Iterable are of the given type or a subclass thereof. If not, raises a TypeError.
-    :param item_type: Type to check for.
-    :param actual_values: Iterable of values of possibly different types.
-    :return: A list of values validated as per the _validate_value function, coercing certain types like int to float
-    and str to int or float if possible.
-    :raise: TypeError if not all elements of the actual_values list are of type item_type.
-    """
-    if actual_values is None:
-        return []
-    validated_values = []
-    for value in actual_values:
-        validated_values.append(_validate_value(item_type, value))
-    return validated_values
-
-
-def _validate_types(
-    item_type: type[T],
-    other: Iterable[T] | Collection[T],
-    valid_typed_types: tuple[type[Collection], ...],
-    valid_built_in_types: tuple[type, ...]
-) -> list:
-    """
-    Checks that two objects self and others hold compatible types. Self will always be assumed a typed class, while others
-    will be of the parameter tuples valid_typed_typed and valid_built_in_types.
-    :param item_type: Type to compare the type against.
-    :param other: Typed or not object to check its contained type.
-    :param valid_typed_types: Types from my typed classes that should be accepted.
-    :param valid_built_in_types: Typed from Python's built ins that should be accepted.
-    :return: A list containing the values contained on the others object after validating its type and converting it to
-    self.item_type if necessary.
-    """
-    if isinstance(other, valid_typed_types):
-        if not issubclass(other.item_type, item_type):
-            raise ValueError(f"Different types for self ({item_type.__name__}) and others ({other.item_type.__name__})")
-        other_values = other.values
-    elif isinstance(other, valid_built_in_types):
-        other_values = _validate_values(item_type, other)
-    else:
-        raise TypeError(f"{other} must be a valid type.")
-    return other_values
-
-
-def _validate_multiple_sets(item_type: type[T], others: Iterable[Iterable[T]]):
-    other_sets: list = []
-    for iterable in others:
-        other_sets.append(_validate_types(item_type, iterable, (Collection,), (Iterable,)))
-    return other_sets
-
-
-def _infer_type(values: Iterable[T]) -> type[T]:
-    if values is None or not values:
-        raise ValueError("Type can't be inferred from an empty iterable or None object.")
-
-    inferred_type: type | None = None
-    for value in values:
-        if inferred_type is None:
-            inferred_type = type(value)
-        elif inferred_type != type(value):
-            raise ValueError(f"There's a type mismatch: value {value} doesn't have type {inferred_type.__name__}, but {type(value).__name__}")
-    return inferred_type
 
 
 class Collection(Generic[T]):
@@ -360,32 +264,35 @@ class AbstractSet(Collection[T]):
     def union(self: AbstractSet[T], *others: Iterable[T]) -> AbstractSet[T]:
         return self.__class__(self.item_type, self.values.union(*_validate_multiple_sets(self.item_type, others)))
 
-    def intersection(self: AbstractSet[T], *others: Iterable[T]) -> AbstractSet[T]:
+    def intersection(self: AbstractSet[T], *others: Iterable[T] | Collection[T]) -> AbstractSet[T]:
         return self.__class__(self.item_type, self.values.intersection(*_validate_multiple_sets(self.item_type, others)))
 
-    def difference(self: AbstractSet[T], *others: Iterable[T]) -> AbstractSet[T]:
+    def difference(self: AbstractSet[T], *others: Iterable[T] | Collection[T]) -> AbstractSet[T]:
         return self.__class__(self.item_type, self.values.difference(*_validate_multiple_sets(self.item_type, others)))
 
-    def symmetric_difference(self: AbstractSet[T], *others: Iterable[T]) -> AbstractSet[T]:
-        return self.__class__(self.item_type, self.values.symmetric_difference(*_validate_multiple_sets(self.item_type, others)))
+    def symmetric_difference(self: AbstractSet[T], *others: Iterable[T] | Collection[T]) -> AbstractSet[T]:
+        new_values = self.values
+        for validated_set in _validate_multiple_sets(self.item_type, others):
+            new_values = new_values.symmetric_difference(validated_set)
+        return self.__class__(self.item_type, new_values)
 
     def is_subset(self: AbstractSet[T], other: AbstractSet[T] | set[T] | frozenset[T]) -> bool:
         if isinstance(other, AbstractSet) and other.item_type != self.item_type:
             return False
         other_values = _validate_types(self.item_type, other, (AbstractSet,), (set, frozenset))
-        return set.issubset(self.values, other_values)
+        return self.values.issubset(other_values)
 
     def is_superset(self: AbstractSet[T], other: AbstractSet[T] | set[T] | frozenset[T]) -> bool:
         if isinstance(other, AbstractSet) and other.item_type != self.item_type:
             return False
         other_values = _validate_types(self.item_type, other, (AbstractSet,), (set, frozenset))
-        return set.issuperset(self.values, other_values)
+        return self.values.issuperset(other_values)
 
     def is_disjoint(self: AbstractSet[T], other: AbstractSet[T] | set[T] | frozenset[T]) -> bool:
         if isinstance(other, AbstractSet) and other.item_type != self.item_type:
             return False
         other_values = _validate_types(self.item_type, other, (AbstractSet,), (set, frozenset))
-        return set.isdisjoint(self.values, other_values)
+        return self.values.isdisjoint(other_values)
 
 
 class AbstractMutableSet(AbstractSet[T]):
@@ -408,17 +315,18 @@ class AbstractMutableSet(AbstractSet[T]):
     def pop(self: AbstractMutableSet[T]) -> T:
         return self.values.pop()
 
-    def update(self: AbstractMutableSet[T], *others: Iterable[T]) -> None:
+    def update(self: AbstractMutableSet[T], *others: Iterable[T] | Collection[T]) -> None:
         self.values.update(*_validate_multiple_sets(self.item_type, others))
 
-    def difference_update(self: AbstractMutableSet[T], *others: Iterable[T]) -> None:
+    def difference_update(self: AbstractMutableSet[T], *others: Iterable[T] | Collection[T]) -> None:
         self.values.difference_update(*_validate_multiple_sets(self.item_type, others))
 
-    def intersection_update(self: AbstractMutableSet[T], *others: Iterable[T]) -> None:
+    def intersection_update(self: AbstractMutableSet[T], *others: Iterable[T] | Collection[T]) -> None:
         self.values.intersection_update(*_validate_multiple_sets(self.item_type, others))
 
-    def symmetric_difference_update(self: AbstractMutableSet[T], *others: Iterable[T]) -> None:
-        self.values.symmetric_difference_update(*_validate_multiple_sets(self.item_type, others))
+    def symmetric_difference_update(self: AbstractMutableSet[T], *others: Iterable[T] | Collection[T]) -> None:
+        for validated_set in _validate_multiple_sets(self.item_type, others):
+            self.values.symmetric_difference_update(validated_set)
 
 
 class AbstractDict(Generic[K, V]):

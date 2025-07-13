@@ -209,9 +209,18 @@ class TestList(unittest.TestCase):
         self.assertEqual(mul.distinct(), MutableList(values=['a', 'b', 'c']))
 
         STR_INT = namedtuple("STR_INT", ["string", "integer"])
-
+        # TODO: Make this work with non-named tuples
         iml = ImmutableList(STR_INT, [STR_INT('a', 1), STR_INT('b', 2), STR_INT('c', 1)])
         self.assertEqual(iml.distinct(lambda tup: tup.integer), ImmutableList(STR_INT, [STR_INT('a', 1), STR_INT('b', 2)]))
+
+    def test_collect(self):
+        mul = MutableList(int, [1, 2, 3, 4, 5])
+        dic = mul.collect(
+            supplier=lambda:{},
+            accumulator=lambda d, n: d.__setitem__(n, 2**n),
+            finisher=lambda d: d | {0: 1}
+        )
+        self.assertEqual(dic, {0: 1, 1: 2, 2: 4, 3: 8, 4: 16, 5: 32})
 
 if __name__ == '__main__':
     unittest.main()
