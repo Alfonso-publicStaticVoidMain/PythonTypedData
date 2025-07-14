@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, Callable
+from typing import Generic, Callable, TypeVar, TYPE_CHECKING
 
-from abstract_classes import class_name
-from concrete_classes import T, U
+T = TypeVar("T")
+U = TypeVar("U")
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -18,9 +18,11 @@ class Maybe(Generic[T]):
         item_type: type[T] | None = None,
         value: T | None = None
     ) -> None:
+        from type_validation import _validate_and_coerce_value
+
         if value is not None and item_type is not None:
             object.__setattr__(self, 'item_type', item_type)
-            object.__setattr__(self, 'value', _validate_value(item_type, value))
+            object.__setattr__(self, 'value', _validate_and_coerce_value(item_type, value))
         elif value is not None and item_type is None:
             object.__setattr__(self, 'item_type', type(value))
             object.__setattr__(self, 'value', value)
@@ -103,5 +105,6 @@ class Maybe(Generic[T]):
         return bool(self.value) if self.is_present() else False
 
     def __repr__(self: Maybe[T]) -> str:
+        from abstract_classes import class_name
         cls_name: str = class_name(self)
         return f"{cls_name}.of({self.value!r})" if self.is_present() else f"{cls_name}.empty({self.item_type.__name__})"
