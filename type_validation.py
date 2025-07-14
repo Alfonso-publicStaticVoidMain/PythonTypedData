@@ -189,12 +189,6 @@ def _validate_type(value: Any, expected_type: type) -> bool:
     return False
 
 
-def _validate_iterable(value: Any, iterable_type: type, item_type: Any) -> bool:
-    if not isinstance(value, iterable_type) or isinstance(value, str):
-        return False
-    return all(_validate_type(v, item_type) for v in value)
-
-
 def _validate_mapping_type(value: Any, mapping_type: type, args: tuple) -> bool:
     if not isinstance(value, mapping_type):
         return False
