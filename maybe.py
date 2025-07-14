@@ -18,11 +18,11 @@ class Maybe(Generic[T]):
         item_type: type[T] | None = None,
         value: T | None = None
     ) -> None:
-        from type_validation import _validate_and_coerce_value
+        from type_validation import _validate_or_coerce_value
 
         if value is not None and item_type is not None:
             object.__setattr__(self, 'item_type', item_type)
-            object.__setattr__(self, 'value', _validate_and_coerce_value(item_type, value))
+            object.__setattr__(self, 'value', _validate_or_coerce_value(item_type, value))
         elif value is not None and item_type is None:
             object.__setattr__(self, 'item_type', type(value))
             object.__setattr__(self, 'value', value)
