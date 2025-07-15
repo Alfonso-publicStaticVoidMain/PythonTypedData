@@ -78,8 +78,8 @@ class MutableDict(AbstractMutableDict[K, V]):
 
     def __init__(
         self: MutableDict[K, V],
-        key_type: type[K],
-        value_type: type[V],
+        key_type: type[K] | None = None,
+        value_type: type[V] | None = None,
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
         coerce_keys: bool = False,
         coerce_values: bool = False
@@ -106,8 +106,8 @@ class ImmutableDict(AbstractDict[K, V]):
 
     def __init__(
         self: MutableDict[K, V],
-        key_type: type[K],
-        value_type: type[V],
+        key_type: type[K] | None = None,
+        value_type: type[V] | None = None,
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
         coerce_keys: bool = False,
         coerce_values: bool = False

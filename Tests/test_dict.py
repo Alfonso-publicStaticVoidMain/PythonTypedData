@@ -19,6 +19,11 @@ class DictionaryTest(unittest.TestCase):
         mud = MutableDict(str, int, imd)
         self.assertEqual(dic, mud)
 
+    def test_type_inference(self):
+        dic = ImmutableDict(keys_values={1: 'a', 2: 'b'})
+        self.assertEqual(dic.key_type, int)
+        self.assertEqual(dic.value_type, str)
+
     def test_immutability(self):
         fd = ImmutableDict(str, int, {'x': 2})
         with self.assertRaises(TypeError):

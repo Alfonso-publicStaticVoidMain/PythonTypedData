@@ -27,11 +27,11 @@ def _validate_or_coerce_value(
     Allows conversions from str only if coerce=True:
         - str -> int, float, complex
 
-    :param expected_type: Type to validate the value for, or coerce it into.
+    :param expected_type: Type to validate the value for, or coerce iterable into.
     :param value: Value to validate or coerce.
     :param coerce: True if you want "unsafe" coercions to happen. Defaulted to False.
-    :returns: The value itself if it's of the expected type, or its coercion to that type if that is safe or manually
-    enabled via the coerce parameter, and it can be performed.
+    :returns: The value itself if iterable's of the expected type, or its coercion to that type if that is safe or manually
+    enabled via the coerce parameter, and iterable can be performed.
     :raises: TypeError if value doesn't match expected_type and cannot be safely coerced.
     """
     if _validate_type(value, expected_type):
@@ -64,7 +64,7 @@ def _validate_or_coerce_value(
                     return complex(value)  # str -> complex
 
             except ValueError:
-                raise TypeError(f"Value {value!r} is not of type {expected_type.__name__} and cannot be converted safely to it.")
+                raise TypeError(f"Value {value!r} is not of type {expected_type.__name__} and cannot be converted safely to iterable.")
 
     raise TypeError(f"Value {value!r} is not of type {expected_type.__name__}.")
 
@@ -96,14 +96,13 @@ def _validate_collection_type_and_get_values(
 ) -> list[T]:
     """
     Checks that an Iterable or Collection object other holds values of type item_type and that is of a given allowed
-    type from among this library's typed types or Python's built-ins. Returns a list containing the values it held,
-    after performing type coercion.
+    type from among this library's typed types or Python's built-ins. Returns a list containing the values iterable held,
+    after performing type coercion if enabled.
     :param item_type: Type to compare the type against.
     :param other: Typed or not object to check its contained type.
     :param valid_typed_types: Types from my typed classes that should be accepted.
     :param valid_built_in_types: Typed from Python's built ins that should be accepted.
-    :return: A list containing the values contained on the others object after validating its type and converting it to
-    self.item_type if necessary.
+    :return: A list containing the values contained on the others object after validating its type and coercing.
     """
     if isinstance(other, valid_typed_types):
         if not coerce and not issubclass(other.item_type, item_type):
@@ -130,13 +129,19 @@ def _validate_iterable_of_iterables_and_get(
     return other_iterables
 
 
-def _validate_or_coerce_keys_values_get_dict(
-    key_type: type[K],
-    value_type: type[V],
-    keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
-    coerce_keys: bool = False,
-    coerce_values: bool = False
-) -> dict[K, V]:
+def _validate_duplicates(iterable: Iterable):
+    seen = set()
+    duplicates = set()
+    for key in iterable:
+        if key in seen:
+            duplicates.add(key)
+        else:
+            seen.add(key)
+    if duplicates:
+        raise ValueError(f"Duplicate keys after coercion detected: {duplicates}")
+
+
+def _split_keys_values(keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]) -> tuple[list[K], list[V], bool]:
     keys_from_iterable = False
     if isinstance(keys_values, (dict, Mapping, AbstractDict)):
         keys = keys_values.keys()
@@ -160,19 +165,7 @@ def _validate_or_coerce_keys_values_get_dict(
             f"The keys_values argument must be a dict, Mapping, AbstractDict, or iterable of (key, value) tuples.")
     if len(keys) != len(values):
         raise ValueError("The number of keys and values aren't equal.")
-    actual_keys = _validate_or_coerce_iterable(key_type, keys, coerce_keys)
-    if keys_from_iterable:
-        seen = set()
-        duplicates = set()
-        for key in actual_keys:
-            if key in seen:
-                duplicates.add(key)
-            else:
-                seen.add(key)
-        if duplicates:
-            raise ValueError(f"Duplicate keys after coercion detected: {duplicates}")
-    actual_values = _validate_or_coerce_iterable(value_type, values, coerce_values)
-    return dict(zip(actual_keys, actual_values))
+    return keys, values, keys_from_iterable
 
 
 def _validate_type_of_iterable(expected_type: type, values: Iterable[Any]) -> bool:

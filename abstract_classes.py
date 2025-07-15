@@ -29,7 +29,7 @@ def _forbid_instantiation(forbidden_type: type[T]) -> Callable[..., T]:
     forbidden type.
     :param forbidden_type: Type for the instantiation to be forbidden.
     :return: A __new__ method that, no matter the arguments received, raises a TypeError if the class that tried
-    to call it was of the forbidden type.
+    to call iterable was of the forbidden type.
     """
     def __new__(cls: type[T], *args, **kwargs) -> T:
         if cls is forbidden_type:
@@ -535,29 +535,39 @@ class AbstractDict(Generic[K, V]):
 
     def __init__(
         self: AbstractDict[K, V],
-        key_type: type[K], value_type: type[V],
+        key_type: type[K] | None = None, value_type: type[V] | None = None,
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
         coerce_keys: bool = False, coerce_values: bool = False,
         finisher: Callable[[dict[K, V]], Any] = lambda x : x
     ) -> None:
-        from type_validation import _validate_or_coerce_keys_values_get_dict
-
-        object.__setattr__(self, "key_type", key_type)
-        object.__setattr__(self, "value_type", value_type)
+        from type_validation import _validate_or_coerce_iterable, _split_keys_values, _infer_type_contained_in_iterable, _validate_duplicates
 
         if keys_values is None or not keys_values:
+            if key_type is None or value_type is None:
+                raise ValueError("Dictionary types can't be inferred from empty data.")
+            object.__setattr__(self, "key_type", key_type)
+            object.__setattr__(self, "value_type", value_type)
             object.__setattr__(self, "data", finisher({}))
             return
 
-        actual_dict = _validate_or_coerce_keys_values_get_dict(
-            key_type,
-            value_type,
-            keys_values,
-            coerce_keys,
-            coerce_values
-        )
+        keys, values, keys_from_iterable = _split_keys_values(keys_values)
+        inferred_key_type = None
+        inferred_value_type = None
+        if key_type is None:
+            inferred_key_type = _infer_type_contained_in_iterable(keys)
+        if value_type is None:
+            inferred_value_type = _infer_type_contained_in_iterable(values)
 
-        object.__setattr__(self, "data", finisher(actual_dict))
+        object.__setattr__(self, "key_type", key_type or inferred_key_type)
+        object.__setattr__(self, "value_type", value_type or inferred_value_type)
+
+        actual_keys = _validate_or_coerce_iterable(self.key_type, keys, coerce_keys)
+        actual_values = _validate_or_coerce_iterable(self.value_type, values, coerce_values)
+
+        if keys_from_iterable:
+            _validate_duplicates(actual_keys)
+
+        object.__setattr__(self, "data", finisher(dict(zip(actual_keys, actual_values))))
 
     def __getitem__(self: AbstractDict[K, V], key: K) -> V:
         return self.data[key]
@@ -625,7 +635,7 @@ class AbstractDict(Generic[K, V]):
             result_type,
             new_data,
             coerce_values=coerce_values
-        )
+        ) if result_type is not None else self.__class__(key_type=self.key_type, keys_values=new_data)
 
     def filter_keys(self: AbstractDict[K, V], predicate: Callable[[K], bool]) -> AbstractDict[K, V]:
         return self.__class__(
