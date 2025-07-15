@@ -602,6 +602,7 @@ class AbstractDict(Generic[K, V]):
         coerce_keys: bool = False,
         coerce_values: bool = False
     ) -> V | None:
+        from type_validation import _validate_or_coerce_value
         if coerce_keys:
             try:
                 key = _validate_or_coerce_value(self.key_type, key, coerce_keys)
@@ -612,12 +613,18 @@ class AbstractDict(Generic[K, V]):
             _validate_or_coerce_value(self.value_type, fallback, coerce_values) if fallback is not None else None
         )
 
-    def map_values(self: AbstractDict[K, V], f: Callable[[V], R]) -> AbstractDict[K, R]:
+    def map_values(
+        self: AbstractDict[K, V],
+        f: Callable[[V], R],
+        result_type: type[R],
+        coerce_values: bool = False
+    ) -> AbstractDict[K, R]:
         new_data = {key : f(value) for key, value in self.data.items()}
         return self.__class__(
             self.key_type,
-            type(next(iter(new_data.values()), object)),
-            new_data
+            result_type,
+            new_data,
+            coerce_values=coerce_values
         )
 
     def filter_keys(self: AbstractDict[K, V], predicate: Callable[[K], bool]) -> AbstractDict[K, V]:
@@ -649,12 +656,7 @@ class AbstractDict(Generic[K, V]):
             raise TypeError("Keys must support ordering for subdict slicing.")
         except ValueError:
             raise ValueError("Start must be lower than end.")
-
-        return self.__class__(
-            self.key_type,
-            self.value_type,
-            {key : value for key, value in self.data.items() if start <= key <= end}
-        )
+        return self.filter_keys(lambda key : start <= key <= end)
 
 
 class AbstractMutableDict(AbstractDict[K, V]):
@@ -690,12 +692,17 @@ class AbstractMutableDict(AbstractDict[K, V]):
     def pop(
         self: AbstractMutableDict[K, V],
         key: K,
-        default: V | None = None
+        fallback: V | None = None,
+        coerce_keys: bool = None,
+        coerce_values: bool = None
     ) -> V:
         from type_validation import _validate_or_coerce_value
-        if default is not None:
-            return self.data.pop(_validate_or_coerce_value(self.key_type, key), default)
-        return self.data.pop(_validate_or_coerce_value(self.key_type, key))
+        if fallback is not None:
+            return self.data.pop(
+                _validate_or_coerce_value(self.key_type, key, coerce_keys),
+                _validate_or_coerce_value(self.value_type, fallback, coerce_values)
+            )
+        return self.data.pop(_validate_or_coerce_value(self.key_type, key, coerce_keys))
 
     def popitem(self: AbstractMutableDict[K, V]) -> tuple[K, V]:
         return self.data.popitem()
