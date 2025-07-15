@@ -540,7 +540,7 @@ class AbstractDict(Generic[K, V]):
         coerce_keys: bool = False, coerce_values: bool = False,
         finisher: Callable[[dict[K, V]], Any] = lambda x : x
     ) -> None:
-        from type_validation import _validate_or_coerce_iterable
+        from type_validation import _validate_or_coerce_keys_values_get_dict
 
         object.__setattr__(self, "key_type", key_type)
         object.__setattr__(self, "value_type", value_type)
@@ -549,47 +549,15 @@ class AbstractDict(Generic[K, V]):
             object.__setattr__(self, "data", finisher({}))
             return
 
-        keys_from_iterable = False
+        actual_dict = _validate_or_coerce_keys_values_get_dict(
+            key_type,
+            value_type,
+            keys_values,
+            coerce_keys,
+            coerce_values
+        )
 
-        if isinstance(keys_values, (dict, Mapping, AbstractDict)):
-            keys = keys_values.keys()
-            values = keys_values.values()
-        elif isinstance(keys_values, Iterable):
-            keys = []
-            values = []
-            keys_from_iterable = True
-            for pair in keys_values:
-                if not (isinstance(pair, tuple) and len(pair) == 2):
-                    raise TypeError(f"Expected iterable of (key, value) tuples, got: {pair!r}")
-                key, value = pair
-                try:
-                    hash(key)
-                except TypeError:
-                    raise TypeError(f"Key {key!r} is not hashable and cannot be used as a dictionary key.")
-                keys.append(key)
-                values.append(value)
-        else:
-            raise TypeError(f"The keys_values argument must be a dict, Mapping, AbstractDict, or iterable of (key, value) tuples.")
-
-        if len(keys) != len(values):
-            raise ValueError("The number of keys and values aren't equal.")
-
-        actual_keys = _validate_or_coerce_iterable(key_type, keys, coerce_keys)
-
-        if keys_from_iterable:
-            seen = set()
-            duplicates = set()
-            for key in actual_keys:
-                if key in seen:
-                    duplicates.add(key)
-                else:
-                    seen.add(key)
-            if duplicates:
-                raise ValueError(f"Duplicate keys after coercion detected: {duplicates}")
-
-        actual_values = _validate_or_coerce_iterable(value_type, values, coerce_values)
-
-        object.__setattr__(self, "data", finisher(dict(zip(actual_keys, actual_values))))
+        object.__setattr__(self, "data", finisher(actual_dict))
 
     def __getitem__(self: AbstractDict[K, V], key: K) -> V:
         return self.data[key]

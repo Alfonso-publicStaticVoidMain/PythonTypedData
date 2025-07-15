@@ -8,6 +8,8 @@ from abstract_classes import Collection, AbstractDict
 from maybe import Maybe
 
 T = TypeVar("T")
+K = TypeVar("K")
+V = TypeVar("V")
 
 
 def _validate_or_coerce_value(
@@ -63,8 +65,6 @@ def _validate_or_coerce_value(
 
             except ValueError:
                 raise TypeError(f"Value {value!r} is not of type {expected_type.__name__} and cannot be converted safely to it.")
-
-
 
     raise TypeError(f"Value {value!r} is not of type {expected_type.__name__}.")
 
@@ -128,6 +128,51 @@ def _validate_iterable_of_iterables_and_get(
     for iterable in others:
         other_iterables.append(_validate_collection_type_and_get_values(item_type, iterable, (Collection,), (Iterable,), coerce))
     return other_iterables
+
+
+def _validate_or_coerce_keys_values_get_dict(
+    key_type: type[K],
+    value_type: type[V],
+    keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
+    coerce_keys: bool = False,
+    coerce_values: bool = False
+) -> dict[K, V]:
+    keys_from_iterable = False
+    if isinstance(keys_values, (dict, Mapping, AbstractDict)):
+        keys = keys_values.keys()
+        values = keys_values.values()
+    elif isinstance(keys_values, Iterable):
+        keys = []
+        values = []
+        keys_from_iterable = True
+        for pair in keys_values:
+            if not (isinstance(pair, tuple) and len(pair) == 2):
+                raise TypeError(f"Expected iterable of (key, value) tuples, got: {pair!r}")
+            key, value = pair
+            try:
+                hash(key)
+            except TypeError:
+                raise TypeError(f"Key {key!r} is not hashable and cannot be used as a dictionary key.")
+            keys.append(key)
+            values.append(value)
+    else:
+        raise TypeError(
+            f"The keys_values argument must be a dict, Mapping, AbstractDict, or iterable of (key, value) tuples.")
+    if len(keys) != len(values):
+        raise ValueError("The number of keys and values aren't equal.")
+    actual_keys = _validate_or_coerce_iterable(key_type, keys, coerce_keys)
+    if keys_from_iterable:
+        seen = set()
+        duplicates = set()
+        for key in actual_keys:
+            if key in seen:
+                duplicates.add(key)
+            else:
+                seen.add(key)
+        if duplicates:
+            raise ValueError(f"Duplicate keys after coercion detected: {duplicates}")
+    actual_values = _validate_or_coerce_iterable(value_type, values, coerce_values)
+    return dict(zip(actual_keys, actual_values))
 
 
 def _validate_type_of_iterable(expected_type: type, values: Iterable[Any]) -> bool:

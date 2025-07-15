@@ -84,8 +84,14 @@ class MutableDict(AbstractMutableDict[K, V]):
         coerce_keys: bool = False,
         coerce_values: bool = False
     ) -> None:
-        AbstractDict.__init__(self, key_type, value_type, keys_values, coerce_keys=coerce_keys,
-                              coerce_values=coerce_values)
+        AbstractDict.__init__(
+            self,
+            key_type,
+            value_type,
+            keys_values,
+            coerce_keys=coerce_keys,
+            coerce_values=coerce_values
+        )
 
     def to_immutable_dict(self: MutableDict[K, V]) -> ImmutableDict[K, V]:
         return ImmutableDict(self.key_type, self.value_type, self)
@@ -106,8 +112,15 @@ class ImmutableDict(AbstractDict[K, V]):
         coerce_keys: bool = False,
         coerce_values: bool = False
     ) -> None:
-        AbstractDict.__init__(self, key_type, value_type, keys_values, coerce_keys=coerce_keys,
-                              coerce_values=coerce_values, finisher=immutabledict)
+        AbstractDict.__init__(
+            self,
+            key_type,
+            value_type,
+            keys_values,
+            coerce_keys=coerce_keys,
+            coerce_values=coerce_values,
+            finisher=immutabledict
+        )
 
     def to_mutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
         return MutableDict(self.key_type, self.value_type, self)
