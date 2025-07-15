@@ -7,7 +7,7 @@ from concrete_classes import MutableList, ImmutableList
 class TestList(unittest.TestCase):
 
     def test_init_and_access(self):
-        iml = ImmutableList(int, ['1', 2])
+        iml = ImmutableList(int, ['1', 2], coerce=True)
         self.assertEqual(iml.values, (1, 2))
         self.assertEqual(iml[0], 1)
 
@@ -19,19 +19,23 @@ class TestList(unittest.TestCase):
         mul = MutableList(values=[1, 2, 3])
         self.assertEqual(mul.item_type, int)
 
-        with self.assertRaises(ValueError):
-            mul = MutableList(values=[1, 2, '3'])
+        mul = MutableList(values=[1, 2, '3'])
+        self.assertEqual(mul.item_type, int | str)
 
         empty_list = MutableList(str)
         self.assertEqual(len(empty_list), 0)
+        self.assertFalse(empty_list)
 
     def test_type_coercion(self):
-        lst = MutableList(int, ['1', 2])
+        lst = MutableList(int, ['1', 2], coerce=True)
         self.assertEqual(lst.values, [1, 2])
 
-        iml = ImmutableList(int, ['1', 2])
-        self.assertEqual(iml.values, (1, 2))
+        iml = ImmutableList(float, [1, 2.25], coerce=False)
+        self.assertEqual(iml.values, (1.0, 2.25))
         self.assertEqual(iml[0], 1)
+
+        with self.assertRaises(TypeError):
+            mul = MutableList(int, [1, 2, '3'], coerce=False)
 
     def test_immutability(self):
         iml = ImmutableList(str, ['a', 'b'])
@@ -52,8 +56,8 @@ class TestList(unittest.TestCase):
         self.assertEqual(lst.values, [5, 6])
 
     def test_init_and_get(self):
-        int_lst = MutableList(int, ['0', 1, 2])
-        str_lst = MutableList(str, ['a', 'b', 2, 0.4])
+        int_lst = MutableList(int, [0, 1, 2])
+        str_lst = MutableList(str, ['a', 'b', 2, 0.4], coerce=True)
 
         self.assertEqual(int_lst[0], 0)
         self.assertEqual(int_lst[1], 1)
@@ -95,13 +99,17 @@ class TestList(unittest.TestCase):
             self.assertEqual(s, values[i])
             i+=1
 
-    def test_sort(self):
+    def test_sort_and_sorted(self):
         lst = MutableList(int, [5, 2, 9])
         lst.sort()
         self.assertEqual(lst.values, [2, 5, 9])
 
         lst.sort(reverse=True)
         self.assertEqual(lst.values, [9, 5, 2])
+
+        iml = ImmutableList(int, lst)
+        self.assertEqual(iml.sorted().values, (2, 5, 9))
+        self.assertEqual(iml.sorted(reverse=True).values, (9, 5, 2))
 
     def test_repr_and_bool(self):
         mul = MutableList(str, ['a', 'b'])
@@ -191,6 +199,19 @@ class TestList(unittest.TestCase):
         with self.assertRaises(TypeError):
             lst.append("string")
 
+    def test_append(self):
+        int_lst = MutableList(int)
+        int_lst.append('0', coerce=True)
+        self.assertEqual(int_lst[0], 0)
+        with self.assertRaises(TypeError):
+            int_lst.append('1', coerce=False)
+
+        str_lst = MutableList(str)
+        str_lst.append(0, coerce=True)
+        str_lst.append(1, coerce=False)
+        self.assertEqual(str_lst[0], '0')
+        self.assertEqual(str_lst[1], '1')
+
     def test_invalid_setitem(self):
         lst = MutableList(int, [1, 2])
         with self.assertRaises(TypeError):
@@ -209,7 +230,6 @@ class TestList(unittest.TestCase):
         self.assertEqual(mul.distinct(), MutableList(values=['a', 'b', 'c']))
 
         STR_INT = namedtuple("STR_INT", ["string", "integer"])
-        # TODO: Make this work with non-named tuples
         iml = ImmutableList(STR_INT, [STR_INT('a', 1), STR_INT('b', 2), STR_INT('c', 1)])
         self.assertEqual(iml.distinct(lambda tup: tup.integer), ImmutableList(STR_INT, [STR_INT('a', 1), STR_INT('b', 2)]))
 

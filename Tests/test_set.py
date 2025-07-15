@@ -3,14 +3,22 @@ import unittest
 from concrete_classes import MutableSet, ImmutableSet, MutableList
 
 
-class TestTypedSet(unittest.TestCase):
+class TestSet(unittest.TestCase):
 
     def test_basic_init(self):
-        s = MutableSet(int, [1, '2', 2])
+        s = MutableSet(int, [1, '2', 2], coerce=True)
         self.assertEqual(s.values, {1, 2})
 
-        fs = ImmutableSet(int, ['1', 2, '2'])
+        fs = ImmutableSet(int, ['1', 2, '2'], coerce=True)
         self.assertEqual(fs.values, frozenset({1, 2}))
+
+    def test_type_coercion(self):
+        with self.assertRaises(TypeError):
+            ImmutableSet(int, ['1', 2])
+
+        self.assertEqual(ImmutableSet(int, ['1', 2], coerce=True).values, {1, 2})
+        self.assertEqual(MutableSet(str, [2, '3'], coerce=True).values, {'2', '3'})
+        self.assertEqual(MutableSet(str, [2, '3'], coerce=False).values, {'2', '3'})
 
     def test_immutability(self):
         fs = ImmutableSet(str, ['a', 'b'])
@@ -24,8 +32,8 @@ class TestTypedSet(unittest.TestCase):
         self.assertEqual(s1.intersection(s2).values, {2})
 
         self.assertEqual(s1.union(s2, [3, 4], [4, 5]), MutableSet(values={1, 2, 3, 4, 5}))
-        s3 = MutableSet(int, [1, '2', 3, 4, 5, 6, 7, 8])
-        self.assertEqual(s3.intersection({0, 1, 2, 3, 4, '5'}, {'a': 2, 'b': 3, 'c': 4, 'd': 5, 'e': 6, 'f': 7, 'g': 8, 'h': 9}.values()), MutableSet(values={2, 3, 4, 5}))
+        s3 = MutableSet(int, [1, '2', 3, 4, 5, 6, 7, 8], coerce=True)
+        self.assertEqual(s3.intersection({0, 1, 2, 3, 4, '5'}, {'a': 2, 'b': 3, 'c': 4, 'd': 5, 'e': 6, 'f': 7, 'g': 8, 'h': 9}.values(), coerce=True), MutableSet(values={2, 3, 4, 5}))
 
     def test_difference_sym_dif(self):
         s1 = MutableSet(int, {1, 2, 3, 4})
@@ -48,7 +56,7 @@ class TestTypedSet(unittest.TestCase):
         s2 = MutableSet(str, {"a", "1"})
         s3 = MutableSet(str, {"a", "b"})
         s4 = ImmutableSet(str, {2, 3})
-        s5 = ImmutableSet(int, {"2", "3"})
+        s5 = ImmutableSet(int, {"2", "3"}, coerce=True)
         self.assertFalse(s2.is_subset(s1))
         self.assertEqual(s2.is_subset(s1), s1.is_superset(s2))
 
@@ -67,6 +75,12 @@ class TestTypedSet(unittest.TestCase):
 
         self.assertTrue(s4.is_disjoint(s3))
         self.assertEqual(s4.is_disjoint(s3), s3.is_disjoint(s4))
+
+    def test_sub_super_set_coercion(self):
+        int_st = MutableSet(int, {1, 2, 3})
+        str_st = MutableSet(str, {'1', '2', '3'})
+        self.assertTrue(int_st.is_subset(str_st, coerce=True))
+        self.assertTrue(str_st.is_subset(int_st, coerce=True))
 
     def test_add_remove(self):
         s = MutableSet(str, ['a'])

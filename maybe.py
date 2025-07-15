@@ -13,16 +13,12 @@ class Maybe(Generic[T]):
     item_type: type[T]
     value: T | None
 
-    def __init__(
-        self: Maybe[T],
-        item_type: type[T] | None = None,
-        value: T | None = None
-    ) -> None:
+    def __init__(self: Maybe[T], value: T | None = None, item_type: type[T] | None = None, coerce: bool = False) -> None:
         from type_validation import _validate_or_coerce_value
 
         if value is not None and item_type is not None:
             object.__setattr__(self, 'item_type', item_type)
-            object.__setattr__(self, 'value', _validate_or_coerce_value(item_type, value))
+            object.__setattr__(self, 'value', _validate_or_coerce_value(item_type, value, coerce))
         elif value is not None and item_type is None:
             object.__setattr__(self, 'item_type', type(value))
             object.__setattr__(self, 'value', value)
@@ -34,19 +30,17 @@ class Maybe(Generic[T]):
 
     @staticmethod
     def empty(item_type: type[T]) -> Maybe[T]:
-        return Maybe(item_type, None)
+        return Maybe(None, item_type)
 
     @staticmethod
-    def of(value: T) -> Maybe[T]:
+    def of(value: T, item_type: type[T] | None = None) -> Maybe[T]:
         if value is None:
-            raise ValueError("Cannot create StaticOptional.of with None")
-        return Maybe(type(value), value)
+            raise ValueError("Can't create a Maybe.of with a None value.")
+        return Maybe(value, item_type)
 
     @staticmethod
     def of_nullable(value: T | None, item_type: type[T]) -> Maybe[T]:
-        if value is None:
-            return Maybe.empty(item_type)
-        return Maybe(item_type, value)
+        return Maybe(value, item_type)
 
     def is_present(self: Maybe[T]) -> bool:
         return self.value is not None
@@ -59,11 +53,30 @@ class Maybe(Generic[T]):
             raise ValueError("No value present")
         return self.value
 
-    def or_else(self: Maybe[T], fallback: T) -> T:
-        return self.value or fallback
+    def or_else(
+        self: Maybe[T],
+        fallback: T,
+        coerce: bool = False
+    ) -> T:
+        if coerce:
+            from type_validation import _validate_or_coerce_value
+            fallback = _validate_or_coerce_value(self.item_type, fallback, coerce)
+        if not isinstance(fallback, self.item_type):
+            raise TypeError(f"Fallback value {fallback} is not of type {self.item_type.__name__}, but of {type(fallback).__name__}")
+        return self.value if self.is_present() else fallback
 
-    def or_else_get(self: Maybe[T], supplier: Callable[[], T]) -> T:
-        return self.value or supplier()
+    def or_else_get(
+        self: Maybe[T],
+        supplier: Callable[[], T],
+        coerce: bool = False
+    ) -> T:
+        supplied_value = supplier()
+        if coerce:
+            from type_validation import _validate_or_coerce_value
+            supplied_value = _validate_or_coerce_value(self.item_type, supplied_value, coerce)
+        if not isinstance(supplied_value, self.item_type):
+            raise TypeError(f"Supplied value {supplied_value} is not of type {self.item_type.__name__}, but of {type(supplied_value).__name__}")
+        return self.value if self.is_present() else supplied_value
 
     def or_else_raise(self: Maybe[T], exception_supplier: Callable[[], Exception]) -> T:
         if self.is_present():
@@ -76,33 +89,44 @@ class Maybe(Generic[T]):
 
     def map(self: Maybe[T], f: Callable[[T], U]) -> Maybe[U]:
         if self.value is None:
-            return Maybe.empty(object)
+            raise ValueError("There's no value to apply the function to.")
         result = f(self.value)
         if result is None:
-            return Maybe.empty(object)
+            raise ValueError("Callable function returned a None value.")
         return Maybe.of(result)
 
-    def map_or_else(self, f: Callable[[T], U], fallback: U) -> U:
-        if self.is_present():
-            return f(self.value)
-        else:
-            return fallback
+    def map_or_else(
+        self: Maybe[T],
+        f: Callable[[T], U],
+        fallback: U,
+        coerce: bool = False
+    ) -> U:
+        if coerce:
+            from type_validation import _validate_or_coerce_value
+            fallback = _validate_or_coerce_value(self.item_type, fallback, coerce)
+        return f(self.value) if self.is_present() else fallback
 
-    def flatmap(self: Maybe[T], f: Callable[[T], Maybe[U]]) -> Maybe[U]:
+    def flatmap(
+        self: Maybe[T],
+        f: Callable[[T], Maybe[U]]
+    ) -> Maybe[U]:
         if self.is_empty():
-            return Maybe.empty(self.item_type)
+            raise ValueError("There's no value to apply the function to.")
         result = f(self.value)
         if not isinstance(result, Maybe):
-            raise TypeError("flatmap mapper must return StaticOptional")
-        return result
+            raise TypeError("flatmap mapper must return a Maybe object.")
+        if result.is_empty():
+            raise ValueError("flatmap mapper returned an empty value.")
+        return result.get()
 
-    def filter(self: Maybe[T], predicate: Callable[[T], bool]) -> Maybe[T]:
-        if self.is_empty() or not predicate(self.value):
-            return Maybe.empty(self.item_type)
-        return self
+    def filter(
+        self: Maybe[T],
+        predicate: Callable[[T], bool]
+    ) -> Maybe[T]:
+        return self if self.is_present() and predicate(self.value) else Maybe.empty(self.item_type)
 
     def __bool__(self: Maybe[T]) -> bool:
-        return bool(self.value) if self.is_present() else False
+        return bool(self.value)
 
     def __repr__(self: Maybe[T]) -> str:
         from abstract_classes import class_name

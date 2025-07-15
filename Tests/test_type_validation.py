@@ -129,7 +129,7 @@ class TestTypeValidation(unittest.TestCase):
         ims = ImmutableSet(float, {1.1, 2.2})
         self.assertTrue(_validate_type(ims, ImmutableSet[float]))
 
-        mb = Maybe(int, 42)
+        mb = Maybe(42, int)
         self.assertTrue(_validate_type(mb, Maybe[int]))
 
         # --- Type mismatch (item_type, key_type, value_type)
@@ -172,8 +172,8 @@ class TestTypeValidation(unittest.TestCase):
 
         # --- Maybe as value inside another structure
         optional_test = {
-            "a": Maybe(int, 1),
-            "b": Maybe(int, 2),
+            "a": Maybe(1, int),
+            "b": Maybe(2, int),
         }
         self.assertTrue(_validate_type(optional_test, dict[str, Maybe[int]]))
 

@@ -2,94 +2,89 @@ from __future__ import annotations
 
 import collections
 import types
-import typing
-from typing import Iterable, TypeVar, Any, get_origin, get_args, Union, Annotated, Literal
+from typing import Iterable, TypeVar, Any, get_origin, get_args, Union, Annotated, Literal, Mapping
 
-from abstract_classes import Collection, AbstractSequence, AbstractSet, AbstractDict
-from concrete_classes import MutableList, ImmutableList, MutableSet, ImmutableSet, MutableDict, ImmutableDict
+from abstract_classes import Collection, AbstractDict
 from maybe import Maybe
 
 T = TypeVar("T")
-
-COLLECTION_CLASSES = (MutableList, ImmutableList, MutableSet, ImmutableSet)
-DICTIONARY_CLASSES = (MutableDict, ImmutableDict)
-
-
-def _validate_value(
-    expected_type: Any,
-    value: Any
-) -> None:
-    """
-    Raises TypeError if value is not of expected_type.
-    """
-    if not _validate_type(value, expected_type):
-        raise TypeError(f"Value {value!r} is not of expected type {expected_type}")
 
 
 def _validate_or_coerce_value(
     expected_type: type[T],
     value: object,
-    coerce: bool = True
+    coerce: bool = False
 ) -> T:
     """
-    Coerces a value to a given type, returning it unmodified if it already is of that type. Valid conversions for
-    now are int -> float, str -> (int, float) and Any -> str, provided no error is raised.
-    :param value: Value to check validity of.
-    :param expected_type: Type to check match for the value.
-    :return: The value itself if it's of item_type, or its conversion to item_type if it can be safely converted to it.
-    :raise: TypeError if the value isn't of item_type and can't be safely converted to it.
+    Validates or coerces a value to match a given type.
+
+    Always allows safe conversions:
+        - int -> float
+        - int, float -> complex
+        - bool -> int, float
+    Allows conversions from str only if coerce=True:
+        - str -> int, float, complex
+
+    :param expected_type: Type to validate the value for, or coerce it into.
+    :param value: Value to validate or coerce.
+    :param coerce: True if you want "unsafe" coercions to happen. Defaulted to False.
+    :returns: The value itself if it's of the expected type, or its coercion to that type if that is safe or manually
+    enabled via the coerce parameter, and it can be performed.
+    :raises: TypeError if value doesn't match expected_type and cannot be safely coerced.
     """
     if _validate_type(value, expected_type):
-        # If the value is of the given type, it's returned unmodified.
         return value
 
-    if not coerce:
-        raise TypeError(f"Value {value!r} is not of expected type {expected_type.__name__}")
+    # === Always-safe coercions ===
+    if expected_type is float and isinstance(value, (int, bool)):
+        return float(value) # int | bool -> float
 
-    converted = None
+    if expected_type is int and isinstance(value, bool):
+        return int(value) # bool -> int
 
-    if expected_type is float and isinstance(value, int):
-        converted = float(value)
-    elif (expected_type is int or expected_type is float) and isinstance(value, str):
-        try:
-            converted = expected_type(value)
-        except ValueError:
-            pass
-    elif expected_type is str:
-        try:
-            converted = str(value)
-        except ValueError:
-            pass
+    if expected_type is complex and isinstance(value, (int, float, bool)):
+        return complex(value) # int | float | bool -> complex
 
-    if converted is not None:
-        return converted
+    if expected_type is str and isinstance(value, (int, float, complex, bool)):
+        return str(value) # int | float | complex | bool -> str
 
-    raise TypeError(f"Element {value!r} is not of type {expected_type.__name__} and cannot be converted safely to it.")
+    # === str-based coercions ===
+    if coerce:
+        if isinstance(value, str):
+            try:
+                if expected_type is int:
+                    return int(value)  # str -> int
+
+                elif expected_type is float:
+                    return float(value)  # str -> float
+
+                elif expected_type is complex:
+                    return complex(value)  # str -> complex
+
+            except ValueError:
+                raise TypeError(f"Value {value!r} is not of type {expected_type.__name__} and cannot be converted safely to it.")
 
 
-def _validate_iterable(
-    expected_type: type[T],
-    values: Iterable[Any] | None,
-) -> None:
-    for value in values:
-        _validate_value(expected_type, value)
+
+    raise TypeError(f"Value {value!r} is not of type {expected_type.__name__}.")
 
 
 def _validate_or_coerce_iterable(
     item_type: type[T],
-    actual_values: Iterable[Any] | None,
-    coerce: bool = True
+    values: Iterable[Any] | None,
+    coerce: bool = False
 ) -> list[T]:
     """
-    Coerces all elements of an Iterable.
+    Validates that all elements of an Iterable are of a given type, and coerces all that aren't if the coerce parameter
+    is set to True. Returns the coerced or validated iterable as a list.
     :param item_type: Type to coerce the elements to.
     :param values: Iterable object to coerce its elements into.
     :return: A list containing all elements after performing coercion.
     :raise: An Error will be raised if any coercion isn't possible.
     """
-    if actual_values is None:
+    if values is None:
         return []
-    return [_validate_or_coerce_value(item_type, value, coerce) for value in actual_values]
+    return [_validate_or_coerce_value(item_type, value, coerce) for value in values]
 
 
 def _validate_collection_type_and_get_values(
@@ -97,7 +92,7 @@ def _validate_collection_type_and_get_values(
     other: Iterable[T] | Collection[T],
     valid_typed_types: tuple[type[Collection], ...] = (Collection,),
     valid_built_in_types: tuple[type, ...] = (Iterable,),
-    coerce: bool = True
+    coerce: bool = False
 ) -> list[T]:
     """
     Checks that an Iterable or Collection object other holds values of type item_type and that is of a given allowed
@@ -111,7 +106,7 @@ def _validate_collection_type_and_get_values(
     self.item_type if necessary.
     """
     if isinstance(other, valid_typed_types):
-        if not issubclass(other.item_type, item_type):
+        if not coerce and not issubclass(other.item_type, item_type):
             raise ValueError(f"Type mismatch between expected type {item_type.__name__} and actual: {other.item_type.__name__}")
         other_values = _validate_or_coerce_iterable(item_type, other.values, coerce)
     elif isinstance(other, valid_built_in_types):
@@ -126,7 +121,7 @@ def _validate_collection_type_and_get_values(
 def _validate_iterable_of_iterables_and_get(
     item_type: type[T],
     others: Iterable[Iterable[T]],
-    coerce: bool = True
+    coerce: bool = False
 ) -> list[list[T]]:
     from abstract_classes import Collection
     other_iterables: list = []
@@ -135,24 +130,88 @@ def _validate_iterable_of_iterables_and_get(
     return other_iterables
 
 
-def _infer_type(values: Iterable[T] | Collection[T]) -> type[T]:
-    if values is None or not values:
-        raise ValueError("Type can't be inferred from an empty iterable or None object.")
-    from abstract_classes import Collection
-    if isinstance(values, Collection):
-        return values.item_type
-
-    inferred_type: type | None = None
-    for value in values:
-        if inferred_type is None:
-            inferred_type = type(value)
-        elif inferred_type != type(value):
-            raise ValueError(f"There's a type mismatch: value {value} doesn't have type {inferred_type.__name__}, but {type(value).__name__}")
-    return inferred_type
-
-
-def _validate_type_of_iterable(values: Iterable[Any], expected_type: type) -> bool:
+def _validate_type_of_iterable(expected_type: type, values: Iterable[Any]) -> bool:
     return all([_validate_type(value, expected_type) for value in values])
+
+
+def _infer_type(value: Any) -> type:
+    """
+    Infers the most specific typing annotation of a given value,
+    recursively handling collections like list, set, dict, and tuple.
+    """
+    if isinstance(value, (list, set, frozenset)) or isinstance(value, Collection):
+        return _infer_iterable_type(value)
+
+    elif isinstance(value, (dict, Mapping)) or isinstance(value, AbstractDict):
+        return _infer_mapping_type(value)
+
+    elif isinstance(value, tuple):
+        return _infer_tuple_type(value)
+
+    return type(value)
+
+
+def _infer_iterable_type(iterable: Any) -> type:
+    if isinstance(iterable, Collection):
+        return type(iterable)[iterable.item_type]
+
+    if not iterable:
+        raise ValueError("Cannot infer type from empty iterable")
+
+    inner_type = _combine_types({_infer_type(v) for v in iterable})
+
+    if isinstance(iterable, (list, set, frozenset)):
+        return type(iterable)[inner_type]
+    else:
+        return Iterable[inner_type]
+
+
+def _infer_mapping_type(mapping: Mapping) -> type:
+    if isinstance(mapping, AbstractDict):
+        return type(mapping)[mapping.key_type, mapping.value_type]
+
+    if not mapping:
+        raise ValueError("Cannot infer type from empty mapping")
+
+    key_type = _combine_types({_infer_type(k) for k in mapping.keys()})
+    value_type = _combine_types({_infer_type(v) for v in mapping.values()})
+
+    return type(mapping)[key_type, value_type]
+
+
+def _infer_tuple_type(tpl: tuple) -> type:
+    if not tpl:
+        return tuple[()]
+    element_types = tuple(_infer_type(element) for element in tpl)
+    return tuple[element_types]
+
+
+def _combine_types(type_set: set[type]) -> type:
+    if not type_set:
+        raise ValueError("Cannot combine empty type set")
+    elif len(type_set) == 1:
+        return next(iter(type_set))
+    else:
+        result_type = None
+        for t in type_set:
+            result_type = t if result_type is None else result_type | t
+        return result_type
+
+
+def _infer_type_contained_in_iterable(values: Iterable[Any]) -> type:
+    """
+    Infers the type of items inside an iterable by inferring the type of each item.
+    Supports nested containers. Raises ValueError if the iterable is empty or contains incompatible types.
+    """
+    if values is None:
+        raise ValueError("Cannot infer type from None")
+
+    inferred_types = {_infer_type(val) for val in values}
+
+    if not inferred_types:
+        raise ValueError("Cannot infer type from an empty iterable")
+
+    return _combine_types(inferred_types)
 
 
 def _validate_type(value: Any, expected_type: type) -> bool:
@@ -174,10 +233,10 @@ def _validate_type(value: Any, expected_type: type) -> bool:
     if origin is tuple:
         return _validate_tuple(value, args)
 
-    if origin in (list, set, frozenset, collections.abc.Sequence) or origin in COLLECTION_CLASSES:
+    if origin in (list, set, frozenset, collections.abc.Sequence) or (isinstance(origin, type) and issubclass(origin, Collection)):
         return _validate_iterable(value, origin, args[0])
 
-    if origin in (collections.abc.Mapping, dict) or origin in DICTIONARY_CLASSES:
+    if origin in (collections.abc.Mapping, dict) or (isinstance(origin, type) and issubclass(origin, AbstractDict)):
         return _validate_mapping_type(value, origin, args)
 
     if origin is Maybe:
@@ -187,6 +246,12 @@ def _validate_type(value: Any, expected_type: type) -> bool:
         return isinstance(value, expected_type)
 
     return False
+
+
+def _validate_iterable(value: Any, iterable_type: type, item_type: Any) -> bool:
+    if not isinstance(value, iterable_type) or isinstance(value, str):
+        return False
+    return all(_validate_type(v, item_type) for v in value)
 
 
 def _validate_mapping_type(value: Any, mapping_type: type, args: tuple) -> bool:
@@ -209,5 +274,4 @@ def _validate_tuple(value: Any, args: tuple) -> bool:
 def _validate_maybe(value: Any, origin: Any, args: tuple) -> bool:
     if not isinstance(value, origin):
         return False
-
     return value.value is None or _validate_type(value.value, args[0])
