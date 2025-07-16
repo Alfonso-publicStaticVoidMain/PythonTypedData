@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Iterable, Any, Callable, TypeVar, Generic, Mapping, TYPE_CHECKING
+from typing import Iterable, Any, Callable, TypeVar, Generic, Mapping, TYPE_CHECKING, ClassVar
+from weakref import WeakValueDictionary
 
 if TYPE_CHECKING:
     from type_validation import (
@@ -42,29 +43,57 @@ class Collection(Generic[T]):
 
     item_type: type[T]
     values: Any
+    _inferred_type_cache: ClassVar[WeakValueDictionary[tuple[type, type], type]] = WeakValueDictionary()
 
     def __new__(cls, *args, **kwargs) -> Collection[T] | None:
         return _forbid_instantiation(Collection)(cls, *args, **kwargs)
 
     def __init__(
         self: Collection[T],
-        item_type: type[T] | None = None,
+        item_type: type,
         values: Iterable[T] | Collection[T] | None = None,
         forbidden_iterable_types: tuple[type, ...] = (),
         coerce: bool = False,
         finisher: Callable[[Iterable[T]], Any] = lambda x: x
     ) -> None:
-        from type_validation import _infer_type_contained_in_iterable, _validate_or_coerce_iterable
+        from type_validation import _validate_or_coerce_iterable
 
-        obj_type: type | None = None
-        if item_type is None:
-            # This raises a ValueError if the type can't be properly inferred.
-            obj_type = _infer_type_contained_in_iterable(values)
-
+        inferred_type = getattr(type(self), "_inferred_item_type", None)
+        # TODO: Change the logic to raise an error if there's a type mismatch between item_type and inferred_type
+        # item_type takes precedence over the generic type given inside [...]
+        final_item_type = item_type or inferred_type
+        # TODO: correct the reference to self.__class__.__name__, as it won't show properly with the new generic system
+        if final_item_type is None:
+            raise ValueError(f"Can't create a {self.__class__.__name__} object without a type. To infer the type of the values use {self.__class__.__name__}.of")
         if isinstance(values, forbidden_iterable_types):
             raise TypeError(f"Invalid type {type(values).__name__} for class {class_name(self)}.")
-        object.__setattr__(self, 'item_type', item_type or obj_type)
+        object.__setattr__(self, 'item_type', final_item_type)
         object.__setattr__(self, 'values', finisher(_validate_or_coerce_iterable(self.item_type, values, coerce)))
+
+    @classmethod
+    def of(cls: type[Collection[T]], values: Iterable[T] | Collection[T]):
+        if values is None or not values:
+            raise ValueError(f"Can't create a {cls.__name__} object from empty values.")
+        from type_validation import _infer_type_contained_in_iterable
+        return cls(_infer_type_contained_in_iterable(values), values)
+
+    @classmethod
+    def empty(cls: type[Collection[T]], item_type: type[T]):
+        if item_type is None:
+            raise ValueError(f"Trying to call {cls.__name__}.empty with a None type.")
+        return cls(item_type)
+
+    def __class_getitem__(cls, item_type: type[T]) -> type:
+        key = (cls, item_type)
+        if key in cls._inferred_type_cache:
+            return cls._inferred_type_cache[key]
+
+        class TypedCollection(cls):
+            pass
+
+        setattr(TypedCollection, '_inferred_item_type', item_type)
+        cls._inferred_type_cache[key] = TypedCollection
+        return TypedCollection
 
     def __len__(self: Collection[T]) -> int:
         return len(self.values)
@@ -123,7 +152,7 @@ class Collection(Generic[T]):
         coerce: bool = False
     ) -> Collection[R]:
         mapped = [f(value) for value in self.values]
-        return self.__class__(result_type, mapped, coerce=coerce) if result_type is not None else self.__class__(values=mapped)
+        return self.__class__(result_type, mapped, coerce=coerce) if result_type is not None else self.__class__.of(mapped)
 
     # TODO tests
     def flatmap(
@@ -138,7 +167,7 @@ class Collection(Generic[T]):
             if not isinstance(result, Iterable) or isinstance(result, (str, bytes)):
                 raise TypeError("flatmap function must return a non-string iterable")
             flattened.extend(result)
-        return self.__class__(result_type, flattened, coerce=coerce) if result_type is not None else self.__class__(values=flattened)
+        return self.__class__(result_type, flattened, coerce=coerce) if result_type is not None else self.__class__.of(flattened)
 
     def filter(self: Collection[T], predicate: Callable[[T], bool]) -> Collection[T]:
         return self.__class__(self.item_type, [value for value in self.values if predicate(value)])
@@ -535,39 +564,78 @@ class AbstractDict(Generic[K, V]):
 
     def __init__(
         self: AbstractDict[K, V],
-        key_type: type[K] | None = None, value_type: type[V] | None = None,
+        key_type: type[K], value_type: type[V],
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
+        *,
+        _keys: Iterable[K] | None = None, _values: Iterable[V] | None = None,
         coerce_keys: bool = False, coerce_values: bool = False,
         finisher: Callable[[dict[K, V]], Any] = lambda x : x
     ) -> None:
-        from type_validation import _validate_or_coerce_iterable, _split_keys_values, _infer_type_contained_in_iterable, _validate_duplicates
+        from type_validation import (
+            _validate_or_coerce_iterable,
+            _split_keys_values,
+            _validate_duplicates_and_hash
+        )
 
-        if keys_values is None or not keys_values:
-            if key_type is None or value_type is None:
-                raise ValueError("Dictionary types can't be inferred from empty data.")
+        if key_type is None or value_type is None:
+            raise ValueError(f"Some dictionary types are empty. To infer the type from the data use {self.__class__.__name__}.of or .of_keys_values.")
+
+
+        if _keys is not None and _values is not None:
+            keys = _keys
+            values = _values
+            if len(list(keys)) != len(list(values)):
+                raise ValueError("Keys and values must be of the same length.")
+            keys_from_iterable = True
+
+        elif keys_values is None or not keys_values:
             object.__setattr__(self, "key_type", key_type)
             object.__setattr__(self, "value_type", value_type)
             object.__setattr__(self, "data", finisher({}))
             return
 
-        keys, values, keys_from_iterable = _split_keys_values(keys_values)
-        inferred_key_type = None
-        inferred_value_type = None
-        if key_type is None:
-            inferred_key_type = _infer_type_contained_in_iterable(keys)
-        if value_type is None:
-            inferred_value_type = _infer_type_contained_in_iterable(values)
+        else:
+            keys, values, keys_from_iterable = _split_keys_values(keys_values)
 
-        object.__setattr__(self, "key_type", key_type or inferred_key_type)
-        object.__setattr__(self, "value_type", value_type or inferred_value_type)
+        object.__setattr__(self, "key_type", key_type)
+        object.__setattr__(self, "value_type", value_type)
 
         actual_keys = _validate_or_coerce_iterable(self.key_type, keys, coerce_keys)
         actual_values = _validate_or_coerce_iterable(self.value_type, values, coerce_values)
 
         if keys_from_iterable:
-            _validate_duplicates(actual_keys)
+            _validate_duplicates_and_hash(actual_keys)
 
         object.__setattr__(self, "data", finisher(dict(zip(actual_keys, actual_values))))
+
+    @classmethod
+    def of(cls: type[AbstractDict[K, V]], keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]):
+        if keys_values is None or not keys_values:
+            raise ValueError(f"Can't create a {cls.__name__} object from empty values.")
+        from type_validation import _infer_type_contained_in_iterable, _split_keys_values
+        keys, values, _ = _split_keys_values(keys_values)
+        return cls(
+            _infer_type_contained_in_iterable(keys),
+            _infer_type_contained_in_iterable(values),
+            _keys=keys,
+            _values=values
+        )
+
+    @classmethod
+    def of_keys_values(cls: type[AbstractDict[K, V]], keys: Iterable[K], values: Iterable[V]):
+        keys = list(keys)
+        values = list(values)
+
+        if len(keys) != len(values):
+            raise ValueError("Keys and values must be of the same length when using .of_keys_values")
+
+        from type_validation import _infer_type_contained_in_iterable, _validate_duplicates_and_hash
+        return cls(
+            _infer_type_contained_in_iterable(keys),
+            _infer_type_contained_in_iterable(values),
+            _keys=keys,
+            _values=values
+        )
 
     def __getitem__(self: AbstractDict[K, V], key: K) -> V:
         return self.data[key]

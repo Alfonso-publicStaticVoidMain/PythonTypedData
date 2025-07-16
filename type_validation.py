@@ -129,10 +129,14 @@ def _validate_iterable_of_iterables_and_get(
     return other_iterables
 
 
-def _validate_duplicates(iterable: Iterable):
+def _validate_duplicates_and_hash(iterable: Iterable) -> None:
     seen = set()
     duplicates = set()
     for key in iterable:
+        try:
+            hash(key)
+        except TypeError:
+            raise TypeError(f"Key {key!r} is not hashable and cannot be used as a dictionary key.")
         if key in seen:
             duplicates.add(key)
         else:
@@ -154,15 +158,10 @@ def _split_keys_values(keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[
             if not (isinstance(pair, tuple) and len(pair) == 2):
                 raise TypeError(f"Expected iterable of (key, value) tuples, got: {pair!r}")
             key, value = pair
-            try:
-                hash(key)
-            except TypeError:
-                raise TypeError(f"Key {key!r} is not hashable and cannot be used as a dictionary key.")
             keys.append(key)
             values.append(value)
     else:
-        raise TypeError(
-            f"The keys_values argument must be a dict, Mapping, AbstractDict, or iterable of (key, value) tuples.")
+        raise TypeError(f"The keys_values argument must be a dict, Mapping, AbstractDict, or iterable of (key, value) tuples.")
     if len(keys) != len(values):
         raise ValueError("The number of keys and values aren't equal.")
     return keys, values, keys_from_iterable

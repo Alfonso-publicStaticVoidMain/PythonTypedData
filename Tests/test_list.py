@@ -16,13 +16,15 @@ class TestList(unittest.TestCase):
         self.assertEqual(iml.values, tuple(mul.values))
 
     def test_partial_init_parameters(self):
-        mul = MutableList(values=[1, 2, 3])
+        with self.assertRaises(TypeError):
+            MutableList(values=[1, 2, 3])
+        mul = MutableList.of([1, 2, 3])
         self.assertEqual(mul.item_type, int)
 
-        mul = MutableList(values=[1, 2, '3'])
-        self.assertEqual(mul.item_type, int | str)
+        iml = ImmutableList.of([1, 2, '3'])
+        self.assertEqual(iml.item_type, int | str)
 
-        empty_list = MutableList(str)
+        empty_list = MutableList.empty(str)
         self.assertEqual(len(empty_list), 0)
         self.assertFalse(empty_list)
 

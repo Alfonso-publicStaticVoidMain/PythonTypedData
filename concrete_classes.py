@@ -26,7 +26,7 @@ class MutableList(AbstractMutableSequence[T]):
 
     def __init__(
         self: MutableList[T],
-        item_type: type[T] | None = None,
+        item_type: type[T],
         values: Iterable[T] | Collection[T] | None = None,
         coerce: bool = False
     ) -> None:
@@ -50,7 +50,7 @@ class ImmutableList(AbstractSequence[T]):
 
     def __init__(
         self: ImmutableList[T],
-        item_type: type[T] | None = None,
+        item_type: type[T],
         values: Iterable[T] | Collection[T] | None = None,
         coerce: bool = False
     ) -> None:
@@ -134,7 +134,7 @@ class MutableSet(AbstractMutableSet[T]):
 
     def __init__(
         self: MutableSet[T],
-        item_type: type[T] | None = None,
+        item_type: type[T],
         values: Iterable[T] | Collection[T] | None = None,
         coerce: bool = False
     ) -> None:
@@ -152,7 +152,7 @@ class ImmutableSet(AbstractSet[T]):
 
     def __init__(
         self: ImmutableSet[T],
-        item_type: type[T] | None = None,
+        item_type: type[T],
         values: Iterable[T] | Collection[T] | None = None,
         coerce: bool = False
     ) -> None:
