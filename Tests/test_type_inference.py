@@ -54,9 +54,9 @@ class TestTypeInference(unittest.TestCase):
         self.assertEqual(_infer_type(obj), Dummy)
 
     def test_mutable_list(self):
-        self.assertEqual(_infer_type(MutableList(int, [1, 1, 1])), MutableList[int])
+        self.assertEqual(_infer_type(MutableList([1, 1, 1], int)), MutableList[int])
 
-        lst = [MutableList(int, [0, 1]), MutableList(int, [2, 3]), MutableList(int, [])]
+        lst = [MutableList([0, 1], int), MutableList([2, 3], int), MutableList([], int)]
         self.assertEqual(_infer_type(lst), list[MutableList[int]])
 
 

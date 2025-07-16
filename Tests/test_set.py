@@ -111,13 +111,13 @@ class TestSet(unittest.TestCase):
 
     def test_intersection_sym_difference_update_multiple_types(self):
         s = MutableSet(int, [1, 2, 3, 4, 5])
-        s.intersection_update(ImmutableSet(int, [2, 3, 6]), MutableList(int, [3, 4, 5, 6]), [3, 5, 7], {3, 5, 8})
+        s.intersection_update(ImmutableSet(int, [2, 3, 6]), MutableList([3, 4, 5, 6], int), [3, 5, 7], {3, 5, 8})
 
         self.assertEqual(s.values, {3})
 
         mus = MutableSet(int, [1, 2, 3])
         ims = ImmutableSet(int, [2, 3, 4])
-        mul = MutableList(int, [3, 4, 5])
+        mul = MutableList([3, 4, 5], int)
         lst = [4, 5, 6]
         st = {5, 6, 7}
         mus.symmetric_difference_update(ims, mul, lst, st)

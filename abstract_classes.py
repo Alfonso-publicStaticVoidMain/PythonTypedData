@@ -50,17 +50,17 @@ class Collection(Generic[T]):
 
     def __init__(
         self: Collection[T],
-        item_type: type,
         values: Iterable[T] | Collection[T] | None = None,
+        item_type: type | None = None,
         forbidden_iterable_types: tuple[type, ...] = (),
         coerce: bool = False,
-        finisher: Callable[[Iterable[T]], Any] = lambda x: x
+        finisher: Callable[[Iterable[T]], Any] = lambda x : x
     ) -> None:
         from type_validation import _validate_or_coerce_iterable
 
         inferred_type = getattr(type(self), "_inferred_item_type", None)
-        # TODO: Change the logic to raise an error if there's a type mismatch between item_type and inferred_type
-        # item_type takes precedence over the generic type given inside [...]
+        if item_type is not None and inferred_type is not None and item_type != inferred_type:
+            raise ValueError(f"Generic type {inferred_type.__name__} is different than parameter type {item_type.__name__}")
         final_item_type = item_type or inferred_type
         # TODO: correct the reference to self.__class__.__name__, as it won't show properly with the new generic system
         if final_item_type is None:

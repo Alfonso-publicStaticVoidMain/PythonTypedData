@@ -7,7 +7,7 @@ class TestAbstractClasses(unittest.TestCase):
 
     def test_forbidden_instantiation(self):
         with self.assertRaises(TypeError):
-            col = Collection(str)
+            col = Collection(item_type=str)
         with self.assertRaises(TypeError):
             dic = AbstractDict(int, float)
         with self.assertRaises(TypeError):

@@ -26,11 +26,11 @@ class MutableList(AbstractMutableSequence[T]):
 
     def __init__(
         self: MutableList[T],
-        item_type: type[T],
         values: Iterable[T] | Collection[T] | None = None,
+        item_type: type[T] | None = None,
         coerce: bool = False
     ) -> None:
-        Collection.__init__(self, item_type, values, (AbstractSet, set, frozenset), coerce=coerce)
+        Collection.__init__(self, values, item_type, (AbstractSet, set, frozenset), coerce=coerce)
 
     def to_immutable_list(self: MutableList[T]) -> ImmutableList[T]:
         return ImmutableList(self.item_type, self.values)
@@ -54,13 +54,13 @@ class ImmutableList(AbstractSequence[T]):
         values: Iterable[T] | Collection[T] | None = None,
         coerce: bool = False
     ) -> None:
-        Collection.__init__(self, item_type, values, (AbstractSet, set, frozenset), coerce=coerce, finisher=tuple)
+        Collection.__init__(self, values, item_type, (AbstractSet, set, frozenset), coerce=coerce, finisher=tuple)
 
     def __repr__(self: Collection[T]) -> str:
         return f"{class_name(self)}<{self.item_type.__name__}>{list(self.values)}"
 
     def to_mutable_list(self: ImmutableList[T]) -> MutableList[T]:
-        return MutableList(self.item_type, self.values)
+        return MutableList(self.values, self.item_type)
 
     def to_mutable_set(self: ImmutableList[T]) -> MutableSet[T]:
         return MutableSet(self.item_type, self.values)
@@ -138,7 +138,7 @@ class MutableSet(AbstractMutableSet[T]):
         values: Iterable[T] | Collection[T] | None = None,
         coerce: bool = False
     ) -> None:
-        Collection.__init__(self, item_type, values, coerce=coerce, finisher=set)
+        Collection.__init__(self, values, item_type, coerce=coerce, finisher=set)
 
     def to_immutable_set(self: MutableSet[T]) -> ImmutableSet[T]:
         return ImmutableSet(self.item_type, self)
@@ -156,7 +156,7 @@ class ImmutableSet(AbstractSet[T]):
         values: Iterable[T] | Collection[T] | None = None,
         coerce: bool = False
     ) -> None:
-        Collection.__init__(self, item_type, values, coerce=coerce, finisher=frozenset)
+        Collection.__init__(self, values, item_type, coerce=coerce, finisher=frozenset)
 
     def __repr__(self: Collection[T]) -> str:
         return f"{class_name(self)}<{self.item_type.__name__}>{set(self.values)}"

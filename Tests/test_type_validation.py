@@ -111,7 +111,7 @@ class TestTypeValidation(unittest.TestCase):
         from maybe import Maybe
 
         # --- Direct matches
-        ml = MutableList(int, [1, 2, 3])
+        ml = MutableList([1, 2, 3], int)
         self.assertTrue(_validate_type(ml, MutableList[int]))
 
         iml = ImmutableList(str, ["a", "b"])
@@ -133,12 +133,12 @@ class TestTypeValidation(unittest.TestCase):
         self.assertTrue(_validate_type(mb, Maybe[int]))
 
         # --- Type mismatch (item_type, key_type, value_type)
-        self.assertFalse(_validate_type(MutableList(str, ["a", "b"]), MutableList[int]))
+        self.assertFalse(_validate_type(MutableList(["a", "b"], str), MutableList[int]))
         self.assertFalse(_validate_type(MutableDict(str, str, {"a": "b"}), MutableDict[str, int]))
         self.assertFalse(_validate_type(MutableSet(float, {1.0}), MutableSet[str]))
 
         # --- Custom class nested in standard containers
-        lst_of_custom = [MutableList(int, [1, 2]), MutableList(int, [3, 4])]
+        lst_of_custom = [MutableList([1, 2], int), MutableList([3, 4], int)]
         self.assertTrue(_validate_type(lst_of_custom, list[MutableList[int]]))
 
         dict_of_custom = {
@@ -148,16 +148,16 @@ class TestTypeValidation(unittest.TestCase):
         self.assertTrue(_validate_type(dict_of_custom, dict[str, MutableSet[int]]))
 
         # --- Nested custom within custom
-        nested_custom = MutableList(MutableList, [
+        nested_custom = MutableList([
             MutableList(int, [1]),
             MutableList(int, [2, 3])
-        ])
+        ], MutableList)
         self.assertTrue(_validate_type(nested_custom, MutableList[MutableList[int]]))
 
-        deeply_nested = MutableList(MutableDict, [
+        deeply_nested = MutableList([
             MutableDict(str, int, {"a": 1}),
             MutableDict(str, int, {"b": 2})
-        ])
+        ], MutableDict)
         self.assertTrue(_validate_type(deeply_nested, MutableList[MutableDict[str, int]]))
 
         # --- Union (|) with custom types
