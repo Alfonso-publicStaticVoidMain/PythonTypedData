@@ -6,7 +6,7 @@ from concrete_classes import MutableDict, ImmutableDict
 class DictionaryTest(unittest.TestCase):
 
     def test_init_access_and_eq(self):
-        dic = MutableDict(str, int, {'a': 1, 'b': '2'}, _coerce_values=True)
+        dic = MutableDict(str, int, {'a': 1, 'b': '2'}, coerce_values=True)
         self.assertEqual(dic.data, {'a': 1, 'b': 2})
         self.assertEqual(dic['a'], 1)
         self.assertEqual(dic['b'], 2)

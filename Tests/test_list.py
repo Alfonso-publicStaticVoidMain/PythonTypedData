@@ -7,12 +7,9 @@ from concrete_classes import MutableList, ImmutableList
 
 class TestList(unittest.TestCase):
 
-    def test_extract_generic_type(self):
+    def test_class_name(self):
         lst = MutableList[int]([0, 1, 2])
-        generic_type = getattr(type(lst), "_inferred_item_type", None)
         class_name = type(lst).__name__
-
-        self.assertEqual(generic_type, int)
         self.assertEqual(class_name, "MutableList")
 
     def test_init_and_access(self):

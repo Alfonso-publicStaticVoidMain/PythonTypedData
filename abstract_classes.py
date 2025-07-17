@@ -559,8 +559,8 @@ class AbstractDict[K, V]:
         *,
         _keys: Iterable[K] | None = None,
         _values: Iterable[V] | None = None,
-        _coerce_keys: bool = False,
-        _coerce_values: bool = False,
+        coerce_keys: bool = False,
+        coerce_values: bool = False,
         _finisher: Callable[[dict[K, V]], Any] = lambda x : x,
         _skip_validation: bool = False
     ) -> None:
@@ -594,8 +594,8 @@ class AbstractDict[K, V]:
         else:
             keys, values, keys_from_iterable = _split_keys_values(keys_values)
 
-        actual_keys = keys if _skip_validation else _validate_or_coerce_iterable(self.key_type, keys, _coerce_keys)
-        actual_values = values if _skip_validation else _validate_or_coerce_iterable(self.value_type, values, _coerce_values)
+        actual_keys = keys if _skip_validation else _validate_or_coerce_iterable(self.key_type, keys, coerce_keys)
+        actual_values = values if _skip_validation else _validate_or_coerce_iterable(self.value_type, values, coerce_values)
 
         if keys_from_iterable:
             _validate_duplicates_and_hash(actual_keys)
