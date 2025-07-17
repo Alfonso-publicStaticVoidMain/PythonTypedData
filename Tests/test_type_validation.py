@@ -109,12 +109,12 @@ class TestTypeValidation(unittest.TestCase):
     def test_validate_custom_classes(self):
         from concrete_classes import MutableDict, MutableSet, ImmutableDict, ImmutableSet, MutableList, ImmutableList
         from maybe import Maybe
-
+        # TODO solve the problems with this test
         # --- Direct matches
         ml = MutableList([1, 2, 3], int)
         self.assertTrue(_validate_type(ml, MutableList[int]))
 
-        iml = ImmutableList(str, ["a", "b"])
+        iml = ImmutableList(["a", "b"], str)
         self.assertTrue(_validate_type(iml, ImmutableList[str]))
 
         md = MutableDict(str, int, {"a": 1, "b": 2})
@@ -123,10 +123,10 @@ class TestTypeValidation(unittest.TestCase):
         id_ = ImmutableDict(int, float, {1: 1.0, 2: 2.0})
         self.assertTrue(_validate_type(id_, ImmutableDict[int, float]))
 
-        ms = MutableSet(bool, {True, False})
+        ms = MutableSet[bool]({True, False})
         self.assertTrue(_validate_type(ms, MutableSet[bool]))
 
-        ims = ImmutableSet(float, {1.1, 2.2})
+        ims = ImmutableSet({1.1, 2.2}, float)
         self.assertTrue(_validate_type(ims, ImmutableSet[float]))
 
         mb = Maybe(42, int)
@@ -163,7 +163,7 @@ class TestTypeValidation(unittest.TestCase):
         # --- Union (|) with custom types
         union_test = [
             MutableSet(int, {1, 2}),
-            ImmutableSet(int, {3, 4}),
+            ImmutableSet({3, 4}, int),
         ]
         self.assertTrue(_validate_type(union_test, list[MutableSet[int] | ImmutableSet[int]]))
 

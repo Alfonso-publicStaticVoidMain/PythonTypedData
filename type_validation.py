@@ -167,10 +167,6 @@ def _split_keys_values(keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[
     return keys, values, keys_from_iterable
 
 
-def _validate_type_of_iterable(expected_type: type, values: Iterable[Any]) -> bool:
-    return all([_validate_type(value, expected_type) for value in values])
-
-
 def _infer_type(value: Any) -> type:
     """
     Infers the most specific typing annotation of a given value,
@@ -283,6 +279,10 @@ def _validate_type(value: Any, expected_type: type) -> bool:
         return isinstance(value, expected_type)
 
     return False
+
+
+def _validate_type_of_iterable(expected_type: type, values: Iterable[Any]) -> bool:
+    return all([_validate_type(value, expected_type) for value in values])
 
 
 def _validate_iterable(value: Any, iterable_type: type, item_type: Any) -> bool:

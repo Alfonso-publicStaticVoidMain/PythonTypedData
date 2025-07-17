@@ -18,7 +18,7 @@ V = TypeVar("V")
 U = TypeVar("U")
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, eq=False)
 class MutableList(AbstractMutableSequence[T]):
 
     item_type: type[T]
@@ -28,21 +28,22 @@ class MutableList(AbstractMutableSequence[T]):
         self: MutableList[T],
         values: Iterable[T] | Collection[T] | None = None,
         item_type: type[T] | None = None,
-        coerce: bool = False
+        coerce: bool = False,
+        _skip_validation: bool = False
     ) -> None:
-        Collection.__init__(self, values, item_type, (AbstractSet, set, frozenset), coerce=coerce)
+        Collection.__init__(self, values, item_type, (AbstractSet, set, frozenset), coerce=coerce, _skip_validation=_skip_validation)
 
     def to_immutable_list(self: MutableList[T]) -> ImmutableList[T]:
-        return ImmutableList(self.item_type, self.values)
+        return ImmutableList(self.values, self.item_type, _skip_validation=True)
 
     def to_mutable_set(self: MutableList[T]) -> MutableSet[T]:
-        return MutableSet(self.item_type, self.values)
+        return MutableSet(self.values, self.item_type, _skip_validation=True)
 
     def to_immutable_set(self: MutableList[T]) -> ImmutableSet[T]:
-        return ImmutableSet(self.item_type, self.values)
+        return ImmutableSet(self.values, self.item_type, _skip_validation=True)
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, eq=False)
 class ImmutableList(AbstractSequence[T]):
 
     item_type: type[T]
@@ -50,26 +51,69 @@ class ImmutableList(AbstractSequence[T]):
 
     def __init__(
         self: ImmutableList[T],
-        item_type: type[T],
         values: Iterable[T] | Collection[T] | None = None,
-        coerce: bool = False
+        item_type: type[T] | None = None,
+        coerce: bool = False,
+        _skip_validation: bool = False
     ) -> None:
-        Collection.__init__(self, values, item_type, (AbstractSet, set, frozenset), coerce=coerce, finisher=tuple)
+        Collection.__init__(self, values, item_type, (AbstractSet, set, frozenset), coerce=coerce, finisher=tuple,
+                            _skip_validation=_skip_validation)
 
     def __repr__(self: Collection[T]) -> str:
         return f"{class_name(self)}<{self.item_type.__name__}>{list(self.values)}"
 
     def to_mutable_list(self: ImmutableList[T]) -> MutableList[T]:
-        return MutableList(self.values, self.item_type)
+        return MutableList(self.values, self.item_type, _skip_validation=True)
 
     def to_mutable_set(self: ImmutableList[T]) -> MutableSet[T]:
-        return MutableSet(self.item_type, self.values)
+        return MutableSet(self.values, self.item_type, _skip_validation=True)
 
     def to_immutable_set(self: ImmutableList[T]) -> ImmutableSet[T]:
-        return ImmutableSet(self.item_type, self.values)
+        return ImmutableSet(self.values, self.item_type, _skip_validation=True)
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, eq=False)
+class MutableSet(AbstractMutableSet[T]):
+
+    item_type: type[T]
+    values: set[T]
+
+    def __init__(
+        self: MutableSet[T],
+        values: Iterable[T] | Collection[T] | None = None,
+        item_type: type[T] | None = None,
+        coerce: bool = False,
+        _skip_validation: bool = False
+    ) -> None:
+        Collection.__init__(self, values, item_type, coerce=coerce, finisher=set, _skip_validation=_skip_validation)
+
+    def to_immutable_set(self: MutableSet[T]) -> ImmutableSet[T]:
+        return ImmutableSet(self.values, self.item_type, _skip_validation=True)
+
+
+@dataclass(frozen=True, slots=True, repr=False, eq=False)
+class ImmutableSet(AbstractSet[T]):
+
+    item_type: type[T]
+    values: frozenset[T]
+
+    def __init__(
+        self: ImmutableSet[T],
+        values: Iterable[T] | Collection[T] | None = None,
+        item_type: type[T] | None = None,
+        coerce: bool = False,
+        _skip_validation: bool = False
+    ) -> None:
+        Collection.__init__(self, values, item_type, coerce=coerce, finisher=frozenset, _skip_validation=_skip_validation)
+
+    def __repr__(self: Collection[T]) -> str:
+        return f"{class_name(self)}<{self.item_type.__name__}>{set(self.values)}"
+
+    def to_mutable_set(self: ImmutableSet[T]) -> MutableSet[T]:
+        return MutableSet(self.values, self.item_type, _skip_validation=True)
+
+
+@dataclass(frozen=True, slots=True, repr=False, eq=False)
 class MutableDict(AbstractMutableDict[K, V]):
 
     key_type: type[K]
@@ -82,7 +126,9 @@ class MutableDict(AbstractMutableDict[K, V]):
         value_type: type[V] | None = None,
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
         coerce_keys: bool = False,
-        coerce_values: bool = False
+        coerce_values: bool = False,
+        _keys: Iterable[K] | None = None,
+        _values: Iterable[V] | None = None
     ) -> None:
         AbstractDict.__init__(
             self,
@@ -90,14 +136,16 @@ class MutableDict(AbstractMutableDict[K, V]):
             value_type,
             keys_values,
             coerce_keys=coerce_keys,
-            coerce_values=coerce_values
+            coerce_values=coerce_values,
+            _keys=_keys,
+            _values=_values
         )
 
     def to_immutable_dict(self: MutableDict[K, V]) -> ImmutableDict[K, V]:
         return ImmutableDict(self.key_type, self.value_type, self)
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, eq=False)
 class ImmutableDict(AbstractDict[K, V]):
 
     key_type: type[K]
@@ -110,7 +158,9 @@ class ImmutableDict(AbstractDict[K, V]):
         value_type: type[V] | None = None,
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
         coerce_keys: bool = False,
-        coerce_values: bool = False
+        coerce_values: bool = False,
+        _keys: Iterable[K] | None = None,
+        _values: Iterable[V] | None = None
     ) -> None:
         AbstractDict.__init__(
             self,
@@ -119,47 +169,10 @@ class ImmutableDict(AbstractDict[K, V]):
             keys_values,
             coerce_keys=coerce_keys,
             coerce_values=coerce_values,
-            finisher=immutabledict
+            finisher=immutabledict,
+            _keys=_keys,
+            _values=_values
         )
 
     def to_mutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
         return MutableDict(self.key_type, self.value_type, self)
-
-
-@dataclass(frozen=True, slots=True, repr=False)
-class MutableSet(AbstractMutableSet[T]):
-
-    item_type: type[T]
-    values: set[T]
-
-    def __init__(
-        self: MutableSet[T],
-        item_type: type[T],
-        values: Iterable[T] | Collection[T] | None = None,
-        coerce: bool = False
-    ) -> None:
-        Collection.__init__(self, values, item_type, coerce=coerce, finisher=set)
-
-    def to_immutable_set(self: MutableSet[T]) -> ImmutableSet[T]:
-        return ImmutableSet(self.item_type, self)
-
-
-@dataclass(frozen=True, slots=True, repr=False)
-class ImmutableSet(AbstractSet[T]):
-
-    item_type: type[T]
-    values: frozenset[T]
-
-    def __init__(
-        self: ImmutableSet[T],
-        item_type: type[T],
-        values: Iterable[T] | Collection[T] | None = None,
-        coerce: bool = False
-    ) -> None:
-        Collection.__init__(self, values, item_type, coerce=coerce, finisher=frozenset)
-
-    def __repr__(self: Collection[T]) -> str:
-        return f"{class_name(self)}<{self.item_type.__name__}>{set(self.values)}"
-
-    def to_mutable_set(self: ImmutableSet[T]) -> MutableSet[T]:
-        return MutableSet(self.item_type, self)

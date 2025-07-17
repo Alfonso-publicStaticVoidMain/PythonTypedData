@@ -20,7 +20,7 @@ class DictionaryTest(unittest.TestCase):
         self.assertEqual(dic, mud)
 
     def test_type_inference(self):
-        dic = ImmutableDict(keys_values={1: 'a', 2: 'b'})
+        dic = ImmutableDict.of({1: 'a', 2: 'b'})
         self.assertEqual(dic.key_type, int)
         self.assertEqual(dic.value_type, str)
 
