@@ -2,17 +2,13 @@ from __future__ import annotations
 
 import collections
 import types
-from typing import Iterable, TypeVar, Any, get_origin, get_args, Union, Annotated, Literal, Mapping
+from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Literal, Mapping
 
 from abstract_classes import Collection, AbstractDict
 from maybe import Maybe
 
-T = TypeVar("T")
-K = TypeVar("K")
-V = TypeVar("V")
 
-
-def _validate_or_coerce_value(
+def _validate_or_coerce_value[T](
     expected_type: type[T],
     value: object,
     coerce: bool = False
@@ -24,14 +20,14 @@ def _validate_or_coerce_value(
         - int -> float
         - int, float -> complex
         - bool -> int, float
-    Allows conversions from str only if coerce=True:
+    Allows conversions from str only if _coerce=True:
         - str -> int, float, complex
 
-    :param expected_type: Type to validate the value for, or coerce iterable into.
-    :param value: Value to validate or coerce.
+    :param expected_type: Type to validate the value for, or _coerce iterable into.
+    :param value: Value to validate or _coerce.
     :param coerce: True if you want "unsafe" coercions to happen. Defaulted to False.
     :returns: The value itself if iterable's of the expected type, or its coercion to that type if that is safe or manually
-    enabled via the coerce parameter, and iterable can be performed.
+    enabled via the _coerce parameter, and iterable can be performed.
     :raises: TypeError if value doesn't match expected_type and cannot be safely coerced.
     """
     if _validate_type(value, expected_type):
@@ -69,16 +65,16 @@ def _validate_or_coerce_value(
     raise TypeError(f"Value {value!r} is not of type {expected_type.__name__}.")
 
 
-def _validate_or_coerce_iterable(
+def _validate_or_coerce_iterable[T](
     item_type: type[T],
     values: Iterable[Any] | None,
     coerce: bool = False
 ) -> list[T]:
     """
-    Validates that all elements of an Iterable are of a given type, and coerces all that aren't if the coerce parameter
+    Validates that all elements of an Iterable are of a given type, and coerces all that aren't if the _coerce parameter
     is set to True. Returns the coerced or validated iterable as a list.
-    :param item_type: Type to coerce the elements to.
-    :param values: Iterable object to coerce its elements into.
+    :param item_type: Type to _coerce the elements to.
+    :param values: Iterable object to _coerce its elements into.
     :return: A list containing all elements after performing coercion.
     :raise: An Error will be raised if any coercion isn't possible.
     """
@@ -87,7 +83,7 @@ def _validate_or_coerce_iterable(
     return [_validate_or_coerce_value(item_type, value, coerce) for value in values]
 
 
-def _validate_collection_type_and_get_values(
+def _validate_collection_type_and_get_values[T](
     item_type: type[T],
     other: Iterable[T] | Collection[T],
     valid_typed_types: tuple[type[Collection], ...] = (Collection,),
@@ -117,7 +113,7 @@ def _validate_collection_type_and_get_values(
     return other_values
 
 
-def _validate_iterable_of_iterables_and_get(
+def _validate_iterable_of_iterables_and_get[T](
     item_type: type[T],
     others: Iterable[Iterable[T]],
     coerce: bool = False
@@ -145,7 +141,7 @@ def _validate_duplicates_and_hash(iterable: Iterable) -> None:
         raise ValueError(f"Duplicate keys after coercion detected: {duplicates}")
 
 
-def _split_keys_values(keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]) -> tuple[list[K], list[V], bool]:
+def _split_keys_values[K, V](keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]) -> tuple[list[K], list[V], bool]:
     keys_from_iterable = False
     if isinstance(keys_values, (dict, Mapping, AbstractDict)):
         keys = keys_values.keys()
@@ -224,7 +220,7 @@ def _infer_tuple_type(tpl: tuple) -> type:
     return tuple[element_types]
 
 
-def _combine_types(type_set: set[type]) -> type:
+def _combine_types[T](type_set: set[type[T]]) -> type[T]:
     if not type_set:
         raise ValueError("Cannot combine empty type set")
     elif len(type_set) == 1:
@@ -236,7 +232,7 @@ def _combine_types(type_set: set[type]) -> type:
         return result_type
 
 
-def _infer_type_contained_in_iterable(values: Iterable[Any]) -> type:
+def _infer_type_contained_in_iterable[T](values: Iterable[Any]) -> type[T]:
     """
     Infers the type of items inside an iterable by inferring the type of each item.
     Supports nested containers. Raises ValueError if the iterable is empty or contains incompatible types.

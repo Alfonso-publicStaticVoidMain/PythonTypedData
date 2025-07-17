@@ -1,46 +1,54 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, Callable, TypeVar, TYPE_CHECKING
-
-T = TypeVar("T")
-U = TypeVar("U")
+from typing import Generic, Callable, TypeVar, TYPE_CHECKING, get_args
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class Maybe(Generic[T]):
+class Maybe[T]:
 
     item_type: type[T]
     value: T | None
 
-    def __init__(self: Maybe[T], value: T | None = None, item_type: type[T] | None = None, coerce: bool = False) -> None:
+    def __init__(
+        self: Maybe[T],
+        value: T | None = None,
+        *,
+        _coerce: bool = False,
+        _skip_validation: bool = False
+    ) -> None:
         from type_validation import _validate_or_coerce_value
 
-        if value is not None and item_type is not None:
-            object.__setattr__(self, 'item_type', item_type)
-            object.__setattr__(self, 'value', _validate_or_coerce_value(item_type, value, coerce))
-        elif value is not None and item_type is None:
-            object.__setattr__(self, 'item_type', type(value))
-            object.__setattr__(self, 'value', value)
-        elif value is None and item_type is None:
-            raise TypeError(f"You must provide either a type or a value.")
+        try:
+            generic_item_type = get_args(type(self))[0]
+        except (AttributeError, IndexError, TypeError):
+            generic_item_type = None
+
+        actual_value = value if _skip_validation else _validate_or_coerce_value(generic_item_type, value, _coerce)
+
+        if generic_item_type is not None:
+            object.__setattr__(self, 'item_type', generic_item_type)
+            object.__setattr__(self, 'value', actual_value)
         else:
-            object.__setattr__(self, 'item_type', item_type)
-            object.__setattr__(self, 'value', None)
+            raise TypeError(f"Generic type of the Maybe object can't be inferred.")
 
     @staticmethod
     def empty(item_type: type[T]) -> Maybe[T]:
-        return Maybe(None, item_type)
+        return Maybe[item_type](None)
 
     @staticmethod
-    def of(value: T, item_type: type[T] | None = None) -> Maybe[T]:
+    def of(value: T) -> Maybe[T]:
         if value is None:
-            raise ValueError("Can't create a Maybe.of with a None value.")
-        return Maybe(value, item_type)
+            raise ValueError("Can't use Maybe.of with a None value.")
+        from type_validation import _infer_type
+        return Maybe[_infer_type(value)](value)
 
     @staticmethod
     def of_nullable(value: T | None, item_type: type[T]) -> Maybe[T]:
-        return Maybe(value, item_type)
+        if item_type is None:
+            raise ValueError("You must give a type when using Maybe.of_nullable")
+        from type_validation import _validate_or_coerce_value
+        return Maybe[item_type](_validate_or_coerce_value(value))
 
     def is_present(self: Maybe[T]) -> bool:
         return self.value is not None
@@ -87,7 +95,7 @@ class Maybe(Generic[T]):
         if self.is_present():
             consumer(self.value)
 
-    def map(self: Maybe[T], f: Callable[[T], U]) -> Maybe[U]:
+    def map[U](self: Maybe[T], f: Callable[[T], U]) -> Maybe[U]:
         if self.value is None:
             raise ValueError("There's no value to apply the function to.")
         result = f(self.value)
@@ -95,7 +103,7 @@ class Maybe(Generic[T]):
             raise ValueError("Callable function returned a None value.")
         return Maybe.of(result)
 
-    def map_or_else(
+    def map_or_else[U](
         self: Maybe[T],
         f: Callable[[T], U],
         fallback: U,
@@ -106,7 +114,7 @@ class Maybe(Generic[T]):
             fallback = _validate_or_coerce_value(self.item_type, fallback, coerce)
         return f(self.value) if self.is_present() else fallback
 
-    def flatmap(
+    def flatmap[U](
         self: Maybe[T],
         f: Callable[[T], Maybe[U]]
     ) -> Maybe[U]:

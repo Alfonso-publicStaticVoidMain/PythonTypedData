@@ -8,11 +8,11 @@ class TestMaybe(unittest.TestCase):
         self.assertEqual(Maybe(2, int).get(), 2)
         self.assertEqual(Maybe(2), Maybe.of(2))
         with self.assertRaises(TypeError):
-            mb = Maybe('2', int, coerce=False)
+            mb = Maybe('2', int, _coerce=False)
 
-        self.assertEqual(Maybe('2', int, coerce=True).get(), 2)
-        self.assertEqual(Maybe(2, str, coerce=False).get(), '2')
-        self.assertEqual(Maybe(3.14, str, coerce=False).get(), '3.14')
+        self.assertEqual(Maybe('2', int, _coerce=True).get(), 2)
+        self.assertEqual(Maybe(2, str, _coerce=False).get(), '2')
+        self.assertEqual(Maybe(3.14, str, _coerce=False).get(), '3.14')
 
     def test_get_present_empty(self):
         with self.assertRaises(ValueError):
