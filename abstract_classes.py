@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Iterable, Any, Callable, TypeVar, Generic, Mapping, TYPE_CHECKING, ClassVar, get_origin, get_args, \
-    _GenericAlias
+from typing import Iterable, Any, Callable, TypeVar, Generic, Mapping, TYPE_CHECKING, ClassVar
 from weakref import WeakValueDictionary
 from collections import defaultdict
 

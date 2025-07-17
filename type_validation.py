@@ -186,7 +186,9 @@ def _infer_type(value: Any) -> type:
 
 def _infer_iterable_type(iterable: Any) -> type:
     if isinstance(iterable, Collection):
-        return type(iterable)[iterable.item_type]
+        item_type = getattr(iterable, 'item_type', None) or getattr(type(iterable), '_inferred_item_type', None)
+        if item_type is not None:
+            return type(iterable)[item_type]
 
     if not iterable:
         raise ValueError("Cannot infer type from empty iterable")
@@ -201,7 +203,10 @@ def _infer_iterable_type(iterable: Any) -> type:
 
 def _infer_mapping_type(mapping: Mapping) -> type:
     if isinstance(mapping, AbstractDict):
-        return type(mapping)[mapping.key_type, mapping.value_type]
+        key_type = getattr(mapping, 'key_type', None) or getattr(type(mapping), '_inferred_key_type', None)
+        value_type = getattr(mapping, 'value_type', None) or getattr(type(mapping), '_inferred_value_type', None)
+        if key_type and value_type:
+            return type(mapping)[key_type, value_type]
 
     if not mapping:
         raise ValueError("Cannot infer type from empty mapping")
@@ -253,6 +258,17 @@ def _validate_type(value: Any, expected_type: type) -> bool:
 
     origin = get_origin(expected_type)
     args = get_args(expected_type)
+
+    if origin is None:
+        if hasattr(expected_type, '_inferred_item_type'):
+            origin = expected_type
+            args = (getattr(expected_type, '_inferred_item_type'),)
+        elif hasattr(expected_type, '_inferred_key_type') and hasattr(expected_type, '_inferred_value_type'):
+            origin = expected_type
+            args = (
+                getattr(expected_type, '_inferred_key_type'),
+                getattr(expected_type, '_inferred_value_type')
+            )
 
     if origin in (Union, types.UnionType):
         return any(_validate_type(value, arg) for arg in args)

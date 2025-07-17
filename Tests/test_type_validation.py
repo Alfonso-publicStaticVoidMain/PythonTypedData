@@ -111,7 +111,7 @@ class TestTypeValidation(unittest.TestCase):
         from maybe import Maybe
         # TODO solve the problems with this test
         # --- Direct matches
-        ml = MutableList([1, 2, 3], int)
+        ml = MutableList[int]([1, 2, 3])
         self.assertTrue(_validate_type(ml, MutableList[int]))
 
         iml = ImmutableList(["a", "b"], str)
