@@ -17,18 +17,15 @@ class TestList(unittest.TestCase):
         self.assertEqual(iml.values, (1, 2))
         self.assertEqual(iml[0], 1)
 
-        mul = MutableList(iml, int)
+        mul = MutableList[int](iml)
         self.assertEqual(list(iml.values), mul.values)
         self.assertEqual(iml.values, tuple(mul.values))
 
         mul_2 = MutableList.of(iml)
         self.assertEqual(mul, mul_2)
 
-        with self.assertRaises(ValueError):
-            mul_3 = MutableList[int](item_type=str)
-
     def test_partial_init_parameters(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             MutableList([1, 2, 3])
         mul = MutableList.of([1, 2, 3])
         self.assertEqual(mul.item_type, int)
@@ -41,25 +38,25 @@ class TestList(unittest.TestCase):
         self.assertFalse(empty_list)
 
     def test_type_coercion(self):
-        lst = MutableList(['1', 2], int, coerce=True)
+        lst = MutableList[int](['1', 2], coerce=True)
         self.assertEqual(lst.values, [1, 2])
 
-        iml = ImmutableList([1, 2.25], float, coerce=False)
+        iml = ImmutableList[float]([1, 2.25], coerce=False)
         self.assertEqual(iml.values, (1.0, 2.25))
         self.assertEqual(iml[0], 1)
 
         with self.assertRaises(TypeError):
-            mul = MutableList([1, 2, '3'], int, coerce=False)
+            mul = MutableList[int]([1, 2, '3'], coerce=False)
 
     def test_immutability(self):
-        iml = ImmutableList(['a', 'b'], str)
+        iml = ImmutableList[str](['a', 'b'])
         with self.assertRaises(TypeError):
             iml[0] = 'c'
         with self.assertRaises(TypeError):
             iml.values[0] = 'c'
 
     def test_setitem_and_delitem(self):
-        lst = MutableList([1, 2, 3], int)
+        lst = MutableList[int]([1, 2, 3])
         lst[1] = 10
         self.assertEqual(lst.values, [1, 10, 3])
 
@@ -70,8 +67,8 @@ class TestList(unittest.TestCase):
         self.assertEqual(lst.values, [5, 6])
 
     def test_init_and_get(self):
-        int_lst = MutableList([0, 1, 2], int)
-        str_lst = MutableList(['a', 'b', 2, 0.4], str, coerce=True)
+        int_lst = MutableList[int]([0, 1, 2])
+        str_lst = MutableList[str](['a', 'b', 2, 0.4], coerce=True)
 
         self.assertEqual(int_lst[0], 0)
         self.assertEqual(int_lst[1], 1)

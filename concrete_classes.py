@@ -52,12 +52,11 @@ class ImmutableList[T](AbstractSequence[T]):
     def __init__(
         self: ImmutableList[T],
         values: Iterable[T] | Collection[T] | None = None,
-        item_type: type[T] | None = None,
+        *,
         coerce: bool = False,
         _skip_validation: bool = False
     ) -> None:
-        Collection.__init__(self, values, item_type, (AbstractSet, set, frozenset), coerce=coerce, _finisher=tuple,
-                            _skip_validation=_skip_validation)
+        Collection.__init__(self, values, _forbidden_iterable_types=(AbstractSet, set, frozenset), coerce=coerce, _finisher=tuple, _skip_validation=_skip_validation)
 
     def __repr__(self: Collection[T]) -> str:
         return f"{class_name(self)}<{self.item_type.__name__}>{list(self.values)}"

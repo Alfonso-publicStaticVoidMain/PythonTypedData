@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import reduce
 from typing import Iterable, Any, Callable, Generic, Mapping, TYPE_CHECKING, ClassVar, TypeVar, get_args
-from weakref import WeakValueDictionary
+from weakref import WeakValueDictionary, WeakKeyDictionary
 from collections import defaultdict
 
 if TYPE_CHECKING:
@@ -38,6 +38,7 @@ class Collection[T]:
 
     item_type: type[T]
     values: Any
+    _generic_type_registry: ClassVar[WeakKeyDictionary[type, type]] = WeakKeyDictionary()
 
     def __new__(cls, *args, **kwargs) -> Collection[T] | None:
         return _forbid_instantiation(Collection)(cls, *args, **kwargs)
@@ -54,13 +55,12 @@ class Collection[T]:
         from type_validation import _validate_or_coerce_iterable
 
         try:
-            generic_item_type = get_args(type(self))[0]
-        except (AttributeError, IndexError, TypeError):
+            generic_item_type = Collection._generic_type_registry[self.__class__]
+        except (AttributeError, IndexError, TypeError, KeyError):
             generic_item_type = None
 
         if generic_item_type is None:
-            raise TypeError(
-                f"{type(self).__name__} must be instantiated with a concrete type, e.g., MutableList[int](...) or via .of().")
+            raise TypeError(f"{type(self).__name__} must be instantiated with a concrete type, e.g., MutableList[int](...) or via .of().")
 
         if isinstance(generic_item_type, TypeVar):
             raise TypeError(f"{type(self).__name__} was instantiated without a concrete generic type. ")
@@ -73,6 +73,11 @@ class Collection[T]:
         final_values = values if _skip_validation else _validate_or_coerce_iterable(self.item_type, values, coerce)
 
         object.__setattr__(self, "values", _finisher(final_values))
+
+    @classmethod
+    def __class_getitem__(cls: type[Collection[T]], item: type[T]):
+        Collection._generic_type_registry[cls] = item
+        return cls
 
     @classmethod
     def of(cls: type[Collection[T]], *values: T):
@@ -549,6 +554,7 @@ class AbstractDict[K, V]:
     key_type: type[K]
     value_type: type[V]
     data: dict[K, V]
+    _key_value_registry: ClassVar[WeakKeyDictionary[type, tuple[type, type]]] = WeakKeyDictionary()
 
     def __new__(cls, *args, **kwargs) -> AbstractDict[K, V] | None:
         return _forbid_instantiation(AbstractDict)(cls, *args, **kwargs)
@@ -571,8 +577,8 @@ class AbstractDict[K, V]:
         )
 
         try:
-            key_type, value_type = get_args(type(self))
-        except (TypeError, ValueError, IndexError):
+            key_type, value_type = AbstractDict._key_value_registry[self.__class__]
+        except (TypeError, ValueError, IndexError, KeyError):
             raise TypeError(f"Generic key/value types could not be inferred for {type(self).__name__}.")
 
         if isinstance(key_type, TypeVar) or isinstance(value_type, TypeVar):
@@ -601,6 +607,11 @@ class AbstractDict[K, V]:
             _validate_duplicates_and_hash(actual_keys)
 
         object.__setattr__(self, "data", _finisher(dict(zip(actual_keys, actual_values))))
+
+    @classmethod
+    def __class_getitem__(cls: type[AbstractDict[K, V]], key_value: tuple[type[K], type[V]]):
+        AbstractDict._key_value_registry[cls] = key_value
+        return cls
 
     @classmethod
     def of(cls: type[AbstractDict[K, V]], keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]):
