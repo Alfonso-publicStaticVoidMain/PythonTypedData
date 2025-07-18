@@ -14,11 +14,12 @@ class TestList(unittest.TestCase):
 
 
     def test_class_name(self):
+        from abstract_classes import class_name
         lst = MutableList[int]([0, 1, 2])
-        self.assertEqual(type(lst).__name__, "MutableList")
+        self.assertEqual(class_name(lst), "MutableList[int]")
 
         iml = ImmutableList.of('a', 2, 0.1)
-        self.assertEqual(type(iml).__name__, "ImmutableList")
+        self.assertEqual(class_name(iml), "ImmutableList[int | str | float]")
 
     def test_init_and_access(self):
         iml = ImmutableList[int](['1', 2], coerce=True)
@@ -136,11 +137,11 @@ class TestList(unittest.TestCase):
     def test_repr_and_bool(self):
         mul = MutableList[str]('a', 'b')
         self.assertTrue(mul)
-        self.assertIn("MutableList<str>", repr(mul))
+        self.assertIn("MutableList[str]", repr(mul))
 
         iml = ImmutableList[str]('x')
         self.assertTrue(iml)
-        self.assertIn("ImmutableList<str>", repr(iml))
+        self.assertIn("ImmutableList[str]", repr(iml))
 
         empty_lst = MutableList[int]()
         self.assertFalse(empty_lst)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import reduce
 from typing import Iterable, Any, Callable, Mapping, TYPE_CHECKING, ClassVar, TypeVar
-from weakref import WeakKeyDictionary
+from weakref import WeakKeyDictionary, WeakValueDictionary
 from collections import defaultdict
 
 if TYPE_CHECKING:
@@ -16,7 +16,10 @@ if TYPE_CHECKING:
 
 
 def class_name(self: object) -> str:
-    return type(self).__name__
+    name = type(self).__name__
+    if name.startswith('__') and name.endswith('__'):
+        return name[2:-2]
+    return name
 
 
 def _forbid_instantiation[T](forbidden_type: type[T]) -> Callable[..., T]:
@@ -38,7 +41,7 @@ class Collection[T]:
 
     item_type: type[T]
     values: Any
-    _generic_type_registry: ClassVar[WeakKeyDictionary[type, type]] = WeakKeyDictionary()
+    _generic_type_registry: ClassVar[WeakValueDictionary[tuple[type, type], type]] = WeakValueDictionary()
 
     def __new__(cls, *args, **kwargs) -> Collection[T] | None:
         return _forbid_instantiation(Collection)(cls, *args, **kwargs)
@@ -54,7 +57,7 @@ class Collection[T]:
         from type_validation import _validate_or_coerce_iterable
 
         try:
-            generic_item_type = Collection._generic_type_registry.pop(self.__class__)
+            generic_item_type = self.__class__._inferred_item_type
         except (AttributeError, IndexError, TypeError, KeyError):
             generic_item_type = None
 
@@ -77,10 +80,22 @@ class Collection[T]:
         object.__setattr__(self, "values", _finisher(final_values))
 
     @classmethod
-    def __class_getitem__(cls: type[Collection[T]], item: type[T]):
-        Collection._generic_type_registry.clear()
-        Collection._generic_type_registry[cls] = item
-        return cls
+    def __class_getitem__(cls: type[Collection[T]], item: Any):
+        cache_key = (cls, item)
+        if cache_key in cls._generic_type_registry:
+            return cls._generic_type_registry[cache_key]
+
+        name = f"__{cls.__name__}[{getattr(item, '__name__', repr(item))}]__"
+        subclass = type(
+            name,
+            (cls,),
+            {
+                "__name__": cls.__name__,
+                "_inferred_item_type": item,
+            },
+        )
+        cls._generic_type_registry[cache_key] = subclass
+        return subclass
 
     @classmethod
     def of(cls: type[Collection[T]], *values: T):
@@ -110,13 +125,14 @@ class Collection[T]:
 
     def __eq__(self: Collection[T], other: Any) -> bool:
         return (
-            type(self) == type(other)
+            issubclass(self.__class__, Collection)
+            and issubclass(other.__class__, Collection)
             and self.item_type == other.item_type
             and self.values == other.values
         )
 
     def __repr__(self: Collection[T]) -> str:
-        return f"{class_name(self)}<{self.item_type.__name__}>{self.values}"
+        return f"{class_name(self)}{self.values}"
 
     def __bool__(self: Collection[T]) -> bool:
         return bool(self.values)
@@ -557,7 +573,7 @@ class AbstractDict[K, V]:
     key_type: type[K]
     value_type: type[V]
     data: dict[K, V]
-    _key_value_registry: ClassVar[WeakKeyDictionary[type, tuple[type, type]]] = WeakKeyDictionary()
+    _key_value_registry: ClassVar[WeakValueDictionary[tuple[type, tuple[type, type]], type]] = WeakValueDictionary()
 
     def __new__(cls, *args, **kwargs) -> AbstractDict[K, V] | None:
         return _forbid_instantiation(AbstractDict)(cls, *args, **kwargs)
@@ -580,7 +596,8 @@ class AbstractDict[K, V]:
         )
 
         try:
-            key_type, value_type = AbstractDict._key_value_registry[self.__class__]
+            key_type = self.__class__._inferred_key_type
+            value_type = self.__class__._inferred_value_type
         except (TypeError, ValueError, IndexError, KeyError):
             raise TypeError(f"Generic key/value types could not be inferred for {type(self).__name__}.")
 
@@ -613,8 +630,23 @@ class AbstractDict[K, V]:
 
     @classmethod
     def __class_getitem__(cls: type[AbstractDict[K, V]], key_value: tuple[type[K], type[V]]):
-        AbstractDict._key_value_registry[cls] = key_value
-        return cls
+        cache_key = (cls, key_value)
+        if cache_key in cls._key_value_registry:
+            return cls._key_value_registry[cache_key]
+
+        key_type, value_type = key_value
+        name = f"__{cls.__name__}[{getattr(key_type, '__name__', repr(key_type))}, {getattr(value_type, '__name__', repr(value_type))}]__"
+        subclass = type(
+            name,
+            (cls,),
+            {
+                "__name__": cls.__name__,
+                "_inferred_key_type": key_type,
+                "_inferred_value_type": value_type
+            },
+        )
+        cls._key_value_registry[cache_key] = subclass
+        return subclass
 
     @classmethod
     def of(cls: type[AbstractDict[K, V]], keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]):
@@ -662,14 +694,15 @@ class AbstractDict[K, V]:
 
     def __eq__(self: AbstractDict[K, V], other: Any) -> bool:
         return (
-            type(self) == type(other)
+            issubclass(self.__class__, AbstractDict)
+            and issubclass(other.__class__, AbstractDict)
             and self.key_type == other.key_type
             and self.value_type == other.value_type
             and self.data == other.data
         )
 
     def __repr__(self: AbstractDict[K, V]) -> str:
-        return f"{class_name(self)}<{self.key_type.__name__}, {self.value_type.__name__}>{self.data}"
+        return f"{class_name(self)}{self.data}"
 
     def copy(self: AbstractDict[K, V]) -> AbstractDict[K, V]:
         return self.__class__[self.key_type, self.value_type](self.data.copy())

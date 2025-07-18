@@ -168,7 +168,7 @@ class TestTypeValidation(unittest.TestCase):
             ImmutableSet[int]({3, 4}),
         ]
         self.assertTrue(_validate_type(union_test, list[MutableSet[int] | ImmutableSet[int]]))
-        self.assertTrue(_validate_type(union_test, list[AbstractSet[int]]))
+        self.assertFalse(_validate_type(union_test, list[AbstractSet[int]]))
 
         union_dict_test = MutableDict[str, str]({"a": "1"})
         self.assertTrue(_validate_type(union_dict_test, MutableDict[str, str] | ImmutableDict[str, str]))

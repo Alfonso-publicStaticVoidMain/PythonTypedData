@@ -14,7 +14,7 @@ class DictionaryTest(unittest.TestCase):
         imd = ImmutableDict[str, int](dic)
         self.assertEqual(dic.data, imd.data)
         self.assertEqual(dic['a'], imd['a'])
-        self.assertNotEqual(imd, dic)
+        self.assertEqual(imd, dic)
 
         mud = MutableDict[str, int](imd)
         self.assertEqual(dic, mud)
@@ -49,10 +49,10 @@ class DictionaryTest(unittest.TestCase):
 
     def test_repr(self):
         d = MutableDict[str, float]({'pi': 3.14})
-        self.assertIn("MutableDict<str, float>", repr(d))
+        self.assertIn("MutableDict[str, float]", repr(d))
 
         fd = ImmutableDict[str, int]({'z': 99})
-        self.assertIn("ImmutableDict<str, int>", repr(fd))
+        self.assertIn("ImmutableDict[str, int]", repr(fd))
 
     def test_get(self):
         d = MutableDict[int, int]()

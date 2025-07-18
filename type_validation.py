@@ -182,9 +182,13 @@ def _infer_type(value: Any) -> type:
 
 def _infer_iterable_type(iterable: Any) -> type:
     if isinstance(iterable, Collection):
-        item_type = getattr(iterable, 'item_type', None) or getattr(type(iterable), '_inferred_item_type', None)
+        inferred = getattr(type(iterable), '_inferred_item_type', None)
+        if inferred is not None:
+            return type(iterable)
+
+        item_type = getattr(iterable, 'item_type', None)
         if item_type is not None:
-            return type(iterable)[item_type]
+            return type(iterable)[item_type]  # OK if original class
 
     if not iterable:
         raise ValueError("Cannot infer type from empty iterable")
@@ -199,9 +203,14 @@ def _infer_iterable_type(iterable: Any) -> type:
 
 def _infer_mapping_type(mapping: Mapping) -> type:
     if isinstance(mapping, AbstractDict):
-        key_type = getattr(mapping, 'key_type', None) or getattr(type(mapping), '_inferred_key_type', None)
-        value_type = getattr(mapping, 'value_type', None) or getattr(type(mapping), '_inferred_value_type', None)
-        if key_type and value_type:
+        inferred_key = getattr(type(mapping), '_inferred_key_type', None)
+        inferred_value = getattr(type(mapping), '_inferred_value_type', None)
+        if inferred_key is not None and inferred_value is not None:
+            return type(mapping)
+
+        key_type = getattr(mapping, 'key_type', None)
+        value_type = getattr(mapping, 'value_type', None)
+        if key_type is not None and value_type is not None:
             return type(mapping)[key_type, value_type]
 
     if not mapping:
