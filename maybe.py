@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, Callable, TypeVar, TYPE_CHECKING, get_args, ClassVar
-from weakref import WeakKeyDictionary
+from typing import Generic, Callable, TypeVar, TYPE_CHECKING, get_args, ClassVar, Any
+from weakref import WeakKeyDictionary, WeakValueDictionary
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -10,7 +10,7 @@ class Maybe[T]:
 
     item_type: type[T]
     value: T | None
-    _generic_type_registry: ClassVar[WeakKeyDictionary[type, type]] = WeakKeyDictionary()
+    _generic_type_registry: ClassVar[WeakValueDictionary[tuple[type, type], type]] = WeakValueDictionary()
 
     def __init__(
         self: Maybe[T],
@@ -22,22 +22,32 @@ class Maybe[T]:
         from type_validation import _validate_or_coerce_value
 
         try:
-            generic_item_type = Maybe._generic_type_registry.pop(self.__class__)
+            generic_item_type = self.__class__._inferred_item_type
         except (AttributeError, IndexError, TypeError, KeyError):
             generic_item_type = None
 
-        actual_value = value if _skip_validation else _validate_or_coerce_value(generic_item_type, value, _coerce)
+        actual_value = value if _skip_validation else _validate_or_coerce_value(generic_item_type, value, _coerce) if value is not None else None
 
-        if generic_item_type is not None:
-            object.__setattr__(self, 'item_type', generic_item_type)
-            object.__setattr__(self, 'value', actual_value)
-        else:
-            raise TypeError(f"Generic type of the Maybe object can't be inferred.")
+        object.__setattr__(self, 'item_type', generic_item_type)
+        object.__setattr__(self, 'value', actual_value)
 
     @classmethod
-    def __class_getitem__(cls, item):
-        Maybe._generic_type_registry[cls] = item
-        return cls
+    def __class_getitem__(cls: type[Maybe[T]], item: Any):
+        cache_key = (cls, item)
+        if cache_key in cls._generic_type_registry:
+            return cls._generic_type_registry[cache_key]
+
+        name = f"__{cls.__name__}[{getattr(item, '__name__', repr(item))}]__"
+        subclass = type(
+            name,
+            (cls,),
+            {
+                "__name__": cls.__name__,
+                "_inferred_item_type": item,
+            },
+        )
+        cls._generic_type_registry[cache_key] = subclass
+        return subclass
 
     @classmethod
     def empty(cls, item_type: type[T]) -> Maybe[T]:

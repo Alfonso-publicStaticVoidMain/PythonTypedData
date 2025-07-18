@@ -5,14 +5,14 @@ from maybe import Maybe
 
 class TestMaybe(unittest.TestCase):
     def test_init(self):
-        self.assertEqual(Maybe(2, int).get(), 2)
-        self.assertEqual(Maybe(2), Maybe.of(2))
+        self.assertEqual(Maybe[int](2).get(), 2)
+        self.assertEqual(Maybe[int](2), Maybe.of(2))
         with self.assertRaises(TypeError):
-            mb = Maybe('2', int, _coerce=False)
+            mb = Maybe[int]('2', _coerce=False)
 
-        self.assertEqual(Maybe('2', int, _coerce=True).get(), 2)
-        self.assertEqual(Maybe(2, str, _coerce=False).get(), '2')
-        self.assertEqual(Maybe(3.14, str, _coerce=False).get(), '3.14')
+        self.assertEqual(Maybe[int]('2', _coerce=True).get(), 2)
+        self.assertEqual(Maybe[str](2, _coerce=False).get(), '2')
+        self.assertEqual(Maybe[str](3.14, _coerce=False).get(), '3.14')
 
     def test_get_present_empty(self):
         with self.assertRaises(ValueError):
