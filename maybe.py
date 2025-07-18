@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, Callable, TypeVar, TYPE_CHECKING, get_args, ClassVar, Any
-from weakref import WeakKeyDictionary, WeakValueDictionary
+from typing import Generic, Callable, get_args, ClassVar, Any
+from weakref import WeakValueDictionary
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -156,4 +156,4 @@ class Maybe[T]:
     def __repr__(self: Maybe[T]) -> str:
         from abstract_classes import class_name
         cls_name: str = class_name(self)
-        return f"{cls_name}.of({self.value!r})" if self.is_present() else f"{cls_name}.empty({self.item_type.__name__})"
+        return f"{cls_name}.of({self.value!r})" if self.is_present() else f"{cls_name}.empty()"

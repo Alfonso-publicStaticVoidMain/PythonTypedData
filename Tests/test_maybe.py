@@ -1,9 +1,11 @@
 import unittest
 
+from concrete_classes import MutableList, MutableSet
 from maybe import Maybe
 
 
 class TestMaybe(unittest.TestCase):
+
     def test_init(self):
         self.assertEqual(Maybe[int](2).get(), 2)
         self.assertEqual(Maybe[int](2), Maybe.of(2))
@@ -21,13 +23,18 @@ class TestMaybe(unittest.TestCase):
         self.assertTrue(Maybe.empty(str).is_empty())
         self.assertTrue(Maybe.of(2).is_present())
 
-
     def test_or_else(self):
         self.assertEqual(Maybe.empty(int).or_else(3), 3)
         with self.assertRaises(TypeError):
             Maybe.empty(int).or_else('a')
         self.assertEqual(Maybe.empty(str).or_else_get(lambda:""), "")
 
+    def test_repr(self):
+        mb = Maybe[list[int]]([0, 1, 2])
+        self.assertIn('Maybe[list[int]]', repr(mb))
+
+        mb2 = Maybe.of(MutableList[MutableSet[int]](MutableSet.of(0, 1), MutableSet.of(0, -1)))
+        self.assertIn('Maybe[MutableList[MutableSet]]', repr(mb2))
 
 if __name__ == '__main__':
     unittest.main()
