@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Iterable, Any, Callable, Generic, Mapping, TYPE_CHECKING, ClassVar, TypeVar, get_args
-from weakref import WeakValueDictionary, WeakKeyDictionary
+from typing import Iterable, Any, Callable, Mapping, TYPE_CHECKING, ClassVar, TypeVar
+from weakref import WeakKeyDictionary
 from collections import defaultdict
 
 if TYPE_CHECKING:
@@ -45,8 +45,7 @@ class Collection[T]:
 
     def __init__(
         self: Collection[T],
-        values: Iterable[T] | Collection[T] | None = None,
-        *,
+        *values: Iterable[T] | Collection[T] | T,
         coerce: bool = False,
         _forbidden_iterable_types: tuple[type, ...] = (),
         _finisher: Callable[[Iterable[T]], Any] = lambda x : x,
@@ -55,7 +54,7 @@ class Collection[T]:
         from type_validation import _validate_or_coerce_iterable
 
         try:
-            generic_item_type = Collection._generic_type_registry[self.__class__]
+            generic_item_type = Collection._generic_type_registry.pop(self.__class__)
         except (AttributeError, IndexError, TypeError, KeyError):
             generic_item_type = None
 
@@ -63,7 +62,10 @@ class Collection[T]:
             raise TypeError(f"{type(self).__name__} must be instantiated with a concrete type, e.g., MutableList[int](...) or via .of().")
 
         if isinstance(generic_item_type, TypeVar):
-            raise TypeError(f"{type(self).__name__} was instantiated without a concrete generic type. ")
+            raise TypeError(f"{type(self).__name__} was instantiated without a concrete type, somehow {generic_item_type} was a TypeVar.")
+
+        if len(values) == 1 and isinstance(values[0], Iterable) and not isinstance(values[0], (str, bytes)):
+            values = values[0]
 
         if isinstance(values, _forbidden_iterable_types):
             raise TypeError(f"Invalid type {type(values).__name__} for class {type(self).__name__}.")
@@ -76,6 +78,7 @@ class Collection[T]:
 
     @classmethod
     def __class_getitem__(cls: type[Collection[T]], item: type[T]):
+        Collection._generic_type_registry.clear()
         Collection._generic_type_registry[cls] = item
         return cls
 

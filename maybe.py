@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, Callable, TypeVar, TYPE_CHECKING, get_args
+from typing import Generic, Callable, TypeVar, TYPE_CHECKING, get_args, ClassVar
+from weakref import WeakKeyDictionary
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -9,6 +10,7 @@ class Maybe[T]:
 
     item_type: type[T]
     value: T | None
+    _generic_type_registry: ClassVar[WeakKeyDictionary[type, type]] = WeakKeyDictionary()
 
     def __init__(
         self: Maybe[T],
@@ -20,8 +22,8 @@ class Maybe[T]:
         from type_validation import _validate_or_coerce_value
 
         try:
-            generic_item_type = get_args(type(self))[0]
-        except (AttributeError, IndexError, TypeError):
+            generic_item_type = Maybe._generic_type_registry.pop(self.__class__)
+        except (AttributeError, IndexError, TypeError, KeyError):
             generic_item_type = None
 
         actual_value = value if _skip_validation else _validate_or_coerce_value(generic_item_type, value, _coerce)
@@ -32,19 +34,24 @@ class Maybe[T]:
         else:
             raise TypeError(f"Generic type of the Maybe object can't be inferred.")
 
-    @staticmethod
-    def empty(item_type: type[T]) -> Maybe[T]:
+    @classmethod
+    def __class_getitem__(cls, item):
+        Maybe._generic_type_registry[cls] = item
+        return cls
+
+    @classmethod
+    def empty(cls, item_type: type[T]) -> Maybe[T]:
         return Maybe[item_type](None)
 
-    @staticmethod
-    def of(value: T) -> Maybe[T]:
+    @classmethod
+    def of(cls, value: T) -> Maybe[T]:
         if value is None:
             raise ValueError("Can't use Maybe.of with a None value.")
         from type_validation import _infer_type
         return Maybe[_infer_type(value)](value)
 
-    @staticmethod
-    def of_nullable(value: T | None, item_type: type[T]) -> Maybe[T]:
+    @classmethod
+    def of_nullable(cls, value: T | None, item_type: type[T]) -> Maybe[T]:
         if item_type is None:
             raise ValueError("You must give a type when using Maybe.of_nullable")
         from type_validation import _validate_or_coerce_value

@@ -207,8 +207,8 @@ def _infer_mapping_type(mapping: Mapping) -> type:
     if not mapping:
         raise ValueError("Cannot infer type from empty mapping")
 
-    key_type = _combine_types({_infer_type(k) for k in mapping.keys()})
-    value_type = _combine_types({_infer_type(v) for v in mapping.values()})
+    key_type = _infer_type_contained_in_iterable(mapping.keys())
+    value_type =_infer_type_contained_in_iterable(mapping.values())
 
     return type(mapping)[key_type, value_type]
 
@@ -239,13 +239,10 @@ def _infer_type_contained_in_iterable[T](values: Iterable[Any]) -> type[T]:
     """
     if values is None:
         raise ValueError("Cannot infer type from None")
-
-    inferred_types = {_infer_type(val) for val in values}
-
-    if not inferred_types:
+    if not values:
         raise ValueError("Cannot infer type from an empty iterable")
 
-    return _combine_types(inferred_types)
+    return _combine_types({_infer_type(val) for val in values})
 
 
 def _validate_type(value: Any, expected_type: type) -> bool:
