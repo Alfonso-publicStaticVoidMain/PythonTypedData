@@ -1,23 +1,72 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Iterable, Any, Callable, TypeVar, Generic, Mapping, TYPE_CHECKING
+from types import UnionType
+from typing import Iterable, Any, Callable, Mapping, TYPE_CHECKING, ClassVar, TypeVar, get_origin, get_args, Union
+from weakref import WeakKeyDictionary, WeakValueDictionary
+from collections import defaultdict
 
 if TYPE_CHECKING:
-    from type_validation import _validate_and_coerce_value, _validate_and_coerce_values, _validate_types, _validate_multiple_sets, _infer_type
-
-T = TypeVar("T")
-K = TypeVar("K")
-V = TypeVar("V")
-A = TypeVar("A")
-R = TypeVar("R")
-
-
-def class_name(self: object) -> str:
-    return type(self).__name__
+    from type_validation import (
+        _validate_or_coerce_value,
+        _validate_or_coerce_iterable,
+        _validate_collection_type_and_get_values,
+        _validate_iterable_of_iterables_and_get,
+        _infer_type_contained_in_iterable
+    )
 
 
-def _forbid_instantiation(forbidden_type: type[T]) -> Callable[..., T]:
+def class_name(cls: type) -> str:
+    """
+    Gives a str representation of a given type or class, including generics info handled recursively.
+    :param cls: Class whose name will be represented.
+    :return: If the type is a Union or UnionType, it's represented using the pipe operator |. If it's a Collection or
+    AbstractDict (has a _inferred_item_type or _inferred_key_type and _inferred_value_type attributes), their generics
+    are fetched from the attributes and recursively parsed with this very method, and put in brackers [] after the
+    actual class name.
+
+    Then with typing.get_origin and typing.get_args info about the base class and its generics is fetched to again
+    reconstruct a representation that displays that information. If that wasn't possible, a fallback is present using
+    __name__ and repr.
+    """
+
+    # Case 0: Handle Union[...] using | notation
+    origin = get_origin(cls)
+    args = get_args(cls)
+    if origin is Union or origin is UnionType:
+        return " | ".join(class_name(arg) for arg in args)
+
+    # Case 1: Collection, AbstractDict
+    if hasattr(cls, '_inferred_item_type'):
+        item_str = class_name(cls._inferred_item_type)
+        return f"{cls.__name__}[{item_str}]"
+    elif hasattr(cls, '_inferred_key_type') and hasattr(cls, '_inferred_value_type'):
+        key_str = class_name(cls._inferred_key_type)
+        val_str = class_name(cls._inferred_value_type)
+        return f"{cls.__name__}[{key_str}, {val_str}]"
+
+    # Case 2: Built-in generics list[int], dict[str, int], etc.
+    if origin:
+        origin_name = getattr(origin, '__name__', repr(origin))
+        args_str = ", ".join(class_name(arg) for arg in args)
+        return f"{origin_name}[{args_str}]"
+
+    # Case 3: Simple class
+    if hasattr(cls, '__name__'):
+        return cls.__name__
+
+    # Fallback for things like typing.Any
+    return repr(cls)
+
+
+def _forbid_instantiation[T](forbidden_type: type[T]) -> Callable[..., T]:
+    """
+    Generates a __new__ method that raises a TypeError if the class that is trying to be instantiated is of the
+    forbidden type.
+    :param forbidden_type: Type for the instantiation to be forbidden.
+    :return: A __new__ method that, no matter the arguments received, raises a TypeError if the class that tried
+    to call iterable was of the forbidden type.
+    """
     def __new__(cls: type[T], *args, **kwargs) -> T:
         if cls is forbidden_type:
             raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
@@ -25,32 +74,74 @@ def _forbid_instantiation(forbidden_type: type[T]) -> Callable[..., T]:
     return __new__
 
 
-class Collection(Generic[T]):
+class Collection[T]:
 
     item_type: type[T]
     values: Any
+    _generic_type_registry: ClassVar[WeakValueDictionary[tuple[type, type], type]] = WeakValueDictionary()
 
     def __new__(cls, *args, **kwargs) -> Collection[T] | None:
         return _forbid_instantiation(Collection)(cls, *args, **kwargs)
 
     def __init__(
         self: Collection[T],
-        item_type: type[T] | None = None,
-        values: Iterable[T] | Collection[T] | None = None,
-        forbidden_iterable_types: tuple[type, ...] = (),
-        finisher: Callable[[Iterable[T]], Any] = lambda x : x
+        *values: Iterable[T] | Collection[T] | T,
+        coerce: bool = False,
+        _forbidden_iterable_types: tuple[type, ...] = (),
+        _finisher: Callable[[Iterable[T]], Any] = lambda x : x,
+        _skip_validation: bool = False
     ) -> None:
-        from type_validation import _infer_type, _validate_and_coerce_values
+        from type_validation import _validate_or_coerce_iterable
 
-        obj_type: type[T] | None = None
+        try:
+            generic_item_type = type(self)._inferred_item_type
+        except (AttributeError, IndexError, TypeError, KeyError):
+            generic_item_type = None
+
+        if generic_item_type is None:
+            raise TypeError(f"{type(self).__name__} must be instantiated with a concrete type, e.g., MutableList[int](...) or via .of().")
+
+        if isinstance(generic_item_type, TypeVar):
+            raise TypeError(f"{type(self).__name__} was instantiated without a concrete type, somehow {generic_item_type} was a TypeVar.")
+
+        if len(values) == 1 and isinstance(values[0], Iterable) and not isinstance(values[0], (str, bytes)):
+            values = values[0]
+
+        if isinstance(values, _forbidden_iterable_types):
+            raise TypeError(f"Invalid type {type(values).__name__} for class {type(self).__name__}.")
+
+        object.__setattr__(self, "item_type", generic_item_type)
+
+        final_values = values if _skip_validation else _validate_or_coerce_iterable(self.item_type, values, coerce)
+
+        object.__setattr__(self, "values", _finisher(final_values))
+
+    @classmethod
+    def __class_getitem__(cls: type[Collection[T]], item: Any):
+        cache_key = (cls, item)
+        if cache_key in cls._generic_type_registry:
+            return cls._generic_type_registry[cache_key]
+
+        subclass = type(cls.__name__, (cls,), {"_inferred_item_type": item})
+        cls._generic_type_registry[cache_key] = subclass
+        return subclass
+
+    @classmethod
+    def of(cls: type[Collection[T]], *values: T):
+        if not values:
+            raise ValueError(f"Can't create a {cls.__name__} object from empty values.")
+
+        if len(values) == 1 and isinstance(values[0], Iterable) and not isinstance(values[0], (str, bytes)):
+            values = tuple(values[0])
+
+        from type_validation import _infer_type_contained_in_iterable
+        return cls[_infer_type_contained_in_iterable(values)](values)
+
+    @classmethod
+    def empty[R](cls: type[Collection[R]], item_type: type[R]) -> Collection[R]:
         if item_type is None:
-            # This raises a ValueError if the type can't be properly inferred.
-            obj_type = _infer_type(values)
-
-        if isinstance(values, forbidden_iterable_types):
-            raise TypeError(f"Invalid type {type(values).__name__} for class {class_name(self)}.")
-        object.__setattr__(self, 'item_type', item_type or obj_type)
-        object.__setattr__(self, 'values', finisher(_validate_and_coerce_values(self.item_type, values)))
+            raise ValueError(f"Trying to call {cls.__name__}.empty with a None type.")
+        return cls[item_type]()
 
     def __len__(self: Collection[T]) -> int:
         return len(self.values)
@@ -58,24 +149,29 @@ class Collection(Generic[T]):
     def __iter__(self: Collection[T]) -> Iterable[T]:
         return iter(self.values)
 
-    def __contains__(self: Collection[T], item) -> bool:
+    def __contains__(self: Collection[T], item: object) -> bool:
         return item in self.values
 
-    def __eq__(self: Collection[T], other) -> bool:
+    def __eq__(self: Collection[T], other: Any) -> bool:
         return (
-            isinstance(other, self.__class__)
+            issubclass(type(self), Collection)
+            and issubclass(type(other), Collection)
             and self.item_type == other.item_type
             and self.values == other.values
         )
 
     def __repr__(self: Collection[T]) -> str:
-        return f"{class_name(self)}<{self.item_type.__name__}>{self.values}"
+        cls = type(self)
+        return f"{class_name(cls)}{self.values}"
 
     def __bool__(self: Collection[T]) -> bool:
         return bool(self.values)
 
-    def copy(self: Collection[T]) -> Collection[T]:
-        return self.__class__(self.item_type, self.values.copy() if hasattr(self.values, 'copy') else self.values)
+    # TODO tests
+    def copy(self: Collection[T], deep: bool = False) -> Collection[T]:
+        from copy import deepcopy
+        values = deepcopy(self.values) if deep else (self.values.copy() if hasattr(self.values, 'copy') else self.values)
+        return type(self)[self.item_type](values, _skip_validation=True)
 
     def to_list(self: Collection[T]) -> list[T]:
         return list(self.values)
@@ -98,21 +194,33 @@ class Collection(Generic[T]):
 
     # Functional Methods:
 
-    def map(self: Collection[T], f: Callable[[T], R]) -> Collection[R]:
-        mapped = [f(value) for value in self.values]
-        return self.__class__(type(mapped[0]) if mapped else object, mapped)
+    # TODO tests
+    def map[R](
+        self: Collection[T],
+        f: Callable[[T], R],
+        result_type: type[R] | None = None,
+        coerce: bool = False
+    ) -> Collection[R]:
+        mapped_values = [f(value) for value in self.values]
+        return type(self)[result_type](mapped_values, coerce=coerce) if result_type is not None else type(self).of(mapped_values)
 
-    def flatmap(self: Collection[T], f: Callable[[T], Iterable[R]]) -> Collection[R]:
+    # TODO tests
+    def flatmap[R](
+        self: Collection[T],
+        f: Callable[[T], Iterable[R]],
+        result_type: type[R] | None = None,
+        coerce: bool = False
+    ) -> Collection[R]:
         flattened = []
         for value in self.values:
             result = f(value)
             if not isinstance(result, Iterable) or isinstance(result, (str, bytes)):
                 raise TypeError("flatmap function must return a non-string iterable")
             flattened.extend(result)
-        return self.__class__(type(flattened[0]) if flattened else object, flattened)
+        return type(self)[result_type](flattened, coerce=coerce) if result_type is not None else type(self).of(flattened)
 
     def filter(self: Collection[T], predicate: Callable[[T], bool]) -> Collection[T]:
-        return self.__class__(self.item_type, [value for value in self.values if predicate(value)])
+        return type(self)[self.item_type]([value for value in self.values if predicate(value)], _skip_validation=True)
 
     def all_match(self: Collection[T], predicate: Callable[[T], bool]) -> bool:
         return all(predicate(value) for value in self.values)
@@ -132,7 +240,12 @@ class Collection(Generic[T]):
         for value in self.values:
             consumer(value)
 
-    def distinct(self: Collection[T], key: Callable[[T], K] = lambda x: x) -> Collection[T]:
+    def peek(self: Collection[T], consumer: Callable[[T], None]) -> Collection[T]:
+        for item in self.values:
+            consumer(item)
+        return self
+
+    def distinct[K](self: Collection[T], key: Callable[[T], K] = lambda x: x) -> Collection[T]:
         seen = set()
         result = []
         for value in self.values:
@@ -140,23 +253,49 @@ class Collection(Generic[T]):
             if key_of_value not in seen:
                 seen.add(key_of_value)
                 result.append(value)
-        return self.__class__(self.item_type, result)
+        return type(self)[self.item_type](result, _skip_validation=True)
 
-    def max(self: Collection[T], *, default=None, key=None) -> T | None:
+    def max(self: Collection[T], *, default: T = None, key: Callable[[T], Any] = None) -> T | None:
         if default is not None:
             return max(self.values, default=default, key=key)
         if not self.values:
             return None
         return max(self.values, key=key)
 
-    def min(self: Collection[T], *, default=None, key=None) -> T | None:
+    def min(self: Collection[T], *, default: T = None, key: Callable[[T], Any] = None) -> T | None:
         if default is not None:
             return min(self.values, default=default, key=key)
         if not self.values:
             return None
         return min(self.values, key=key)
 
-    def collect(
+    # TODO tests
+    def group_by[K](
+        self: Collection[T],
+        key: Callable[[T], K]
+    ) -> dict[K, Collection[T]]:
+        groups: dict[K, list[T]] = defaultdict(list)
+        for item in self.values:
+            groups[key(item)].append(item)
+        return {
+            key : type(self)[self.item_type](group, _skip_validation=True)
+            for key, group in groups.items()
+        }
+
+    # TODO tests
+    def partition_by(
+        self: Collection[T],
+        predicate: Callable[[T], bool]
+    ) -> dict[bool, Collection[T]]:
+        true_part, false_part = [], []
+        for item in self.values:
+            (true_part if predicate(item) else false_part).append(item)
+        return {
+            True: type(self)[self.item_type](true_part, _skip_validation=True),
+            False: type(self)[self.item_type](false_part, _skip_validation=True)
+        }
+
+    def collect[A, R](
         self: Collection[T],
         supplier: Callable[[], A],
         accumulator: Callable[[A, T], None],
@@ -175,14 +314,14 @@ class Collection(Generic[T]):
         return finisher(acc)
 
 
-class AbstractSequence(Collection[T]):
+class AbstractSequence[T](Collection[T]):
 
     def __new__(cls, *args, **kwargs) -> AbstractSequence[T] | None:
         return _forbid_instantiation(AbstractSequence)(cls, *args, **kwargs)
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
         if isinstance(index, slice):
-            return self.__class__(self.item_type, self.values[index])
+            return type(self)[self.item_type](self.values[index])
         elif isinstance(index, int):
             return self.values[index]
         else:
@@ -208,23 +347,33 @@ class AbstractSequence(Collection[T]):
             return tuple(self.values) >= tuple(other.values if isinstance(other, AbstractSequence) else other)
         return NotImplemented
 
-    def __add__(self: AbstractSequence[T], other) -> AbstractSequence[T]:
-        from type_validation import _validate_types
-        return self.__class__(
-            self.item_type,
-            self.values + _validate_types(self.item_type, other, (AbstractSequence,), (list, tuple))
+    def __add__(
+        self: AbstractSequence[T],
+        other: AbstractSequence[T] | list[T] | tuple[T]
+    ) -> AbstractSequence[T]:
+        from type_validation import _validate_collection_type_and_get_values
+        return type(self)[self.item_type](
+            self.values + _validate_collection_type_and_get_values(
+                self.item_type,
+                other,
+                (AbstractSequence,),
+                (list, tuple)
+            )
         )
 
-    def __mul__(self: AbstractSequence[T], n: int) -> AbstractSequence[T]:
+    def __mul__(
+        self: AbstractSequence[T],
+        n: int
+    ) -> AbstractSequence[T]:
         if not isinstance(n, int):
             return NotImplemented
-        return self.__class__(self.item_type, self.values * n)
+        return type(self)[self.item_type](self.values * n, _skip_validation=True)
 
     def __sub__(self: AbstractSequence[T], other) -> AbstractSequence[T]:
-        from type_validation import _validate_types
-        other_values = _validate_types(self.item_type, other, (AbstractSequence,), (list, tuple))
+        from type_validation import _validate_collection_type_and_get_values
+        other_values = _validate_collection_type_and_get_values(self.item_type, other, (AbstractSequence,), (list, tuple))
         filtered_values = [value for value in self.values if value not in other_values]
-        return self.__class__(self.item_type, filtered_values)
+        return type(self)[self.item_type](filtered_values, _skip_validation=True)
 
     def __reversed__(self: AbstractSequence[T]):
         return reversed(self.values)
@@ -233,26 +382,41 @@ class AbstractSequence(Collection[T]):
         return self.values.index(value)
 
     def sorted(self: AbstractSequence[T], key=None, reverse=False) -> AbstractSequence[T]:
-        return self.__class__(self.item_type, sorted(self.values, key=key, reverse=reverse))
+        return type(self)[self.item_type](sorted(self.values, key=key, reverse=reverse), _skip_validation=True)
 
 
-class AbstractMutableSequence(AbstractSequence[T]):
+class AbstractMutableSequence[T](AbstractSequence[T]):
 
     def __new__(cls, *args, **kwargs) -> AbstractMutableSequence[T] | None:
         return _forbid_instantiation(AbstractMutableSequence)(cls, *args, **kwargs)
 
-    def append(self: AbstractMutableSequence[T], value: T) -> None:
-        from type_validation import _validate_and_coerce_value
-        self.values.append(_validate_and_coerce_value(self.item_type, value))
+    def append(
+        self: AbstractMutableSequence[T],
+        value: T,
+        coerce: bool = False
+    ) -> None:
+        from type_validation import _validate_or_coerce_value
+        self.values.append(_validate_or_coerce_value(self.item_type, value, coerce))
 
-    def __setitem__(self: AbstractMutableSequence[T], index: int | slice, value: T | AbstractSequence[T] | list[T] | tuple[T]) -> None:
-        from type_validation import _validate_types, _validate_and_coerce_value
+    def __setitem__(
+        self: AbstractMutableSequence[T],
+        index: int | slice,
+        value: T | AbstractSequence[T] | list[T] | tuple[T],
+        coerce: bool = False
+    ) -> None:
+        from type_validation import _validate_collection_type_and_get_values, _validate_or_coerce_value
 
         if isinstance(index, slice):
-            self.values[index] = _validate_types(self.item_type, value, (AbstractSequence,), (list, tuple))
+            self.values[index] = _validate_collection_type_and_get_values(
+                self.item_type,
+                value,
+                (AbstractSequence,),
+                (list, tuple),
+                coerce
+            )
 
         elif isinstance(index, int):
-            self.values[index] = _validate_and_coerce_value(self.item_type, value)
+            self.values[index] = _validate_or_coerce_value(self.item_type, value, coerce)
 
         else:
             raise TypeError("Invalid index type: must be int or slice")
@@ -264,65 +428,134 @@ class AbstractMutableSequence(AbstractSequence[T]):
         self.values.sort(key=key, reverse=reverse)
 
 
-class AbstractSet(Collection[T]):
+class AbstractSet[T](Collection[T]):
 
     def __new__(cls, *args, **kwargs) -> AbstractSet[T] | None:
         return _forbid_instantiation(AbstractSet)(cls, *args, **kwargs)
 
-    def union(self: AbstractSet[T], *others: Iterable[T]) -> AbstractSet[T]:
-        from type_validation import _validate_multiple_sets
-        return self.__class__(self.item_type, self.values.union(*_validate_multiple_sets(self.item_type, others)))
+    def union(
+        self: AbstractSet[T],
+        *others: Iterable[T],
+        coerce: bool = False
+    ) -> AbstractSet[T]:
+        from type_validation import _validate_iterable_of_iterables_and_get
+        return type(self)[self.item_type](self.values.union(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce)))
 
-    def intersection(self: AbstractSet[T], *others: Iterable[T] | Collection[T]) -> AbstractSet[T]:
-        from type_validation import _validate_multiple_sets
-        return self.__class__(self.item_type, self.values.intersection(*_validate_multiple_sets(self.item_type, others)))
+    def intersection(
+        self: AbstractSet[T],
+        *others: Iterable[T] | Collection[T],
+        coerce: bool = False
+    ) -> AbstractSet[T]:
+        from type_validation import _validate_iterable_of_iterables_and_get
+        return type(self)[self.item_type](self.values.intersection(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce)),)
 
-    def difference(self: AbstractSet[T], *others: Iterable[T] | Collection[T]) -> AbstractSet[T]:
-        from type_validation import _validate_multiple_sets
-        return self.__class__(self.item_type, self.values.difference(*_validate_multiple_sets(self.item_type, others)))
+    def difference(
+        self: AbstractSet[T],
+        *others: Iterable[T] | Collection[T],
+        coerce: bool = False
+    ) -> AbstractSet[T]:
+        from type_validation import _validate_iterable_of_iterables_and_get
+        return type(self)[self.item_type](self.values.difference(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce)),)
 
-    def symmetric_difference(self: AbstractSet[T], *others: Iterable[T] | Collection[T]) -> AbstractSet[T]:
-        from type_validation import _validate_multiple_sets
+    def symmetric_difference(
+        self: AbstractSet[T],
+        *others: Iterable[T] | Collection[T],
+        coerce: bool = False
+    ) -> AbstractSet[T]:
+        from type_validation import _validate_iterable_of_iterables_and_get
         new_values = self.values
-        for validated_set in _validate_multiple_sets(self.item_type, others):
+        for validated_set in _validate_iterable_of_iterables_and_get(self.item_type, others, coerce):
             new_values = new_values.symmetric_difference(validated_set)
-        return self.__class__(self.item_type, new_values)
+        return type(self)[self.item_type](new_values)
 
-    def is_subset(self: AbstractSet[T], other: AbstractSet[T] | set[T] | frozenset[T]) -> bool:
-        from type_validation import _validate_types
-        if isinstance(other, AbstractSet) and other.item_type != self.item_type:
+    def is_subset(
+        self: AbstractSet[T],
+        other: AbstractSet[T] | set[T] | frozenset[T],
+        coerce: bool = False
+    ) -> bool:
+        from type_validation import _validate_collection_type_and_get_values
+        if not coerce and isinstance(other, Collection) and other.item_type != self.item_type:
             return False
-        other_values = _validate_types(self.item_type, other, (AbstractSet,), (set, frozenset))
-        return self.values.issubset(other_values)
+        return self.values.issubset(
+            _validate_collection_type_and_get_values(
+                self.item_type,
+                other,
+                coerce=coerce
+            )
+        )
 
-    def is_superset(self: AbstractSet[T], other: AbstractSet[T] | set[T] | frozenset[T]) -> bool:
-        from type_validation import _validate_types
-        if isinstance(other, AbstractSet) and other.item_type != self.item_type:
+    def is_superset(
+        self: AbstractSet[T],
+        other: AbstractSet[T] | set[T] | frozenset[T],
+        coerce: bool = False
+    ) -> bool:
+        from type_validation import _validate_collection_type_and_get_values
+        if not coerce and isinstance(other, Collection) and other.item_type != self.item_type:
             return False
-        other_values = _validate_types(self.item_type, other, (AbstractSet,), (set, frozenset))
-        return self.values.issuperset(other_values)
+        return self.values.issuperset(
+            _validate_collection_type_and_get_values(
+                self.item_type,
+                other,
+                coerce=coerce
+            )
+        )
 
-    def is_disjoint(self: AbstractSet[T], other: AbstractSet[T] | set[T] | frozenset[T]) -> bool:
-        from type_validation import _validate_types
-        if isinstance(other, AbstractSet) and other.item_type != self.item_type:
+    def is_disjoint(
+        self: AbstractSet[T],
+        other: AbstractSet[T] | set[T] | frozenset[T],
+        coerce: bool = False
+    ) -> bool:
+        from type_validation import _validate_collection_type_and_get_values
+        if not coerce and isinstance(other, Collection) and other.item_type != self.item_type:
             return False
-        other_values = _validate_types(self.item_type, other, (AbstractSet,), (set, frozenset))
-        return self.values.isdisjoint(other_values)
+        return self.values.isdisjoint(
+            _validate_collection_type_and_get_values(
+                self.item_type,
+                other,
+                coerce=coerce
+            )
+        )
 
 
-class AbstractMutableSet(AbstractSet[T]):
+class AbstractMutableSet[T](AbstractSet[T]):
 
     def __new__(cls, *args, **kwargs) -> AbstractMutableSet[T] | None:
         return _forbid_instantiation(AbstractMutableSet)(cls, *args, **kwargs)
 
-    def add(self: AbstractMutableSet[T], value: T) -> None:
-        from type_validation import _validate_and_coerce_value
-        self.values.add(_validate_and_coerce_value(self.item_type, value))
+    def add(
+        self: AbstractMutableSet[T],
+        value: T,
+        coerce: bool = False
+    ) -> None:
+        from type_validation import _validate_or_coerce_value
+        self.values.add(_validate_or_coerce_value(self.item_type, value, coerce))
 
-    def remove(self: AbstractMutableSet[T], value: T) -> None:
+    def remove(
+        self: AbstractMutableSet[T],
+        value: T,
+        coerce: bool = False
+    ) -> None:
+        from type_validation import _validate_or_coerce_value
+        if coerce:
+            try:
+                self.values.remove(_validate_or_coerce_value(self.item_type, value))
+                return
+            except (TypeError, ValueError):
+                pass
         self.values.remove(value)
 
-    def discard(self: AbstractMutableSet[T], value: T) -> None:
+    def discard(
+        self: AbstractMutableSet[T],
+        value: T,
+        coerce: bool = False
+    ) -> None:
+        from type_validation import _validate_or_coerce_value
+        if coerce:
+            try:
+                self.values.discard(_validate_or_coerce_value(self.item_type, value))
+                return
+            except (TypeError, ValueError):
+                pass
         self.values.discard(value)
 
     def clear(self: AbstractMutableSet[T]) -> None:
@@ -331,67 +564,142 @@ class AbstractMutableSet(AbstractSet[T]):
     def pop(self: AbstractMutableSet[T]) -> T:
         return self.values.pop()
 
-    def update(self: AbstractMutableSet[T], *others: Iterable[T] | Collection[T]) -> None:
-        from type_validation import _validate_multiple_sets
-        self.values.update(*_validate_multiple_sets(self.item_type, others))
+    def update(
+        self: AbstractMutableSet[T],
+        *others: Iterable[T] | Collection[T],
+        coerce: bool = False
+    ) -> None:
+        from type_validation import _validate_iterable_of_iterables_and_get
+        self.values.update(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce))
 
-    def difference_update(self: AbstractMutableSet[T], *others: Iterable[T] | Collection[T]) -> None:
-        from type_validation import _validate_multiple_sets
-        self.values.difference_update(*_validate_multiple_sets(self.item_type, others))
+    def difference_update(
+        self: AbstractMutableSet[T],
+        *others: Iterable[T] | Collection[T],
+        coerce: bool = False
+    ) -> None:
+        from type_validation import _validate_iterable_of_iterables_and_get
+        self.values.difference_update(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce))
 
-    def intersection_update(self: AbstractMutableSet[T], *others: Iterable[T] | Collection[T]) -> None:
-        from type_validation import _validate_multiple_sets
-        self.values.intersection_update(*_validate_multiple_sets(self.item_type, others))
+    def intersection_update(
+        self: AbstractMutableSet[T],
+        *others: Iterable[T] | Collection[T],
+        coerce: bool = False
+    ) -> None:
+        from type_validation import _validate_iterable_of_iterables_and_get
+        self.values.intersection_update(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce))
 
-    def symmetric_difference_update(self: AbstractMutableSet[T], *others: Iterable[T] | Collection[T]) -> None:
-        from type_validation import _validate_multiple_sets
-        for validated_set in _validate_multiple_sets(self.item_type, others):
+    def symmetric_difference_update(
+        self: AbstractMutableSet[T],
+        *others: Iterable[T] | Collection[T],
+        coerce: bool = False
+    ) -> None:
+        from type_validation import _validate_iterable_of_iterables_and_get
+        for validated_set in _validate_iterable_of_iterables_and_get(self.item_type, others, coerce):
             self.values.symmetric_difference_update(validated_set)
 
 
-class AbstractDict(Generic[K, V]):
+class AbstractDict[K, V]:
 
     key_type: type[K]
     value_type: type[V]
-    data: dict
+    data: dict[K, V]
+    _key_value_registry: ClassVar[WeakValueDictionary[tuple[type, tuple[type, type]], type]] = WeakValueDictionary()
 
     def __new__(cls, *args, **kwargs) -> AbstractDict[K, V] | None:
         return _forbid_instantiation(AbstractDict)(cls, *args, **kwargs)
 
     def __init__(
         self: AbstractDict[K, V],
-        key_type: type[K],
-        value_type: type[V],
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
-        finisher: Callable[[dict[K, V]], Any] = lambda x : x
+        *,
+        _keys: Iterable[K] | None = None,
+        _values: Iterable[V] | None = None,
+        _coerce_keys: bool = False,
+        _coerce_values: bool = False,
+        _finisher: Callable[[dict[K, V]], Any] = lambda x : x,
+        _skip_validation: bool = False
     ) -> None:
-        from type_validation import _validate_and_coerce_values
+        from type_validation import (
+            _validate_or_coerce_iterable,
+            _split_keys_values,
+            _validate_duplicates_and_hash
+        )
+
+        try:
+            key_type = type(self)._inferred_key_type
+            value_type = type(self)._inferred_value_type
+        except (TypeError, ValueError, IndexError, KeyError):
+            raise TypeError(f"Generic key/value types could not be inferred for {type(self).__name__}.")
+
+        if isinstance(key_type, TypeVar) or isinstance(value_type, TypeVar):
+            raise TypeError(f"Generic types must be fully specified for {type(self).__name__}. Use {type(self).__name__}.of(...) to infer types from values.")
 
         object.__setattr__(self, "key_type", key_type)
         object.__setattr__(self, "value_type", value_type)
 
-        if keys_values is None or not keys_values:
-            object.__setattr__(self, "data", finisher({}))
+        if keys_values is None and (_keys is None or _values is None):
+            object.__setattr__(self, "data", _finisher({}))
             return
 
-        if isinstance(keys_values, (dict, Mapping, AbstractDict)):
-            keys = keys_values.keys()
-            values = keys_values.values()
-        elif isinstance(keys_values, Iterable):
-            keys = [key for (key, _) in keys_values]
-            values = [value for (_, value) in keys_values]
+        if _keys is not None and _values is not None:
+            keys = _keys
+            values = _values
+            if len(list(keys)) != len(list(values)):
+                raise ValueError("Keys and values must be of the same length.")
+            keys_from_iterable = True
         else:
-            raise TypeError(f"The values aren't a dict or Iterable.")
+            keys, values, keys_from_iterable = _split_keys_values(keys_values)
+
+        actual_keys = keys if _skip_validation else _validate_or_coerce_iterable(self.key_type, keys, _coerce_keys)
+        actual_values = values if _skip_validation else _validate_or_coerce_iterable(self.value_type, values, _coerce_values)
+
+        if keys_from_iterable:
+            _validate_duplicates_and_hash(actual_keys)
+
+        object.__setattr__(self, "data", _finisher(dict(zip(actual_keys, actual_values))))
+
+    @classmethod
+    def __class_getitem__(cls: type[AbstractDict[K, V]], key_value: tuple[type[K], type[V]]):
+        cache_key = (cls, key_value)
+        if cache_key in cls._key_value_registry:
+            return cls._key_value_registry[cache_key]
+
+        key_type, value_type = key_value
+        name = f"__{cls.__name__}[{getattr(key_type, '__name__', repr(key_type))}, {getattr(value_type, '__name__', repr(value_type))}]__"
+        subclass = type(
+            name,
+            (cls,),
+            {
+                "__name__": cls.__name__,
+                "_inferred_key_type": key_type,
+                "_inferred_value_type": value_type
+            },
+        )
+        cls._key_value_registry[cache_key] = subclass
+        return subclass
+
+    @classmethod
+    def of(cls: type[AbstractDict[K, V]], keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]):
+        if keys_values is None or not keys_values:
+            raise ValueError(f"Can't create a {cls.__name__} object from empty values.")
+        from type_validation import _infer_type_contained_in_iterable, _split_keys_values
+        keys, values, _ = _split_keys_values(keys_values)
+        key_type = _infer_type_contained_in_iterable(keys)
+        value_type = _infer_type_contained_in_iterable(values)
+        return cls[key_type, value_type](_keys=keys, _values=values)
+
+    @classmethod
+    def of_keys_values(cls: type[AbstractDict[K, V]], keys: Iterable[K], values: Iterable[V]):
+        keys = list(keys)
+        values = list(values)
 
         if len(keys) != len(values):
-            raise ValueError(f"The number of keys and values aren't equal.")
+            raise ValueError("Keys and values must be of the same length when using .of_keys_values")
 
-        actual_dict = {}
-
-        for key, value in zip(_validate_and_coerce_values(key_type, keys), _validate_and_coerce_values(value_type, values)):
-            actual_dict[key] = value
-
-        object.__setattr__(self, "data", finisher(actual_dict))
+        from type_validation import _infer_type_contained_in_iterable, _validate_duplicates_and_hash
+        key_type = _infer_type_contained_in_iterable(keys)
+        value_type = _infer_type_contained_in_iterable(values)
+        return cls[key_type, value_type](_keys=keys, _values=values)
 
     def __getitem__(self: AbstractDict[K, V], key: K) -> V:
         return self.data[key]
@@ -408,83 +716,87 @@ class AbstractDict(Generic[K, V]):
     def items(self: AbstractDict[K, V]):
         return self.data.items()
 
-    def __len__(self: AbstractDict[K, V]):
+    def __len__(self: AbstractDict[K, V]) -> int:
         return len(self.data)
 
-    def __contains__(self: AbstractDict[K, V], key: K) -> bool:
+    def __contains__(self: AbstractDict[K, V], key: object) -> bool:
         return key in self.data
 
-    def __eq__(self: AbstractDict[K, V], other) -> bool:
-        if type(self) != type(other):
-            return NotImplemented
+    def __eq__(self: AbstractDict[K, V], other: Any) -> bool:
         return (
-            self.key_type == other.key_type
+            issubclass(type(self), AbstractDict)
+            and issubclass(type(other), AbstractDict)
+            and self.key_type == other.key_type
             and self.value_type == other.value_type
             and self.data == other.data
         )
 
     def __repr__(self: AbstractDict[K, V]) -> str:
-        return f"{class_name(self)}<{self.key_type.__name__}, {self.value_type.__name__}>{self.data}"
+        return f"{class_name(type(self))}{dict(self.data)}"
 
     def copy(self: AbstractDict[K, V]) -> AbstractDict[K, V]:
-        return self.__class__(self.key_type, self.value_type, self.data.copy())
+        return type(self)[self.key_type, self.value_type](self.data.copy())
 
-    def get(self: AbstractDict[K, V], key: K, fallback: V | None = None) -> V | None:
-        return self.data.get(key, fallback)
-
-    def map_values(self: AbstractDict[K, V], f: Callable[[V], R]) -> AbstractDict[K, R]:
-        new_data = {key : f(value) for key, value in self.data.items()}
-        return self.__class__(
-            self.key_type,
-            type(next(iter(new_data.values()), object)),
-            new_data
+    def get(
+        self: AbstractDict[K, V],
+        key: K,
+        fallback: V | None = None,
+        coerce_keys: bool = False,
+        coerce_values: bool = False
+    ) -> V | None:
+        from type_validation import _validate_or_coerce_value
+        if coerce_keys:
+            try:
+                key = _validate_or_coerce_value(self.key_type, key, coerce_keys)
+            except TypeError:
+                pass
+        return self.data.get(
+            key,
+            _validate_or_coerce_value(self.value_type, fallback, coerce_values) if fallback is not None else None
         )
+
+    def map_values[R](
+        self: AbstractDict[K, V],
+        f: Callable[[V], R],
+        result_type: type[R],
+        coerce_values: bool = False
+    ) -> AbstractDict[K, R]:
+        from type_validation import _infer_type_contained_in_iterable
+        new_data = {key : f(value) for key, value in self.data.items()}
+        if result_type is not None:
+            return type(self)[self.key_type, result_type](new_data, _coerce_values=coerce_values)
+        else:
+            inferred_return_type = _infer_type_contained_in_iterable(new_data.values())
+            return type(self)[self.key_type, inferred_return_type](new_data, _skip_validation=True)
 
     def filter_keys(self: AbstractDict[K, V], predicate: Callable[[K], bool]) -> AbstractDict[K, V]:
-        return self.__class__(
-            self.key_type,
-            self.value_type,
-            {key: value for key, value in self.data.items() if predicate(key)}
-        )
+        return type(self)[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(key)})
 
     def filter_values(self: AbstractDict[K, V], predicate: Callable[[V], bool]) -> AbstractDict[K, V]:
-        return self.__class__(
-            self.key_type,
-            self.value_type,
-            {key: value for key, value in self.data.items() if predicate(value)}
-        )
+        return type(self)[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(value)})
 
     def filter_items(self: AbstractDict[K, V], predicate: Callable[[K, V], bool]) -> AbstractDict[K, V]:
-        return self.__class__(
-            self.key_type,
-            self.value_type,
-            {key: value for key, value in self.data.items() if predicate(key, value)}
-        )
+        return type(self)[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(key, value)})
 
     def subdict(self: AbstractDict[K, V], start: K, end: K) -> AbstractDict[K, V]:
         try:
-            if start > end:
+            if start >= end:
                 raise ValueError()
         except TypeError:
             raise TypeError("Keys must support ordering for subdict slicing.")
         except ValueError:
             raise ValueError("Start must be lower than end.")
-
-        return self.__class__(
-            self.key_type,
-            self.value_type,
-            {key: value for key, value in self.data.items() if start <= key <= end}
-        )
+        return self.filter_keys(lambda key : start <= key <= end)
 
 
-class AbstractMutableDict(AbstractDict[K, V]):
+class AbstractMutableDict[K, V](AbstractDict[K, V]):
 
     def __new__(cls, *args, **kwargs) -> AbstractMutableDict[K, V] | None:
         return _forbid_instantiation(AbstractMutableDict)(cls, *args, **kwargs)
 
     def __setitem__(self: AbstractMutableDict[K, V], key: K, value: V) -> None:
-        from type_validation import _validate_and_coerce_value
-        self.data[_validate_and_coerce_value(self.key_type, key)] = _validate_and_coerce_value(self.value_type, value)
+        from type_validation import _validate_or_coerce_value
+        self.data[_validate_or_coerce_value(self.key_type, key)] = _validate_or_coerce_value(self.value_type, value)
 
     def __delitem__(self: AbstractMutableDict[K, V], key: K) -> None:
         del self.data[key]
@@ -492,37 +804,42 @@ class AbstractMutableDict(AbstractDict[K, V]):
     def clear(self: AbstractMutableDict[K, V]) -> None:
         self.data.clear()
 
-    def update(self: AbstractMutableDict[K, V], other: dict[K, V] | Mapping[K, V] | AbstractDict[K, V]) -> None:
-        from type_validation import _validate_and_coerce_values
-        if isinstance(other, AbstractDict):
-            if not issubclass(other.key_type, self.key_type):
-                raise TypeError(f"Cannot update with StaticDict of keys {other.key_type.__name__}")
-            if not issubclass(other.value_type, self.value_type):
-                raise TypeError(f"Cannot update with StaticDict of values {other.value_type.__name__}")
-            other_items = other.data.items()
+    def update(
+        self: AbstractMutableDict[K, V],
+        other: dict[K, V] | Mapping[K, V] | AbstractDict[K, V],
+        coerce_keys: bool = True,
+        coerce_values: bool = True
+    ) -> None:
+        from type_validation import _validate_or_coerce_iterable
 
-        elif isinstance(other, (dict, Mapping)):
-            validated_keys = _validate_and_coerce_values(self.key_type, other.keys())
-            validated_values = _validate_and_coerce_values(self.value_type, other.values())
-            other_items = dict(zip(validated_keys, validated_values)).items()
-
-        else:
-            raise TypeError("'others' argument must be a dict or MutableDict")
+        validated_keys = _validate_or_coerce_iterable(self.key_type, other.keys(), coerce_keys)
+        validated_values = _validate_or_coerce_iterable(self.value_type, other.values(), coerce_values)
+        other_items = dict(zip(validated_keys, validated_values)).items()
 
         for key, value in other_items:
             self[key] = value
 
-    def pop(self: AbstractMutableDict[K, V], key: K, default: V | None = None) -> V:
-        from type_validation import _validate_and_coerce_value
-        if default is not None:
-            return self.data.pop(_validate_and_coerce_value(self.key_type, key), default)
-        return self.data.pop(_validate_and_coerce_value(self.key_type, key))
+    def pop(
+        self: AbstractMutableDict[K, V],
+        key: K,
+        fallback: V | None = None,
+        coerce_keys: bool = None,
+        coerce_values: bool = None
+    ) -> V:
+        from type_validation import _validate_or_coerce_value
+        if fallback is not None:
+            return self.data.pop(
+                _validate_or_coerce_value(self.key_type, key, coerce_keys),
+                _validate_or_coerce_value(self.value_type, fallback, coerce_values)
+            )
+        return self.data.pop(_validate_or_coerce_value(self.key_type, key, coerce_keys))
 
     def popitem(self: AbstractMutableDict[K, V]) -> tuple[K, V]:
         return self.data.popitem()
 
     def setdefault(self: AbstractMutableDict[K, V], key: K, default: V) -> V:
-        from type_validation import _validate_and_coerce_value
-        key = _validate_and_coerce_value(self.key_type, key)
-        default = _validate_and_coerce_value(self.value_type, default)
-        return self.data.setdefault(key, default)
+        from type_validation import _validate_or_coerce_value
+        return self.data.setdefault(
+            _validate_or_coerce_value(self.key_type, key),
+            _validate_or_coerce_value(self.value_type, default)
+        )

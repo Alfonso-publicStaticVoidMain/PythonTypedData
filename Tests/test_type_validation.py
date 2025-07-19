@@ -1,6 +1,8 @@
 import unittest
 from typing import Literal, Union, TYPE_CHECKING
 
+from abstract_classes import AbstractSet
+
 if TYPE_CHECKING:
     from concrete_classes import MutableDict, MutableSet, ImmutableDict, ImmutableSet, MutableList, ImmutableList
     from maybe import Maybe
@@ -111,69 +113,70 @@ class TestTypeValidation(unittest.TestCase):
         from maybe import Maybe
 
         # --- Direct matches
-        ml = MutableList(int, [1, 2, 3])
+        ml = MutableList[int]([1, 2, 3])
         self.assertTrue(_validate_type(ml, MutableList[int]))
 
-        iml = ImmutableList(str, ["a", "b"])
+        iml = ImmutableList[str]("a", "b")
         self.assertTrue(_validate_type(iml, ImmutableList[str]))
 
-        md = MutableDict(str, int, {"a": 1, "b": 2})
+        md = MutableDict[str, int]({"a": 1, "b": 2})
         self.assertTrue(_validate_type(md, MutableDict[str, int]))
 
-        id_ = ImmutableDict(int, float, {1: 1.0, 2: 2.0})
+        id_ = ImmutableDict[int, float]({1: 1.0, 2: 2.0})
         self.assertTrue(_validate_type(id_, ImmutableDict[int, float]))
 
-        ms = MutableSet(bool, {True, False})
+        ms = MutableSet[bool]({True, False})
         self.assertTrue(_validate_type(ms, MutableSet[bool]))
 
-        ims = ImmutableSet(float, {1.1, 2.2})
+        ims = ImmutableSet[float](1.1, 2.2)
         self.assertTrue(_validate_type(ims, ImmutableSet[float]))
 
-        mb = Maybe(int, 42)
+        mb = Maybe[int](42)
         self.assertTrue(_validate_type(mb, Maybe[int]))
 
         # --- Type mismatch (item_type, key_type, value_type)
-        self.assertFalse(_validate_type(MutableList(str, ["a", "b"]), MutableList[int]))
-        self.assertFalse(_validate_type(MutableDict(str, str, {"a": "b"}), MutableDict[str, int]))
-        self.assertFalse(_validate_type(MutableSet(float, {1.0}), MutableSet[str]))
+        self.assertFalse(_validate_type(MutableList[str]("a", "b"), MutableList[int]))
+        self.assertFalse(_validate_type(MutableDict[str, str]({"a": "b"}), MutableDict[str, int]))
+        self.assertFalse(_validate_type(MutableSet[float](1.0), MutableSet[str]))
 
         # --- Custom class nested in standard containers
-        lst_of_custom = [MutableList(int, [1, 2]), MutableList(int, [3, 4])]
+        lst_of_custom = [MutableList[int]([1, 2]), MutableList[int](3, 4)]
         self.assertTrue(_validate_type(lst_of_custom, list[MutableList[int]]))
 
         dict_of_custom = {
-            "x": MutableSet(int, {1, 2}),
-            "y": MutableSet(int, {3, 4})
+            "x": MutableSet[int]({1, 2}),
+            "y": MutableSet[int]({3, 4})
         }
         self.assertTrue(_validate_type(dict_of_custom, dict[str, MutableSet[int]]))
 
         # --- Nested custom within custom
-        nested_custom = MutableList(MutableList, [
-            MutableList(int, [1]),
-            MutableList(int, [2, 3])
+        nested_custom = MutableList[MutableList[int]]([
+            MutableList[int]([1]),
+            MutableList[int]([2, 3])
         ])
         self.assertTrue(_validate_type(nested_custom, MutableList[MutableList[int]]))
 
-        deeply_nested = MutableList(MutableDict, [
-            MutableDict(str, int, {"a": 1}),
-            MutableDict(str, int, {"b": 2})
+        deeply_nested = MutableList[MutableDict[str, int]]([
+            MutableDict[str, int]({"a": 1}),
+            MutableDict[str, int]({"b": 2})
         ])
         self.assertTrue(_validate_type(deeply_nested, MutableList[MutableDict[str, int]]))
 
         # --- Union (|) with custom types
         union_test = [
-            MutableSet(int, {1, 2}),
-            ImmutableSet(int, {3, 4}),
+            MutableSet[int]({1, 2}),
+            ImmutableSet[int]({3, 4}),
         ]
         self.assertTrue(_validate_type(union_test, list[MutableSet[int] | ImmutableSet[int]]))
+        self.assertFalse(_validate_type(union_test, list[AbstractSet[int]]))
 
-        union_dict_test = MutableDict(str, str, {"a": "1"})
+        union_dict_test = MutableDict[str, str]({"a": "1"})
         self.assertTrue(_validate_type(union_dict_test, MutableDict[str, str] | ImmutableDict[str, str]))
 
         # --- Maybe as value inside another structure
         optional_test = {
-            "a": Maybe(int, 1),
-            "b": Maybe(int, 2),
+            "a": Maybe[int](1),
+            "b": Maybe[int](2),
         }
         self.assertTrue(_validate_type(optional_test, dict[str, Maybe[int]]))
 
