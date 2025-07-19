@@ -421,26 +421,24 @@ class AbstractSet[T](Collection[T]):
     def is_superset(
         self: AbstractSet[T],
         other: AbstractSet[T] | set[T] | frozenset[T],
-        coerce: bool = False
+        *,
+        _coerce: bool = False
     ) -> bool:
         from type_validation import _validate_collection_type_and_get_values
-        if not coerce and isinstance(other, Collection) and other.item_type != self.item_type:
+        if not _coerce and isinstance(other, Collection) and other.item_type != self.item_type:
             return False
-        return self.values.issuperset(
-            _validate_collection_type_and_get_values(other, self.item_type, _coerce=coerce)
-        )
+        return self.values.issuperset(_validate_collection_type_and_get_values(other, self.item_type, _coerce=_coerce))
 
     def is_disjoint(
         self: AbstractSet[T],
         other: AbstractSet[T] | set[T] | frozenset[T],
-        coerce: bool = False
+        *,
+        _coerce: bool = False
     ) -> bool:
         from type_validation import _validate_collection_type_and_get_values
-        if not coerce and isinstance(other, Collection) and other.item_type != self.item_type:
+        if not _coerce and isinstance(other, Collection) and other.item_type != self.item_type:
             return False
-        return self.values.isdisjoint(
-            _validate_collection_type_and_get_values(other, self.item_type, _coerce=coerce)
-        )
+        return self.values.isdisjoint(_validate_collection_type_and_get_values(other, self.item_type, _coerce=_coerce))
 
 
 class AbstractMutableSet[T](AbstractSet[T]):
@@ -652,48 +650,50 @@ class AbstractDict[K, V](GenericBase[K, V]):
         return f"{class_name(type(self))}{dict(self.data)}"
 
     def copy(self: AbstractDict[K, V]) -> AbstractDict[K, V]:
-        return type(self)[self.key_type, self.value_type](self.data.copy())
+        return type(self)(self.data.copy())
 
     def get(
         self: AbstractDict[K, V],
         key: K,
         fallback: V | None = None,
-        coerce_keys: bool = False,
-        coerce_values: bool = False
+        *,
+        _coerce_keys: bool = False,
+        _coerce_values: bool = False
     ) -> V | None:
         from type_validation import _validate_or_coerce_value
-        if coerce_keys:
+        if _coerce_keys:
             try:
-                key = _validate_or_coerce_value(key, self.key_type, coerce_keys)
+                key = _validate_or_coerce_value(key, self.key_type, _coerce=_coerce_keys)
             except TypeError:
                 pass
         return self.data.get(
             key,
-            _validate_or_coerce_value(fallback, self.value_type, _coerce=coerce_values) if fallback is not None else None
+            _validate_or_coerce_value(fallback, self.value_type, _coerce=_coerce_values) if fallback is not None else None
         )
 
     def map_values[R](
         self: AbstractDict[K, V],
         f: Callable[[V], R],
-        result_type: type[R],
-        coerce_values: bool = False
+        result_type: type[R] | None = None,
+        *,
+        _coerce_values: bool = False
     ) -> AbstractDict[K, R]:
         from type_validation import _infer_type_contained_in_iterable
         new_data = {key : f(value) for key, value in self.data.items()}
         if result_type is not None:
-            return type(self)[self.key_type, result_type](new_data, _coerce_values=coerce_values)
+            return type(self)[self.key_type, result_type](new_data, _coerce_values=_coerce_values)
         else:
             inferred_return_type = _infer_type_contained_in_iterable(new_data.values())
             return type(self)[self.key_type, inferred_return_type](new_data, _skip_validation=True)
 
     def filter_keys(self: AbstractDict[K, V], predicate: Callable[[K], bool]) -> AbstractDict[K, V]:
-        return type(self)[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(key)})
+        return type(self)({key : value for key, value in self.data.items() if predicate(key)})
 
     def filter_values(self: AbstractDict[K, V], predicate: Callable[[V], bool]) -> AbstractDict[K, V]:
-        return type(self)[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(value)})
+        return type(self)({key : value for key, value in self.data.items() if predicate(value)})
 
     def filter_items(self: AbstractDict[K, V], predicate: Callable[[K, V], bool]) -> AbstractDict[K, V]:
-        return type(self)[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(key, value)})
+        return type(self)({key : value for key, value in self.data.items() if predicate(key, value)})
 
     def subdict(self: AbstractDict[K, V], start: K, end: K) -> AbstractDict[K, V]:
         try:
@@ -724,13 +724,14 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
     def update(
         self: AbstractMutableDict[K, V],
         other: dict[K, V] | Mapping[K, V] | AbstractDict[K, V],
-        coerce_keys: bool = True,
-        coerce_values: bool = True
+        *,
+        _coerce_keys: bool = True,
+        _coerce_values: bool = True
     ) -> None:
         from type_validation import _validate_or_coerce_iterable
 
-        validated_keys = _validate_or_coerce_iterable(other.keys(), self.key_type, _coerce=coerce_keys)
-        validated_values = _validate_or_coerce_iterable(other.values(), self.value_type, _coerce=coerce_values)
+        validated_keys = _validate_or_coerce_iterable(other.keys(), self.key_type, _coerce=_coerce_keys)
+        validated_values = _validate_or_coerce_iterable(other.values(), self.value_type, _coerce=_coerce_values)
         other_items = dict(zip(validated_keys, validated_values)).items()
 
         for key, value in other_items:
@@ -740,16 +741,17 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         self: AbstractMutableDict[K, V],
         key: K,
         fallback: V | None = None,
-        coerce_keys: bool = None,
-        coerce_values: bool = None
+        *,
+        _coerce_keys: bool = None,
+        _coerce_values: bool = None
     ) -> V:
         from type_validation import _validate_or_coerce_value
         if fallback is not None:
             return self.data.pop(
-                _validate_or_coerce_value(key, self.key_type, coerce_keys),
-                _validate_or_coerce_value(fallback, self.value_type, coerce_values)
+                _validate_or_coerce_value(key, self.key_type, _coerce=_coerce_keys),
+                _validate_or_coerce_value(fallback, self.value_type, _coerce=_coerce_values)
             )
-        return self.data.pop(_validate_or_coerce_value(key, self.key_type, coerce_keys))
+        return self.data.pop(_validate_or_coerce_value(key, self.key_type, _coerce=_coerce_keys))
 
     def popitem(self: AbstractMutableDict[K, V]) -> tuple[K, V]:
         return self.data.popitem()

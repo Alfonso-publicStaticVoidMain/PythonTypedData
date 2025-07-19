@@ -117,9 +117,10 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         _coerce_keys: bool = False,
         _coerce_values: bool = False,
         _keys: Iterable[K] | None = None,
-        _values: Iterable[V] | None = None
+        _values: Iterable[V] | None = None,
+        _skip_validation: bool = False
     ) -> None:
-        AbstractDict.__init__(self, keys_values, _coerce_keys=_coerce_keys, _coerce_values=_coerce_values, _keys=_keys, _values=_values)
+        AbstractDict.__init__(self, keys_values, _coerce_keys=_coerce_keys, _coerce_values=_coerce_values, _keys=_keys, _values=_values, _skip_validation=_skip_validation)
 
     def to_immutable_dict(self: MutableDict[K, V]) -> ImmutableDict[K, V]:
         return ImmutableDict[self.key_type, self.value_type](self.data)
@@ -139,9 +140,10 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         _coerce_keys: bool = False,
         _coerce_values: bool = False,
         _keys: Iterable[K] | None = None,
-        _values: Iterable[V] | None = None
+        _values: Iterable[V] | None = None,
+        _skip_validation: bool = False
     ) -> None:
-        AbstractDict.__init__(self, keys_values, _coerce_keys=_coerce_keys, _coerce_values=_coerce_values, _finisher=immutabledict, _keys=_keys, _values=_values)
+        AbstractDict.__init__(self, keys_values, _coerce_keys=_coerce_keys, _coerce_values=_coerce_values, _finisher=immutabledict, _keys=_keys, _values=_values, _skip_validation=_skip_validation)
 
     def to_mutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
         return MutableDict[self.key_type, self.value_type](self.data)
