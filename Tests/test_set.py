@@ -6,19 +6,19 @@ from concrete_classes import MutableSet, ImmutableSet, MutableList
 class TestSet(unittest.TestCase):
 
     def test_basic_init(self):
-        s = MutableSet[int](1, '2', 2, coerce=True)
+        s = MutableSet[int](1, '2', 2, _coerce=True)
         self.assertEqual(s.values, {1, 2})
 
-        fs = ImmutableSet[int]('1', 2, '2', coerce=True)
+        fs = ImmutableSet[int]('1', 2, '2', _coerce=True)
         self.assertEqual(fs.values, frozenset({1, 2}))
 
     def test_type_coercion(self):
         with self.assertRaises(TypeError):
             ImmutableSet[int]('1', 2)
 
-        self.assertEqual(ImmutableSet[int]('1', 2, coerce=True).values, {1, 2})
-        self.assertEqual(MutableSet[str](2, '3', coerce=True).values, {'2', '3'})
-        self.assertEqual(MutableSet[str](2, '3', coerce=False).values, {'2', '3'})
+        self.assertEqual(ImmutableSet[int]('1', 2, _coerce=True).values, {1, 2})
+        self.assertEqual(MutableSet[str](2, '3', _coerce=True).values, {'2', '3'})
+        self.assertEqual(MutableSet[str](2, '3', _coerce=False).values, {'2', '3'})
 
     def test_immutability(self):
         fs = ImmutableSet[str]('a', 'b')
@@ -36,10 +36,10 @@ class TestSet(unittest.TestCase):
             MutableSet[int](1, 2, 3, 4, 5)
         )
 
-        s3 = MutableSet[int](1, '2', 3, 4, 5, 6, 7, 8, coerce=True)
+        s3 = MutableSet[int](1, '2', 3, 4, 5, 6, 7, 8, _coerce=True)
         self.assertEqual(
             s3.intersection({0, 1, 2, 3, 4, '5'},
-                            {'a': 2, 'b': 3, 'c': 4, 'd': 5, 'e': 6, 'f': 7, 'g': 8, 'h': 9}.values(), coerce=True),
+                            {'a': 2, 'b': 3, 'c': 4, 'd': 5, 'e': 6, 'f': 7, 'g': 8, 'h': 9}.values(), _coerce=True),
             MutableSet[int](2, 3, 4, 5)
         )
 
@@ -64,7 +64,7 @@ class TestSet(unittest.TestCase):
         s2 = MutableSet[str]("a", "1")
         s3 = MutableSet[str]("a", "b")
         s4 = ImmutableSet[str](2, 3)
-        s5 = ImmutableSet[int]("2", "3", coerce=True)
+        s5 = ImmutableSet[int]("2", "3", _coerce=True)
 
         self.assertFalse(s2.is_subset(s1))
         self.assertEqual(s2.is_subset(s1), s1.is_superset(s2))
@@ -85,8 +85,8 @@ class TestSet(unittest.TestCase):
     def test_sub_super_set_coercion(self):
         int_st = MutableSet[int](1, 2, 3)
         str_st = MutableSet[str]('1', '2', '3')
-        self.assertTrue(int_st.is_subset(str_st, coerce=True))
-        self.assertTrue(str_st.is_subset(int_st, coerce=True))
+        self.assertTrue(int_st.is_subset(str_st, _coerce=True))
+        self.assertTrue(str_st.is_subset(int_st, _coerce=True))
 
     def test_add_remove(self):
         s = MutableSet[str]('a')
@@ -155,10 +155,10 @@ class TestSet(unittest.TestCase):
 
     def test_repr(self):
         mus = MutableSet[str]('x', 'y')
-        self.assertIn("MutableSet<str>", repr(mus))
+        self.assertIn("MutableSet[str]", repr(mus))
 
-        ims = ImmutableSet[str](*mus)
-        self.assertIn("ImmutableSet<str>", repr(ims))
+        ims = ImmutableSet[str](mus)
+        self.assertIn("ImmutableSet[str]", repr(ims))
 
     def test_iter(self):
         values = {1, 2, 3, 4, 5}

@@ -134,7 +134,7 @@ class TestTypeValidation(unittest.TestCase):
         mb = Maybe[int](42)
         self.assertTrue(_validate_type(mb, Maybe[int]))
 
-        # --- Type mismatch (item_type, key_type, value_type)
+        # --- Type mismatch (expected_type, key_type, value_type)
         self.assertFalse(_validate_type(MutableList[str]("a", "b"), MutableList[int]))
         self.assertFalse(_validate_type(MutableDict[str, str]({"a": "b"}), MutableDict[str, int]))
         self.assertFalse(_validate_type(MutableSet[float](1.0), MutableSet[str]))
@@ -173,7 +173,7 @@ class TestTypeValidation(unittest.TestCase):
         union_dict_test = MutableDict[str, str]({"a": "1"})
         self.assertTrue(_validate_type(union_dict_test, MutableDict[str, str] | ImmutableDict[str, str]))
 
-        # --- Maybe as value inside another structure
+        # --- Maybe as obj inside another structure
         optional_test = {
             "a": Maybe[int](1),
             "b": Maybe[int](2),

@@ -8,8 +8,8 @@ from concrete_classes import MutableList, ImmutableList
 class TestList(unittest.TestCase):
 
     def test_multiple_value_init(self):
-        lst = MutableList[str]('a', 'b', 'c', 1, coerce=True)
-        lst_2 = MutableList[str](['a', 'b', 'c', 1], coerce=True)
+        lst = MutableList[str]('a', 'b', 'c', 1, _coerce=True)
+        lst_2 = MutableList[str](['a', 'b', 'c', 1], _coerce=True)
         self.assertEqual(lst, lst_2)
 
 
@@ -22,7 +22,7 @@ class TestList(unittest.TestCase):
         self.assertEqual(class_name(type(iml)), "ImmutableList[int | str | float]")
 
     def test_init_and_access(self):
-        iml = ImmutableList[int](['1', 2], coerce=True)
+        iml = ImmutableList[int](['1', 2], _coerce=True)
         self.assertEqual(iml.values, (1, 2))
         self.assertEqual(iml[0], 1)
 
@@ -50,15 +50,15 @@ class TestList(unittest.TestCase):
         self.assertFalse(empty_list)
 
     def test_type_coercion(self):
-        lst = MutableList[int](['1', 2], coerce=True)
+        lst = MutableList[int](['1', 2], _coerce=True)
         self.assertEqual(lst.values, [1, 2])
 
-        iml = ImmutableList[float]([1, 2.25], coerce=False)
+        iml = ImmutableList[float]([1, 2.25], _coerce=False)
         self.assertEqual(iml.values, (1.0, 2.25))
         self.assertEqual(iml[0], 1)
 
         with self.assertRaises(TypeError):
-            mul = MutableList[int]([1, 2, '3'], coerce=False)
+            mul = MutableList[int]([1, 2, '3'], _coerce=False)
 
     def test_immutability(self):
         iml = ImmutableList[str](['a', 'b'])
@@ -80,7 +80,7 @@ class TestList(unittest.TestCase):
 
     def test_init_and_get(self):
         int_lst = MutableList[int]([0, 1, 2])
-        str_lst = MutableList[str](['a', 'b', 2, 0.4], coerce=True)
+        str_lst = MutableList[str](['a', 'b', 2, 0.4], _coerce=True)
 
         self.assertEqual(int_lst[0], 0)
         self.assertEqual(int_lst[1], 1)
@@ -224,14 +224,14 @@ class TestList(unittest.TestCase):
 
     def test_append(self):
         int_lst = MutableList[int]()
-        int_lst.append('0', coerce=True)
+        int_lst.append('0', _coerce=True)
         self.assertEqual(int_lst[0], 0)
         with self.assertRaises(TypeError):
-            int_lst.append('1', coerce=False)
+            int_lst.append('1', _coerce=False)
 
         str_lst = MutableList[str]()
-        str_lst.append(0, coerce=True)
-        str_lst.append(1, coerce=False)
+        str_lst.append(0, _coerce=True)
+        str_lst.append(1, _coerce=False)
         self.assertEqual(str_lst[0], '0')
         self.assertEqual(str_lst[1], '1')
 
