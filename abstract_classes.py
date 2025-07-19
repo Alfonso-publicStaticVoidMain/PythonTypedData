@@ -154,8 +154,8 @@ class Collection[T]:
 
     def __eq__(self: Collection[T], other: Any) -> bool:
         return (
-            issubclass(self.__class__, Collection)
-            and issubclass(other.__class__, Collection)
+            issubclass(type(self), Collection)
+            and issubclass(type(other), Collection)
             and self.item_type == other.item_type
             and self.values == other.values
         )
@@ -171,7 +171,7 @@ class Collection[T]:
     def copy(self: Collection[T], deep: bool = False) -> Collection[T]:
         from copy import deepcopy
         values = deepcopy(self.values) if deep else (self.values.copy() if hasattr(self.values, 'copy') else self.values)
-        return self.__class__[self.item_type](values, _skip_validation=True)
+        return type(self)[self.item_type](values, _skip_validation=True)
 
     def to_list(self: Collection[T]) -> list[T]:
         return list(self.values)
@@ -202,7 +202,7 @@ class Collection[T]:
         coerce: bool = False
     ) -> Collection[R]:
         mapped_values = [f(value) for value in self.values]
-        return self.__class__[result_type](mapped_values, coerce=coerce) if result_type is not None else self.__class__.of(mapped_values)
+        return type(self)[result_type](mapped_values, coerce=coerce) if result_type is not None else type(self).of(mapped_values)
 
     # TODO tests
     def flatmap[R](
@@ -217,10 +217,10 @@ class Collection[T]:
             if not isinstance(result, Iterable) or isinstance(result, (str, bytes)):
                 raise TypeError("flatmap function must return a non-string iterable")
             flattened.extend(result)
-        return self.__class__[result_type](flattened, coerce=coerce) if result_type is not None else self.__class__.of(flattened)
+        return type(self)[result_type](flattened, coerce=coerce) if result_type is not None else type(self).of(flattened)
 
     def filter(self: Collection[T], predicate: Callable[[T], bool]) -> Collection[T]:
-        return self.__class__[self.item_type]([value for value in self.values if predicate(value)], _skip_validation=True)
+        return type(self)[self.item_type]([value for value in self.values if predicate(value)], _skip_validation=True)
 
     def all_match(self: Collection[T], predicate: Callable[[T], bool]) -> bool:
         return all(predicate(value) for value in self.values)
@@ -253,7 +253,7 @@ class Collection[T]:
             if key_of_value not in seen:
                 seen.add(key_of_value)
                 result.append(value)
-        return self.__class__[self.item_type](result, _skip_validation=True)
+        return type(self)[self.item_type](result, _skip_validation=True)
 
     def max(self: Collection[T], *, default: T = None, key: Callable[[T], Any] = None) -> T | None:
         if default is not None:
@@ -278,7 +278,7 @@ class Collection[T]:
         for item in self.values:
             groups[key(item)].append(item)
         return {
-            key : self.__class__[self.item_type](group, _skip_validation=True)
+            key : type(self)[self.item_type](group, _skip_validation=True)
             for key, group in groups.items()
         }
 
@@ -291,8 +291,8 @@ class Collection[T]:
         for item in self.values:
             (true_part if predicate(item) else false_part).append(item)
         return {
-            True: self.__class__[self.item_type](true_part, _skip_validation=True),
-            False: self.__class__[self.item_type](false_part, _skip_validation=True)
+            True: type(self)[self.item_type](true_part, _skip_validation=True),
+            False: type(self)[self.item_type](false_part, _skip_validation=True)
         }
 
     def collect[A, R](
@@ -321,7 +321,7 @@ class AbstractSequence[T](Collection[T]):
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
         if isinstance(index, slice):
-            return self.__class__[self.item_type](self.values[index])
+            return type(self)[self.item_type](self.values[index])
         elif isinstance(index, int):
             return self.values[index]
         else:
@@ -352,7 +352,7 @@ class AbstractSequence[T](Collection[T]):
         other: AbstractSequence[T] | list[T] | tuple[T]
     ) -> AbstractSequence[T]:
         from type_validation import _validate_collection_type_and_get_values
-        return self.__class__[self.item_type](
+        return type(self)[self.item_type](
             self.values + _validate_collection_type_and_get_values(
                 self.item_type,
                 other,
@@ -367,13 +367,13 @@ class AbstractSequence[T](Collection[T]):
     ) -> AbstractSequence[T]:
         if not isinstance(n, int):
             return NotImplemented
-        return self.__class__[self.item_type](self.values * n, _skip_validation=True)
+        return type(self)[self.item_type](self.values * n, _skip_validation=True)
 
     def __sub__(self: AbstractSequence[T], other) -> AbstractSequence[T]:
         from type_validation import _validate_collection_type_and_get_values
         other_values = _validate_collection_type_and_get_values(self.item_type, other, (AbstractSequence,), (list, tuple))
         filtered_values = [value for value in self.values if value not in other_values]
-        return self.__class__[self.item_type](filtered_values, _skip_validation=True)
+        return type(self)[self.item_type](filtered_values, _skip_validation=True)
 
     def __reversed__(self: AbstractSequence[T]):
         return reversed(self.values)
@@ -382,7 +382,7 @@ class AbstractSequence[T](Collection[T]):
         return self.values.index(value)
 
     def sorted(self: AbstractSequence[T], key=None, reverse=False) -> AbstractSequence[T]:
-        return self.__class__[self.item_type](sorted(self.values, key=key, reverse=reverse), _skip_validation=True)
+        return type(self)[self.item_type](sorted(self.values, key=key, reverse=reverse), _skip_validation=True)
 
 
 class AbstractMutableSequence[T](AbstractSequence[T]):
@@ -439,7 +439,7 @@ class AbstractSet[T](Collection[T]):
         coerce: bool = False
     ) -> AbstractSet[T]:
         from type_validation import _validate_iterable_of_iterables_and_get
-        return self.__class__[self.item_type](self.values.union(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce)))
+        return type(self)[self.item_type](self.values.union(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce)))
 
     def intersection(
         self: AbstractSet[T],
@@ -447,7 +447,7 @@ class AbstractSet[T](Collection[T]):
         coerce: bool = False
     ) -> AbstractSet[T]:
         from type_validation import _validate_iterable_of_iterables_and_get
-        return self.__class__[self.item_type](self.values.intersection(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce)),)
+        return type(self)[self.item_type](self.values.intersection(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce)),)
 
     def difference(
         self: AbstractSet[T],
@@ -455,7 +455,7 @@ class AbstractSet[T](Collection[T]):
         coerce: bool = False
     ) -> AbstractSet[T]:
         from type_validation import _validate_iterable_of_iterables_and_get
-        return self.__class__[self.item_type](self.values.difference(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce)),)
+        return type(self)[self.item_type](self.values.difference(*_validate_iterable_of_iterables_and_get(self.item_type, others, coerce)),)
 
     def symmetric_difference(
         self: AbstractSet[T],
@@ -466,7 +466,7 @@ class AbstractSet[T](Collection[T]):
         new_values = self.values
         for validated_set in _validate_iterable_of_iterables_and_get(self.item_type, others, coerce):
             new_values = new_values.symmetric_difference(validated_set)
-        return self.__class__[self.item_type](new_values)
+        return type(self)[self.item_type](new_values)
 
     def is_subset(
         self: AbstractSet[T],
@@ -614,8 +614,8 @@ class AbstractDict[K, V]:
         *,
         _keys: Iterable[K] | None = None,
         _values: Iterable[V] | None = None,
-        coerce_keys: bool = False,
-        coerce_values: bool = False,
+        _coerce_keys: bool = False,
+        _coerce_values: bool = False,
         _finisher: Callable[[dict[K, V]], Any] = lambda x : x,
         _skip_validation: bool = False
     ) -> None:
@@ -650,8 +650,8 @@ class AbstractDict[K, V]:
         else:
             keys, values, keys_from_iterable = _split_keys_values(keys_values)
 
-        actual_keys = keys if _skip_validation else _validate_or_coerce_iterable(self.key_type, keys, coerce_keys)
-        actual_values = values if _skip_validation else _validate_or_coerce_iterable(self.value_type, values, coerce_values)
+        actual_keys = keys if _skip_validation else _validate_or_coerce_iterable(self.key_type, keys, _coerce_keys)
+        actual_values = values if _skip_validation else _validate_or_coerce_iterable(self.value_type, values, _coerce_values)
 
         if keys_from_iterable:
             _validate_duplicates_and_hash(actual_keys)
@@ -724,8 +724,8 @@ class AbstractDict[K, V]:
 
     def __eq__(self: AbstractDict[K, V], other: Any) -> bool:
         return (
-            issubclass(self.__class__, AbstractDict)
-            and issubclass(other.__class__, AbstractDict)
+            issubclass(type(self), AbstractDict)
+            and issubclass(type(other), AbstractDict)
             and self.key_type == other.key_type
             and self.value_type == other.value_type
             and self.data == other.data
@@ -735,7 +735,7 @@ class AbstractDict[K, V]:
         return f"{class_name(type(self))}{dict(self.data)}"
 
     def copy(self: AbstractDict[K, V]) -> AbstractDict[K, V]:
-        return self.__class__[self.key_type, self.value_type](self.data.copy())
+        return type(self)[self.key_type, self.value_type](self.data.copy())
 
     def get(
         self: AbstractDict[K, V],
@@ -764,19 +764,19 @@ class AbstractDict[K, V]:
         from type_validation import _infer_type_contained_in_iterable
         new_data = {key : f(value) for key, value in self.data.items()}
         if result_type is not None:
-            return self.__class__[self.key_type, result_type](new_data, coerce_values=coerce_values)
+            return type(self)[self.key_type, result_type](new_data, _coerce_values=coerce_values)
         else:
             inferred_return_type = _infer_type_contained_in_iterable(new_data.values())
-            return self.__class__[self.key_type, inferred_return_type](new_data, _skip_validation=True)
+            return type(self)[self.key_type, inferred_return_type](new_data, _skip_validation=True)
 
     def filter_keys(self: AbstractDict[K, V], predicate: Callable[[K], bool]) -> AbstractDict[K, V]:
-        return self.__class__[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(key)})
+        return type(self)[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(key)})
 
     def filter_values(self: AbstractDict[K, V], predicate: Callable[[V], bool]) -> AbstractDict[K, V]:
-        return self.__class__[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(value)})
+        return type(self)[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(value)})
 
     def filter_items(self: AbstractDict[K, V], predicate: Callable[[K, V], bool]) -> AbstractDict[K, V]:
-        return self.__class__[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(key, value)})
+        return type(self)[self.key_type, self.value_type]({key : value for key, value in self.data.items() if predicate(key, value)})
 
     def subdict(self: AbstractDict[K, V], start: K, end: K) -> AbstractDict[K, V]:
         try:

@@ -114,12 +114,12 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         self: MutableDict[K, V],
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
         *,
-        coerce_keys: bool = False,
-        coerce_values: bool = False,
+        _coerce_keys: bool = False,
+        _coerce_values: bool = False,
         _keys: Iterable[K] | None = None,
         _values: Iterable[V] | None = None
     ) -> None:
-        AbstractDict.__init__(self, keys_values, coerce_keys=coerce_keys, coerce_values=coerce_values, _keys=_keys, _values=_values)
+        AbstractDict.__init__(self, keys_values, _coerce_keys=_coerce_keys, _coerce_values=_coerce_values, _keys=_keys, _values=_values)
 
     def to_immutable_dict(self: MutableDict[K, V]) -> ImmutableDict[K, V]:
         return ImmutableDict[self.key_type, self.value_type](self.data)
@@ -136,12 +136,12 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         self: ImmutableDict[K, V],
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None = None,
         *,
-        coerce_keys: bool = False,
-        coerce_values: bool = False,
+        _coerce_keys: bool = False,
+        _coerce_values: bool = False,
         _keys: Iterable[K] | None = None,
         _values: Iterable[V] | None = None
     ) -> None:
-        AbstractDict.__init__(self, keys_values, coerce_keys=coerce_keys, coerce_values=coerce_values, _finisher=immutabledict, _keys=_keys, _values=_values)
+        AbstractDict.__init__(self, keys_values, _coerce_keys=_coerce_keys, _coerce_values=_coerce_values, _finisher=immutabledict, _keys=_keys, _values=_values)
 
     def to_mutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
         return MutableDict[self.key_type, self.value_type](self.data)

@@ -265,5 +265,13 @@ class TestList(unittest.TestCase):
         )
         self.assertEqual(dic, {0: 1, 1: 2, 2: 4, 3: 8, 4: 16, 5: 32})
 
+    def test_group_by(self):
+        class TestClass:
+            def __init__(self, number: int, name: str):
+                self.number = number
+                self.name = name
+
+        tml = MutableList[TestClass](TestClass(0, 'cosa 0'), TestClass(0, 'cosa 1'), TestClass(1, 'cosa 2'), TestClass(1, 'cosa 3'))
+
 if __name__ == '__main__':
     unittest.main()
