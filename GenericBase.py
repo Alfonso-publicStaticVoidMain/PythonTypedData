@@ -16,11 +16,13 @@ class GenericBase[*Ts]:
         if cache_key in cls._generic_type_registry:
             return cls._generic_type_registry[cache_key]
 
-
         subclass = type(
             f"{cls.__name__}[{", ".join(class_name(arg) for arg in item)}]",
             (cls,),
-            {"_inferred_generic_args": item}
+            {
+                "_args": item,
+                "_origin": cls,
+            }
         )
 
         cls._generic_type_registry[cache_key] = subclass
@@ -48,7 +50,7 @@ def class_name(cls: type) -> str:
         return " | ".join(class_name(arg) for arg in args)
 
     # Case 1: A class extending GenericBase
-    if hasattr(cls, "_inferred_generic_args"):
+    if hasattr(cls, "_args"):
         return cls.__name__  # It's already been formatted
 
     # Case 2: Built-in generics list[int], dict[str, int], etc.

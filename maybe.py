@@ -32,7 +32,7 @@ class Maybe[T](GenericBase[T]):
     @classmethod
     def _inferred_item_type(cls: Maybe[T]) -> type[T] | None:
         try:
-            return cls._inferred_generic_args[0]
+            return cls._args[0]
         except (AttributeError, IndexError, TypeError, KeyError):
             return None
 

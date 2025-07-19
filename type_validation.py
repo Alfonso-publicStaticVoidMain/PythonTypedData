@@ -251,7 +251,7 @@ def _infer_type_contained_in_iterable[T](iterable: Iterable[Any]) -> type[T]:
     """
     if iterable is None:
         raise ValueError("Cannot infer type from None")
-    if isinstance(iterable, Collection) and hasattr(type(iterable), '_inferred_generic_args'):
+    if isinstance(iterable, Collection) and hasattr(type(iterable), '_args'):
         return type(iterable)._inferred_item_type()
     if not iterable:
         raise ValueError("Cannot infer type from an empty iterable")
@@ -266,9 +266,9 @@ def _validate_type(obj: Any, expected_type: type) -> bool:
     origin = get_origin(expected_type)
     args = get_args(expected_type)
 
-    if origin is None and hasattr(expected_type, '_inferred_generic_args'):
-            origin = expected_type
-            args = (expected_type._inferred_generic_args,)
+    if origin is None and hasattr(expected_type, '_args'):
+        origin = expected_type._origin
+        args = expected_type._args
 
     if origin in (Union, types.UnionType):
         return any(_validate_type(obj, arg) for arg in args)
@@ -288,7 +288,7 @@ def _validate_type(obj: Any, expected_type: type) -> bool:
     if origin in (collections.abc.Mapping, dict) or (isinstance(origin, type) and issubclass(origin, AbstractDict)):
         return _validate_mapping(obj, origin, args)
 
-    if origin is Maybe:
+    if isinstance(origin, type) and issubclass(origin, Maybe):
         return _validate_maybe(obj, origin, args[0])
 
     if origin is None:

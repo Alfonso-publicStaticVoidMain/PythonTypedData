@@ -72,7 +72,7 @@ class Collection[T](GenericBase[T]):
     @classmethod
     def _inferred_item_type(cls: Collection[T]) -> type[T] | None:
         try:
-            return cls._inferred_generic_args[0]
+            return cls._args[0]
         except (AttributeError, IndexError, TypeError, KeyError):
             return None
 
@@ -588,8 +588,8 @@ class AbstractDict[K, V](GenericBase[K, V]):
     @classmethod
     def _inferred_key_value_types(cls: AbstractDict[K, V]) -> tuple[type[K] | None, type[V] | None]:
         try:
-            key_type = cls._inferred_generic_args[0]
-            value_type = cls._inferred_generic_args[1]
+            key_type = cls._args[0]
+            value_type = cls._args[1]
         except (TypeError, ValueError, IndexError, KeyError):
             key_type = None
             value_type = None
