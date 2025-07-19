@@ -52,7 +52,7 @@ class ImmutableList[T](AbstractSequence[T]):
         Collection.__init__(self, *values, _forbidden_iterable_types=(AbstractSet, set, frozenset), coerce=coerce, _finisher=tuple, _skip_validation=_skip_validation)
 
     def __repr__(self: Collection[T]) -> str:
-        return f"{class_name(self)}{list(self.values)}"
+        return f"{class_name(type(self))}{list(self.values)}"
 
     def to_mutable_list(self: ImmutableList[T]) -> MutableList[T]:
         return MutableList(self.values, self.item_type, _skip_validation=True)

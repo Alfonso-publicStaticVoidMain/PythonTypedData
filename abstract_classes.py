@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Iterable, Any, Callable, Mapping, TYPE_CHECKING, ClassVar, TypeVar
+from types import UnionType
+from typing import Iterable, Any, Callable, Mapping, TYPE_CHECKING, ClassVar, TypeVar, get_origin, get_args, Union
 from weakref import WeakKeyDictionary, WeakValueDictionary
 from collections import defaultdict
 
@@ -15,11 +16,47 @@ if TYPE_CHECKING:
     )
 
 
-def class_name(self: object) -> str:
-    name = type(self).__name__
-    if name.startswith('__') and name.endswith('__'):
-        return name[2:-2]
-    return name
+def class_name(cls: type) -> str:
+    """
+    Gives a str representation of a given type or class, including generics info handled recursively.
+    :param cls: Class whose name will be represented.
+    :return: If the type is a Union or UnionType, it's represented using the pipe operator |. If it's a Collection or
+    AbstractDict (has a _inferred_item_type or _inferred_key_type and _inferred_value_type attributes), their generics
+    are fetched from the attributes and recursively parsed with this very method, and put in brackers [] after the
+    actual class name.
+
+    Then with typing.get_origin and typing.get_args info about the base class and its generics is fetched to again
+    reconstruct a representation that displays that information. If that wasn't possible, a fallback is present using
+    __name__ and repr.
+    """
+
+    # Case 0: Handle Union[...] using | notation
+    origin = get_origin(cls)
+    args = get_args(cls)
+    if origin is Union or origin is UnionType:
+        return " | ".join(class_name(arg) for arg in args)
+
+    # Case 1: Collection, AbstractDict
+    if hasattr(cls, '_inferred_item_type'):
+        item_str = class_name(cls._inferred_item_type)
+        return f"{cls.__name__}[{item_str}]"
+    elif hasattr(cls, '_inferred_key_type') and hasattr(cls, '_inferred_value_type'):
+        key_str = class_name(cls._inferred_key_type)
+        val_str = class_name(cls._inferred_value_type)
+        return f"{cls.__name__}[{key_str}, {val_str}]"
+
+    # Case 2: Built-in generics list[int], dict[str, int], etc.
+    if origin:
+        origin_name = getattr(origin, '__name__', repr(origin))
+        args_str = ", ".join(class_name(arg) for arg in args)
+        return f"{origin_name}[{args_str}]"
+
+    # Case 3: Simple class
+    if hasattr(cls, '__name__'):
+        return cls.__name__
+
+    # Fallback for things like typing.Any
+    return repr(cls)
 
 
 def _forbid_instantiation[T](forbidden_type: type[T]) -> Callable[..., T]:
@@ -57,7 +94,7 @@ class Collection[T]:
         from type_validation import _validate_or_coerce_iterable
 
         try:
-            generic_item_type = self.__class__._inferred_item_type
+            generic_item_type = type(self)._inferred_item_type
         except (AttributeError, IndexError, TypeError, KeyError):
             generic_item_type = None
 
@@ -85,15 +122,7 @@ class Collection[T]:
         if cache_key in cls._generic_type_registry:
             return cls._generic_type_registry[cache_key]
 
-        name = f"__{cls.__name__}[{getattr(item, '__name__', repr(item))}]__"
-        subclass = type(
-            name,
-            (cls,),
-            {
-                "__name__": cls.__name__,
-                "_inferred_item_type": item,
-            },
-        )
+        subclass = type(cls.__name__, (cls,), {"_inferred_item_type": item})
         cls._generic_type_registry[cache_key] = subclass
         return subclass
 
@@ -132,7 +161,8 @@ class Collection[T]:
         )
 
     def __repr__(self: Collection[T]) -> str:
-        return f"{class_name(self)}{self.values}"
+        cls = type(self)
+        return f"{class_name(cls)}{self.values}"
 
     def __bool__(self: Collection[T]) -> bool:
         return bool(self.values)
@@ -596,8 +626,8 @@ class AbstractDict[K, V]:
         )
 
         try:
-            key_type = self.__class__._inferred_key_type
-            value_type = self.__class__._inferred_value_type
+            key_type = type(self)._inferred_key_type
+            value_type = type(self)._inferred_value_type
         except (TypeError, ValueError, IndexError, KeyError):
             raise TypeError(f"Generic key/value types could not be inferred for {type(self).__name__}.")
 
@@ -702,7 +732,7 @@ class AbstractDict[K, V]:
         )
 
     def __repr__(self: AbstractDict[K, V]) -> str:
-        return f"{class_name(self)}{self.data}"
+        return f"{class_name(type(self))}{dict(self.data)}"
 
     def copy(self: AbstractDict[K, V]) -> AbstractDict[K, V]:
         return self.__class__[self.key_type, self.value_type](self.data.copy())

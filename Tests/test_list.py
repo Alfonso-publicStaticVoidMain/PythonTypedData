@@ -16,10 +16,10 @@ class TestList(unittest.TestCase):
     def test_class_name(self):
         from abstract_classes import class_name
         lst = MutableList[int]([0, 1, 2])
-        self.assertEqual(class_name(lst), "MutableList[int]")
+        self.assertEqual(class_name(type(lst)), "MutableList[int]")
 
         iml = ImmutableList.of('a', 2, 0.1)
-        self.assertEqual(class_name(iml), "ImmutableList[int | str | float]")
+        self.assertEqual(class_name(type(iml)), "ImmutableList[int | str | float]")
 
     def test_init_and_access(self):
         iml = ImmutableList[int](['1', 2], coerce=True)

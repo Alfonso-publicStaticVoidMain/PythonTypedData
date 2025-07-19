@@ -22,7 +22,7 @@ class Maybe[T]:
         from type_validation import _validate_or_coerce_value
 
         try:
-            generic_item_type = self.__class__._inferred_item_type
+            generic_item_type = type(self)._inferred_item_type
         except (AttributeError, IndexError, TypeError, KeyError):
             generic_item_type = None
 
@@ -37,15 +37,7 @@ class Maybe[T]:
         if cache_key in cls._generic_type_registry:
             return cls._generic_type_registry[cache_key]
 
-        name = f"__{cls.__name__}[{getattr(item, '__name__', repr(item))}]__"
-        subclass = type(
-            name,
-            (cls,),
-            {
-                "__name__": cls.__name__,
-                "_inferred_item_type": item,
-            },
-        )
+        subclass = type(cls.__name__, (cls,), {"_inferred_item_type": item})
         cls._generic_type_registry[cache_key] = subclass
         return subclass
 
@@ -155,5 +147,5 @@ class Maybe[T]:
 
     def __repr__(self: Maybe[T]) -> str:
         from abstract_classes import class_name
-        cls_name: str = class_name(self)
-        return f"{cls_name}.of({self.value!r})" if self.is_present() else f"{cls_name}.empty()"
+        cls = type(self)
+        return f"{class_name(cls)}.of({self.value!r})" if self.is_present() else f"{class_name(cls)}.empty()"

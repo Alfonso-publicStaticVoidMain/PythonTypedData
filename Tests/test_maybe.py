@@ -34,7 +34,7 @@ class TestMaybe(unittest.TestCase):
         self.assertIn('Maybe[list[int]]', repr(mb))
 
         mb2 = Maybe.of(MutableList[MutableSet[int]](MutableSet.of(0, 1), MutableSet.of(0, -1)))
-        self.assertIn('Maybe[MutableList[MutableSet]]', repr(mb2))
+        self.assertIn('Maybe[MutableList[MutableSet[int]]]', repr(mb2))
 
 if __name__ == '__main__':
     unittest.main()
