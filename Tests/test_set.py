@@ -1,6 +1,7 @@
 import unittest
 
-from concrete_classes import MutableSet, ImmutableSet, MutableList
+from abstract_classes import AbstractSet, Collection
+from concrete_classes import MutableSet, ImmutableSet, MutableList, ImmutableList
 
 
 class TestSet(unittest.TestCase):
@@ -172,6 +173,23 @@ class TestSet(unittest.TestCase):
 
         s.add('a')
         self.assertTrue(s)
+
+    def test_abstract_set_classes(self):
+        lst = MutableList[AbstractSet[int]]()
+        lst.append(MutableSet[int](1, 2))
+        lst.append(ImmutableSet[int](2, 3))
+        self.assertEqual(lst, MutableList[AbstractSet[int]](MutableSet[int](1, 2), ImmutableSet[int](2, 3)))
+
+        clt_lst = MutableList[Collection[str]]()
+        a = MutableSet[str]('a')
+        b = ImmutableSet[str]('b')
+        c = MutableList[str]('c')
+        d = ImmutableList[str]('d')
+        clt_lst.append(a)
+        clt_lst.append(b)
+        clt_lst.append(c)
+        clt_lst.append(d)
+        self.assertEqual(clt_lst, MutableList[Collection[str]](a, b, c, d))
 
 
 if __name__ == '__main__':

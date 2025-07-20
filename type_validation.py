@@ -47,7 +47,7 @@ def _validate_or_coerce_value[T](
     if expected_type is str and isinstance(obj, (int, float, complex, bool)):
         return str(obj)  # int | float | complex | bool -> str
 
-    # === str-based coercions ===
+    # *********** str-based coercions ***********
     if _coerce:
         if isinstance(obj, str):
             try:
@@ -61,7 +61,7 @@ def _validate_or_coerce_value[T](
                     return complex(obj)  # str -> complex
 
             except ValueError:
-                raise TypeError(f"Value {obj!r} is not of type {expected_type.__name__} and cannot be converted safely to iterable.")
+                raise TypeError(f"Value {obj!r} is not of type {expected_type.__name__} and cannot be converted safely to it.")
 
     raise TypeError(f"Value {obj!r} is not of type {expected_type.__name__}.")
 
