@@ -81,8 +81,12 @@ class DictionaryTest(unittest.TestCase):
 
     def test_map_values_and_filter(self):
         d = MutableDict[int, str]({0:'abc', 1:'def', 2:'xyz'})
-        mapped = d.map_values(lambda s: '__'+s+'__', str)
+        mapped = d.map_values(lambda s: '__'+s+'__')
         self.assertEqual(mapped[0], '__abc__')
+        self.assertEqual(mapped, MutableDict[int, str]({0:'__abc__', 1:'__def__', 2:'__xyz__'}))
+
+        mapped_to_int = d.map_values(len)
+        self.assertEqual(mapped_to_int, MutableDict[int, int]({0:3, 1:3, 2:3}))
 
         filtered_items = d.filter_items(lambda k, v: k > 0 and (v.startswith('x') or v.startswith('a')))
         self.assertEqual(filtered_items.data, {2:'xyz'})

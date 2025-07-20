@@ -134,7 +134,7 @@ class TestTypeValidation(unittest.TestCase):
         mb = Maybe[int](42)
         self.assertTrue(_validate_type(mb, Maybe[int]))
 
-        # --- Type mismatch (item_type, key_type, value_type)
+        # --- Type mismatch
         self.assertFalse(_validate_type(MutableList[str]("a", "b"), MutableList[int]))
         self.assertFalse(_validate_type(MutableDict[str, str]({"a": "b"}), MutableDict[str, int]))
         self.assertFalse(_validate_type(MutableSet[float](1.0), MutableSet[str]))
@@ -168,17 +168,145 @@ class TestTypeValidation(unittest.TestCase):
             ImmutableSet[int]({3, 4}),
         ]
         self.assertTrue(_validate_type(union_test, list[MutableSet[int] | ImmutableSet[int]]))
-        self.assertFalse(_validate_type(union_test, list[AbstractSet[int]]))
+        self.assertTrue(_validate_type(union_test, list[AbstractSet[int]]))
 
         union_dict_test = MutableDict[str, str]({"a": "1"})
         self.assertTrue(_validate_type(union_dict_test, MutableDict[str, str] | ImmutableDict[str, str]))
 
-        # --- Maybe as value inside another structure
+        # --- Maybe as obj inside another structure
         optional_test = {
             "a": Maybe[int](1),
             "b": Maybe[int](2),
         }
         self.assertTrue(_validate_type(optional_test, dict[str, Maybe[int]]))
+
+    def test_validate_against_abstract_classes(self):
+        from concrete_classes import (
+            AbstractSequence, AbstractSet, AbstractMutableSet, AbstractMutableSequence,
+            AbstractDict, AbstractMutableDict, MutableList, MutableSet, MutableDict,
+            ImmutableList, ImmutableSet, ImmutableDict
+        )
+
+        self.assertTrue(_validate_type(MutableList[int]([1, 2]), AbstractSequence[int]))
+        self.assertTrue(_validate_type(ImmutableList[int](1, 2), AbstractSequence[int]))
+
+        self.assertTrue(_validate_type(MutableSet[str]({"a"}), AbstractSet[str]))
+        self.assertTrue(_validate_type(ImmutableSet[str].of("a", "b"), AbstractSet[str]))
+
+        self.assertTrue(_validate_type(MutableSet[str]({"a"}), AbstractMutableSet[str]))
+        self.assertFalse(_validate_type(ImmutableSet[str].of("a", "b"), AbstractMutableSet[str]))
+
+        self.assertTrue(_validate_type(MutableDict[int, float]({1: 1.0}), AbstractDict[int, float]))
+        self.assertTrue(_validate_type(ImmutableDict[int, float]({2: 3.0}), AbstractDict[int, float]))
+
+        self.assertTrue(_validate_type(MutableDict[str, int]({"a": 1}), AbstractMutableDict[str, int]))
+        self.assertFalse(_validate_type(ImmutableDict[str, int]({"a": 1}), AbstractMutableDict[str, int]))
+
+    def test_validate_list_of_abstract(self):
+        from concrete_classes import AbstractSet, MutableSet, ImmutableSet
+
+        sets = [
+            MutableSet[int]({1, 2}),
+            ImmutableSet[int].of(3, 4),
+            MutableSet[int]({5})
+        ]
+        self.assertTrue(_validate_type(sets, list[AbstractSet[int]]))
+        self.assertFalse(_validate_type(sets, list[AbstractSet[str]]))
+
+    def test_validate_nested_with_maybe_and_abstracts(self):
+        from concrete_classes import MutableList, AbstractDict, MutableDict
+        from maybe import Maybe
+
+        nested = MutableList[Maybe[MutableDict[str, int]]]([
+            Maybe[MutableDict[str, int]](MutableDict[str, int]({"a": 1})),
+            Maybe[MutableDict[str, int]](MutableDict[str, int]({"b": 2}))
+        ])
+        self.assertTrue(_validate_type(nested, MutableList[Maybe[AbstractDict[str, int]]]))
+
+    def test_invalid_generic_mismatch_deep(self):
+        from concrete_classes import MutableList, MutableDict
+
+        bad = MutableList[MutableDict[float, int]]([
+            MutableDict[float, int]({1.1: 1}),
+            MutableDict[float, int]({2.2: 2})
+        ])
+        self.assertFalse(_validate_type(bad, MutableList[MutableDict[str, int]]))
+
+    def test_union_of_nested_customs_and_maybe(self):
+        from concrete_classes import MutableSet, ImmutableSet
+        from maybe import Maybe
+
+        hybrid = [
+            Maybe[MutableSet[int]](MutableSet[int]({1, 2})),
+            Maybe[ImmutableSet[int]](ImmutableSet[int].of(3, 4)),
+            Maybe[None](None)
+        ]
+        self.assertTrue(_validate_type(hybrid, list[Maybe[MutableSet[int] | ImmutableSet[int] | None]]))
+
+    def test_collection_of_collections_of_custom_type(self):
+        from concrete_classes import MutableSet, AbstractSet
+
+        nested_sets = [
+            [MutableSet[int]({1}), MutableSet[int]({2})],
+            [MutableSet[int]({3})]
+        ]
+        self.assertTrue(_validate_type(nested_sets, list[list[AbstractSet[int]]]))
+
+    def test_deeply_nested_mixed_mutable_immutable(self):
+        from concrete_classes import MutableDict, ImmutableDict, AbstractDict
+
+        obj = [
+            {
+                "first": MutableDict[int, str]({1: "one"}),
+                "second": ImmutableDict[int, str]({2: "two"})
+            },
+            {
+                "first": MutableDict[int, str]({3: "three"}),
+                "second": ImmutableDict[int, str]({4: "four"})
+            }
+        ]
+        self.assertTrue(_validate_type(obj, list[dict[str, AbstractDict[int, str]]]))
+
+    def test_validate_maybe_inside_structure(self):
+        from maybe import Maybe
+        from concrete_classes import MutableList, MutableDict
+
+        valid_dict = {
+            "a": Maybe[int](1),
+            "b": Maybe[int]()
+        }
+        self.assertTrue(_validate_type(valid_dict, dict[str, Maybe[int]]))
+
+        nested = MutableList[Maybe[MutableDict[str, int]]]([
+            Maybe.of(MutableDict[str, int]({"x": 1})),
+            Maybe.empty(MutableDict[str, int])  # None present
+        ])
+        self.assertTrue(_validate_type(nested, MutableList[Maybe[MutableDict[str, int]]]))
+
+    def test_validate_invalid_maybe_structures(self):
+        from maybe import Maybe
+        from concrete_classes import MutableDict
+
+        self.assertFalse(_validate_type(Maybe[str]("hello"), Maybe[int]))
+        self.assertFalse(_validate_type(Maybe[int](1), int))  # missing Maybe wrapper
+
+        invalid_dict = MutableDict.of({
+            "x": Maybe[int](),
+            "y": "Maybe not"
+        })
+        self.assertFalse(_validate_type(invalid_dict, dict[str, Maybe[int]]))
+
+    def test_validate_maybe_with_nested_unions(self):
+        from maybe import Maybe
+        from concrete_classes import MutableSet, ImmutableSet
+
+        data = [
+            Maybe.of(MutableSet[int]({1})),
+            Maybe.of(ImmutableSet[int].of(2)),
+            Maybe.empty(MutableSet[int])
+        ]
+        self.assertTrue(_validate_type(data, list[Maybe[MutableSet[int] | ImmutableSet[int]]]))
+        self.assertTrue(_validate_type(data, list[Maybe[AbstractSet[int]]]))
 
 
 if __name__ == '__main__':

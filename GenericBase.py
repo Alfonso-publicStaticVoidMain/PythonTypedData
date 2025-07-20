@@ -16,11 +16,13 @@ class GenericBase[*Ts]:
         if cache_key in cls._generic_type_registry:
             return cls._generic_type_registry[cache_key]
 
-
         subclass = type(
             f"{cls.__name__}[{", ".join(class_name(arg) for arg in item)}]",
             (cls,),
-            {"_inferred_generic_args": item}
+            {
+                "_args": item,
+                "_origin": cls,
+            }
         )
 
         cls._generic_type_registry[cache_key] = subclass
@@ -31,13 +33,12 @@ def class_name(cls: type) -> str:
     """
     Gives a str representation of a given type or class, including generics info handled recursively.
     :param cls: Class whose name will be represented.
-    :return: If the type is a Union or UnionType, it's represented using the pipe operator |. If it's a Collection or
-    AbstractDict (has a _inferred_item_type or _inferred_key_type and _inferred_value_type attributes), their generics
-    are fetched from the attributes and recursively parsed with this very method, and put in brackers [] after the
-    actual class name.
+    :return: If the type is a Union or UnionType, it's represented using the pipe operator. If it's a class that
+    extends GenericBase (it has an _args attribute), then it is assumed the class has already been properly formatted
+    in its name within the __class_getitem__ method it inherited from GenericBase.
 
-    Then with typing.get_origin and typing.get_args info about the base class and its generics is fetched to again
-    reconstruct a representation that displays that information. If that wasn't possible, a fallback is present using
+    Then the methods get_origin and get_args from typing are used to fetch info about the base class and its generics
+    to reconstruct a representation that displays that information. If that wasn't possible, a fallback is present using
     __name__ and repr.
     """
 
@@ -48,7 +49,7 @@ def class_name(cls: type) -> str:
         return " | ".join(class_name(arg) for arg in args)
 
     # Case 1: A class extending GenericBase
-    if hasattr(cls, "_inferred_generic_args"):
+    if hasattr(cls, "_args"):
         return cls.__name__  # It's already been formatted
 
     # Case 2: Built-in generics list[int], dict[str, int], etc.
