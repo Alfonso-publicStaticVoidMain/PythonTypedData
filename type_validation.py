@@ -289,7 +289,7 @@ def _validate_type(obj: Any, expected_type: type) -> bool:
         return _validate_mapping(obj, origin, args)
 
     if isinstance(origin, type) and issubclass(origin, Maybe):
-        return _validate_maybe(obj, origin, args[0])
+        return _validate_maybe(obj, args[0])
 
     if origin is None:
         return isinstance(obj, expected_type)
@@ -322,50 +322,7 @@ def _validate_tuple(obj: Any, args: tuple) -> bool:
     return all(_validate_type(v, t) for v, t in zip(obj, args))
 
 
-def _validate_maybe(obj: Any, origin: Any, args: Any) -> bool:
-    if not isinstance(obj, origin):
+def _validate_maybe(obj: Any, args: Any) -> bool:
+    if not isinstance(obj, Maybe):
         return False
     return obj.value is None or _validate_type(obj.value, args)
-
-
-def is_subtype(subtype: type, supertype: type):
-    if supertype is Any:
-        return True
-
-    origin_sub = get_origin(subtype)
-    args_sub = get_args(subtype)
-    origin_super = get_origin(supertype)
-    args_super = get_args(supertype)
-
-    if origin_sub is None and hasattr(subtype, '_origin') and hasattr(subtype, '_args'):
-        origin_sub = subtype._origin
-        args_sub = subtype._args
-
-    if origin_super is None and hasattr(supertype, '_origin') and hasattr(supertype, '_args'):
-        origin_super = supertype._origin
-        args_super = supertype._args
-
-    if origin_super in (Union, UnionType):
-        return any(is_subtype(subtype, outer) for outer in args_super)
-    if origin_sub in (Union, UnionType):
-        return any(is_subtype(inner, supertype) for inner in args_sub)
-
-    if origin_super is Literal:
-        return subtype in args_super
-
-    if origin_super is Annotated:
-        return is_subtype(subtype, args_sub[0])
-
-    if isinstance(origin_sub, type) and isinstance(origin_super, type):
-        if not issubclass(origin_sub, origin_super):
-            return False
-    else:
-        return False
-
-    if not args_super:
-        return True
-
-    if len(args_sub) != len(args_super):
-        return False
-
-    return all(is_subtype(sub, sup) for sub, sup in zip(args_sub, args_super))

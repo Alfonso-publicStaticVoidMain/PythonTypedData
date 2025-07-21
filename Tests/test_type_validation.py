@@ -308,9 +308,6 @@ class TestTypeValidation(unittest.TestCase):
         self.assertTrue(_validate_type(data, list[Maybe[MutableSet[int] | ImmutableSet[int]]]))
         self.assertTrue(_validate_type(data, list[Maybe[AbstractSet[int]]]))
 
-    def test_is_subtype(self):
-        from type_validation import is_subtype
-        self.assertTrue(is_subtype(list[int], list[int | str]))
 
 if __name__ == '__main__':
     unittest.main()

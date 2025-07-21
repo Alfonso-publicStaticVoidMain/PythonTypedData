@@ -1,11 +1,14 @@
 from types import UnionType
-from typing import TypeVarTuple, Any, get_args, get_origin, Union
+from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar
 from weakref import WeakValueDictionary
 
 Ts = TypeVarTuple("Ts")
 
 class GenericBase[*Ts]:
-    _generic_type_registry: WeakValueDictionary[tuple[type, tuple[Any, ...]], type] = WeakValueDictionary()
+
+    _generic_type_registry: WeakValueDictionary[tuple[type, tuple[type, ...]], type] = WeakValueDictionary()
+    _args: ClassVar[tuple[type]]
+    _origin: ClassVar[type]
 
     @classmethod
     def __class_getitem__(cls, item: Any):
@@ -19,11 +22,11 @@ class GenericBase[*Ts]:
         subclass = type(
             f"{cls.__name__}[{", ".join(class_name(arg) for arg in item)}]",
             (cls,),
-            {
-                "_args": item,
-                "_origin": cls,
-            }
+            {}
         )
+
+        subclass._args = item
+        subclass._origin = cls
 
         cls._generic_type_registry[cache_key] = subclass
         return subclass
