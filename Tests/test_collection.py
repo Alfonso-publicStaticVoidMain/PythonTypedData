@@ -186,5 +186,6 @@ class TestCollection(unittest.TestCase):
         clt_lst.append(d)
         self.assertEqual(clt_lst, MutableList[Collection[str]](a, b, c, d))
 
+
 if __name__ == '__main__':
     unittest.main()

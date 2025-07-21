@@ -27,7 +27,7 @@ class GenericBase[*Ts]:
 
         subclass._args = item
         subclass._origin = cls
-
+        subclass._immutable = getattr(cls, "_immutable", False)
         cls._generic_type_registry[cache_key] = subclass
         return subclass
 

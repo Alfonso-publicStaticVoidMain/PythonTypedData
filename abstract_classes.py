@@ -128,8 +128,7 @@ class Collection[T](GenericBase[T]):
 
     def __eq__(self: Collection[T], other: Any) -> bool:
         return (
-            issubclass(type(self), Collection)
-            and issubclass(type(other), Collection)
+            isinstance(other, Collection)
             and self.item_type == other.item_type
             and self.values == other.values
         )
