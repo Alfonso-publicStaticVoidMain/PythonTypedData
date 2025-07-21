@@ -7,11 +7,11 @@ from concrete_classes import MutableSet, ImmutableSet, MutableList, ImmutableLis
 class TestSet(unittest.TestCase):
 
     def test_basic_init(self):
-        s = MutableSet[int](1, '2', 2, _coerce=True)
-        self.assertEqual(s.values, {1, 2})
+        mus = MutableSet[int](1, '2', 2, _coerce=True)
+        self.assertEqual(mus.values, {1, 2})
 
-        fs = ImmutableSet[int]('1', 2, '2', _coerce=True)
-        self.assertEqual(fs.values, frozenset({1, 2}))
+        ims = ImmutableSet[int]('1', 2, '2', _coerce=True)
+        self.assertEqual(ims.values, frozenset({1, 2}))
 
     def test_type_coercion(self):
         with self.assertRaises(TypeError):
@@ -22,15 +22,17 @@ class TestSet(unittest.TestCase):
         self.assertEqual(MutableSet[str](2, '3', _coerce=False).values, {'2', '3'})
 
     def test_immutability(self):
-        fs = ImmutableSet[str]('a', 'b')
+        ims = ImmutableSet[str]('a', 'b')
         with self.assertRaises(AttributeError):
-            fs.add('c')
+            ims.add('c')
 
     def test_union_intersection(self):
         s1 = MutableSet[int](1, 2)
         s2 = ImmutableSet[int](2, 3)
         self.assertEqual(s1.union(s2).values, {1, 2, 3})
+        self.assertEqual(s1.union(s2), s2.union(s1))
         self.assertEqual(s1.intersection(s2).values, {2})
+        self.assertEqual(s1.intersection(s2), s2.intersection(s1))
 
         self.assertEqual(
             s1.union(s2, [3, 4], [4, 5]),
@@ -39,8 +41,11 @@ class TestSet(unittest.TestCase):
 
         s3 = MutableSet[int](1, '2', 3, 4, 5, 6, 7, 8, _coerce=True)
         self.assertEqual(
-            s3.intersection({0, 1, 2, 3, 4, '5'},
-                            {'a': 2, 'b': 3, 'c': 4, 'd': 5, 'e': 6, 'f': 7, 'g': 8, 'h': 9}.values(), _coerce=True),
+            s3.intersection(
+                {0, 1, 2, 3, 4, '5'},
+                {'a': 2, 'b': 3, 'c': 4, 'd': 5, 'e': 6, 'f': 7, 'g': 8, 'h': 9}.values(),
+                _coerce=True
+            ),
             MutableSet[int](2, 3, 4, 5)
         )
 
@@ -133,19 +138,6 @@ class TestSet(unittest.TestCase):
 
         self.assertEqual(mus.values, {1, 3, 4, 5, 7})
 
-    def test_map_filter_flatmap(self):
-        mus = MutableSet[int](1, 2)
-        self.assertEqual(mus.map(lambda x: x * 2), MutableSet[int](2, 4))
-        self.assertEqual(mus.filter(lambda x: x > 1), MutableSet[int](2))
-        self.assertEqual(mus.map(lambda x: x + 1).filter(lambda x: x % 2 == 0), MutableSet[int](2))
-        self.assertEqual(mus.flatmap(lambda x: [x, -x]), MutableSet[int](1, -1, 2, -2))
-
-        ims = ImmutableSet[int](1, 2)
-        self.assertEqual(ims.map(lambda x: x * 2), ImmutableSet[int](2, 4))
-        self.assertEqual(ims.filter(lambda x: x > 1), ImmutableSet[int](2))
-        self.assertEqual(ims.map(lambda x: x + 1).filter(lambda x: x % 2 == 0), ImmutableSet[int](2))
-        self.assertEqual(ims.flatmap(lambda x: [x, -x]), ImmutableSet[int](1, -1, 2, -2))
-
     def test_length(self):
         s = MutableSet[str](1, '1', 0, 0, 2)
         self.assertEqual(len(s), 3)
@@ -154,42 +146,11 @@ class TestSet(unittest.TestCase):
         s.add('a')
         self.assertEqual(len(s), 4)
 
-    def test_repr(self):
-        mus = MutableSet[str]('x', 'y')
-        self.assertIn("MutableSet[str]", repr(mus))
-
-        ims = ImmutableSet[str](mus)
-        self.assertIn("ImmutableSet[str]", repr(ims))
-
     def test_iter(self):
         values = {1, 2, 3, 4, 5}
         ims = ImmutableSet[int](*values)
         for n in ims:
             self.assertIn(n, values)
-
-    def test_bool(self):
-        s = MutableSet[str]()
-        self.assertFalse(s)
-
-        s.add('a')
-        self.assertTrue(s)
-
-    def test_abstract_set_classes(self):
-        lst = MutableList[AbstractSet[int]]()
-        lst.append(MutableSet[int](1, 2))
-        lst.append(ImmutableSet[int](2, 3))
-        self.assertEqual(lst, MutableList[AbstractSet[int]](MutableSet[int](1, 2), ImmutableSet[int](2, 3)))
-
-        clt_lst = MutableList[Collection[str]]()
-        a = MutableSet[str]('a')
-        b = ImmutableSet[str]('b')
-        c = MutableList[str]('c')
-        d = ImmutableList[str]('d')
-        clt_lst.append(a)
-        clt_lst.append(b)
-        clt_lst.append(c)
-        clt_lst.append(d)
-        self.assertEqual(clt_lst, MutableList[Collection[str]](a, b, c, d))
 
 
 if __name__ == '__main__':

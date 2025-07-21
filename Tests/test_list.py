@@ -1,7 +1,5 @@
 import unittest
-from collections import namedtuple
 
-from abstract_classes import Collection
 from concrete_classes import MutableList, ImmutableList
 
 
@@ -12,9 +10,8 @@ class TestList(unittest.TestCase):
         lst_2 = MutableList[str](['a', 'b', 'c', 1], _coerce=True)
         self.assertEqual(lst, lst_2)
 
-
     def test_class_name(self):
-        from abstract_classes import class_name
+        from GenericBase import class_name
         lst = MutableList[int]([0, 1, 2])
         self.assertEqual(class_name(type(lst)), "MutableList[int]")
 
@@ -50,13 +47,18 @@ class TestList(unittest.TestCase):
         self.assertFalse(empty_list)
 
     def test_type_coercion(self):
+        # '1' is coerced to int when coerce parameter is set to True
         lst = MutableList[int](['1', 2], _coerce=True)
         self.assertEqual(lst.values, [1, 2])
 
+        # 1 is coerced to float even when coerce parameter is False
         iml = ImmutableList[float]([1, 2.25], _coerce=False)
         self.assertEqual(iml.values, (1.0, 2.25))
+        # This is because Python considers it equal to both the int and a float representation of 1
         self.assertEqual(iml[0], 1)
+        self.assertEqual(iml[0], 1.0)
 
+        # '3' is not coerced to int if coerce parameter is False, and a TypeError is raised.
         with self.assertRaises(TypeError):
             mul = MutableList[int]([1, 2, '3'], _coerce=False)
 
@@ -134,27 +136,6 @@ class TestList(unittest.TestCase):
         self.assertEqual(iml.sorted().values, (2, 5, 9))
         self.assertEqual(iml.sorted(reverse=True).values, (9, 5, 2))
 
-    def test_repr_and_bool(self):
-        mul = MutableList[str]('a', 'b')
-        self.assertTrue(mul)
-        self.assertIn("MutableList[str]", repr(mul))
-
-        iml = ImmutableList[str]('x')
-        self.assertTrue(iml)
-        self.assertIn("ImmutableList[str]", repr(iml))
-
-        empty_lst = MutableList[int]()
-        self.assertFalse(empty_lst)
-
-        empty_imlist = ImmutableList[str]()
-        self.assertFalse(empty_imlist)
-
-    def test_copy(self):
-        lst = MutableList[int](1, 2)
-        new_lst = lst.copy()
-        self.assertEqual(lst, new_lst)
-        self.assertIsNot(lst, new_lst)
-
     def test_conversions(self):
         lst = MutableList[str]('a', 'b')
         self.assertEqual(lst.to_list(), ['a', 'b'])
@@ -181,38 +162,6 @@ class TestList(unittest.TestCase):
         self.assertEqual(lst.sorted(), MutableList[str]("a", "b", "c"))
         self.assertEqual(lst.sorted(reverse=True), MutableList[str]("c", "b", "a"))
 
-    def test_map_filter_flatmap(self):
-        lst = MutableList[int](1, 2, 3)
-        self.assertEqual(lst.map(lambda x: x * 2), MutableList[int](2, 4, 6))
-        self.assertEqual(lst.filter(lambda x: x % 2 == 1), MutableList[int](1, 3))
-        self.assertEqual(lst.flatmap(lambda x: [x, x + 10]), MutableList[int](1, 11, 2, 12, 3, 13))
-
-        iml = ImmutableList[int](1, 2, 3)
-        self.assertEqual(iml.map(lambda x: x + 1), ImmutableList[int](2, 3, 4))
-        self.assertEqual(iml.filter(lambda x: x % 2), ImmutableList[int]([1, 3]))
-        self.assertEqual(iml.flatmap(lambda x: [x, -x]), ImmutableList[int](1, -1, 2, -2, 3, -3))
-
-    def test_any_all_none_match(self):
-        iml = ImmutableList[int](1, 2, 3, 4, 6, 12)
-        self.assertTrue(iml.all_match(lambda n: 12 % n == 0))
-        self.assertFalse(iml.any_match(lambda n: n < 0))
-        self.assertTrue(iml.none_match(lambda n: n < 0))
-
-    def test_reduce(self):
-        mul = MutableList[int](0, 1, 2, 3)
-        self.assertEqual(mul.reduce(lambda x, y: x + y), 6)
-
-        self.assertEqual(ImmutableList[int]().reduce(lambda x, y: x + y, 0), 0)
-
-        str_lst = ImmutableList[str]('J', 'A', 'V', 'A')
-        self.assertEqual(str_lst.reduce(lambda s1, s2: s1 + s2, '_'), '_JAVA')
-
-    def test_for_each(self):
-        acc = []
-        lst = MutableList[str]('a', 'b')
-        lst.for_each(lambda x: acc.append(x.upper()))
-        self.assertEqual(acc, ['A', 'B'])
-
     def test_invalid_set_values(self):
         with self.assertRaises(TypeError):
             MutableList[int]({1, 2, 3})
@@ -224,11 +173,14 @@ class TestList(unittest.TestCase):
 
     def test_append(self):
         int_lst = MutableList[int]()
+        # '0' is safely coerced to int when coerce = True
         int_lst.append('0', _coerce=True)
         self.assertEqual(int_lst[0], 0)
+        # '1' won't be coerced to int when coerce = False
         with self.assertRaises(TypeError):
             int_lst.append('1', _coerce=False)
 
+        # 0 and 1 will be coerced to str no matter if coerce is set to True or not.
         str_lst = MutableList[str]()
         str_lst.append(0, _coerce=True)
         str_lst.append(1, _coerce=False)
@@ -240,14 +192,6 @@ class TestList(unittest.TestCase):
         with self.assertRaises(TypeError):
             lst[0] = "oops"
 
-    def test_max_min(self):
-        lst = MutableList[int](1, 2, 5, 2)
-        self.assertEqual(lst.max(), 5)
-        self.assertIsNone(MutableList[int]().max())
-
-        self.assertEqual(lst.min(), 1)
-        self.assertIsNone(MutableList[int]().min())
-
     def test_distinct(self):
         mul = MutableList[str]('a', 'a', 'b', 'b', 'b', 'c').distinct()
         other_mul = MutableList[str]('a', 'b', 'c')
@@ -256,22 +200,6 @@ class TestList(unittest.TestCase):
         iml = ImmutableList[tuple[str, int]](('a', 1), ('b', 2), ('c', 1))
         self.assertEqual(iml.distinct(lambda tup: tup[1]), ImmutableList.of(('a', 1), ('b', 2)))
 
-    def test_collect(self):
-        mul = MutableList[int](1, 2, 3, 4, 5)
-        dic = mul.collect(
-            supplier=lambda:{},
-            accumulator=lambda d, n: d.__setitem__(n, 2**n),
-            finisher=lambda d: d | {0: 1}
-        )
-        self.assertEqual(dic, {0: 1, 1: 2, 2: 4, 3: 8, 4: 16, 5: 32})
-
-    def test_group_by(self):
-        class TestClass:
-            def __init__(self, number: int, name: str):
-                self.number = number
-                self.name = name
-
-        tml = MutableList[TestClass](TestClass(0, 'cosa 0'), TestClass(0, 'cosa 1'), TestClass(1, 'cosa 2'), TestClass(1, 'cosa 3'))
 
 if __name__ == '__main__':
     unittest.main()

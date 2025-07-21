@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import field
 from functools import reduce
 from typing import Iterable, Any, Callable, Mapping, TYPE_CHECKING, TypeVar
 from collections import defaultdict
+
+from immutabledict import immutabledict
 
 from GenericBase import GenericBase, class_name
 
@@ -22,7 +25,7 @@ def _forbid_instantiation[T](forbidden_type: type[T]) -> Callable[..., T]:
     forbidden type.
     :param forbidden_type: Type for the instantiation to be forbidden.
     :return: A __new__ method that, no matter the arguments received, raises a TypeError if the class that tried
-    to call iterable was of the forbidden type.
+    to call it was of the forbidden type.
     """
     def __new__(cls: type[T], *args, **kwargs) -> T:
         if cls is forbidden_type:
@@ -47,19 +50,40 @@ class Collection[T](GenericBase[T]):
         _finisher: Callable[[Iterable[T]], Any] = lambda x : x,
         _skip_validation: bool = False
     ) -> None:
-        from type_validation import _validate_or_coerce_iterable
+        """
+        Basic constructor for the Collection abstract class, to be inherited by all subclasses.
+        :param values: Values, received as an iterable or one by one, to store in the Collection.
+        :param _coerce: State parameter to force type coercion or not. Some numeric type coercions are always performed.
+        :param _forbidden_iterable_types: Tuple of types that the values parameter cannot be.
+        :param _finisher: Callable to be applied to the values before storing them on the values attribute of the object.
+        :param _skip_validation: State parameter to skip type validation of the values. Only use it in cases where it's
+        known that the values received will match the inferred generic type.
+        :raises: TypeError if the generic types weren't provided or were a TypeVar.
+        TypeError if the values iterable parameter is of one of the forbidden iterable types.
 
-        generic_item_type = type(self)._inferred_item_type()
+        The attribute item_type is inferred from the generic with which the class was called, which was stored on the
+        _args attribute of the class itself returned by __class_getitem__ and fetched by _inferred_item_type.
 
+        """
+
+        from type_validation import _validate_or_coerce_iterable, _validate_type
+
+        # Fetches the generic type of the Collection from its _args attribute inherited from GenericBase.
+        generic_item_type: type = type(self)._inferred_item_type()
+
+        # If the generic item type is None or a TypeVar, raises a TypeError.
         if generic_item_type is None:
-            raise TypeError(f"{type(self).__name__} must be instantiated with a concrete type, e.g., MutableList[int](...) or via .of().")
+            raise TypeError(f"{type(self).__name__} must be instantiated with a generic type, e.g., MutableList[int](...) or via .of().")
 
         if isinstance(generic_item_type, TypeVar):
-            raise TypeError(f"{type(self).__name__} was instantiated without a concrete type, somehow {generic_item_type} was a TypeVar.")
+            raise TypeError(f"{type(self).__name__} was instantiated without a generic type, somehow {generic_item_type} was a TypeVar.")
 
-        if len(values) == 1 and isinstance(values[0], Iterable) and not isinstance(values[0], (str, bytes)):
+        # If the values are of length 1, the value they contain doesn't match the generic type expected but is an Iterable,
+        # the tuple is unpacked.
+        if len(values) == 1 and not _validate_type(values[0], generic_item_type) and isinstance(values[0], Iterable) and not isinstance(values[0], (str, bytes)):
             values = values[0]
 
+        # If values is of one of the forbidden iterable types, raises a TypeError.
         if isinstance(values, _forbidden_iterable_types):
             raise TypeError(f"Invalid type {type(values).__name__} for class {type(self).__name__}.")
 
@@ -70,7 +94,7 @@ class Collection[T](GenericBase[T]):
         object.__setattr__(self, 'values', _finisher(final_values))
 
     @classmethod
-    def _inferred_item_type(cls: Collection[T]) -> type[T] | None:
+    def _inferred_item_type(cls: type[Collection[T]]) -> type[T] | None:
         try:
             return cls._args[0]
         except (AttributeError, IndexError, TypeError, KeyError):
@@ -111,13 +135,11 @@ class Collection[T](GenericBase[T]):
         )
 
     def __repr__(self: Collection[T]) -> str:
-        cls = type(self)
-        return f"{class_name(cls)}{self.values}"
+        return f"{class_name(type(self))}{self.values}"
 
     def __bool__(self: Collection[T]) -> bool:
         return bool(self.values)
 
-    # TODO tests
     def copy(self: Collection[T], deep: bool = False) -> Collection[T]:
         from copy import deepcopy
         values = deepcopy(self.values) if deep else (self.values.copy() if hasattr(self.values, 'copy') else self.values)
@@ -138,23 +160,33 @@ class Collection[T](GenericBase[T]):
     def count(self: Collection[T], value) -> int:
         try:
             return self.values.count(value)
-        except AttributeError:
+        except (AttributeError, TypeError, ValueError):
             return sum(1 for v in self.values if v == value)
 
 
     # Functional Methods:
 
-    # TODO tests
     def map[R](
         self: Collection[T],
         f: Callable[[T], R],
         result_type: type[R] | None = None,
-        coerce: bool = False
+        *,
+        _coerce: bool = False
     ) -> Collection[R]:
+        """
+        Maps each value of the Collection to its image through the given Callable parameter.
+        :param f: Callable object to map the Collection with.
+        :param result_type: Type expected to be returned by the Callable.
+        :param _coerce: State parameter to try to force coercion to the expected result type if it's not None.
+        :return: A Collection of the same class as self, containing the mapped values of the original Collection. If
+        result_type is None, the generic type of the result is inferred from the mapped values using the classmethod .of.
+        """
         mapped_values = [f(value) for value in self.values]
-        return type(self)[result_type](mapped_values, _coerce=coerce) if result_type is not None else type(self).of(mapped_values)
+        return (
+            type(self)[result_type](mapped_values, _coerce=_coerce) if result_type is not None
+            else type(self).of(mapped_values)
+        )
 
-    # TODO tests
     def flatmap[R](
         self: Collection[T],
         f: Callable[[T], Iterable[R]],
@@ -219,11 +251,16 @@ class Collection[T](GenericBase[T]):
             return None
         return min(self.values, key=key)
 
-    # TODO tests
     def group_by[K](
         self: Collection[T],
         key: Callable[[T], K]
     ) -> dict[K, Collection[T]]:
+        """
+        Groups the items in the Collection by their value by the key Callable parameter.
+        :param key: Callable to group the items by.
+        :return: A dict mapping each found value of key onto a Collection of the same type as self containing the items
+        in the original Collection that were mapped to that key value by the key Callable.
+        """
         groups: dict[K, list[T]] = defaultdict(list)
         for item in self.values:
             groups[key(item)].append(item)
@@ -232,18 +269,11 @@ class Collection[T](GenericBase[T]):
             for key, group in groups.items()
         }
 
-    # TODO tests
     def partition_by(
         self: Collection[T],
         predicate: Callable[[T], bool]
     ) -> dict[bool, Collection[T]]:
-        true_part, false_part = [], []
-        for item in self.values:
-            (true_part if predicate(item) else false_part).append(item)
-        return {
-            True: type(self)(true_part, _skip_validation=True),
-            False: type(self)(false_part, _skip_validation=True)
-        }
+        return self.group_by(predicate)
 
     def collect[A, R](
         self: Collection[T],
@@ -253,15 +283,38 @@ class Collection[T](GenericBase[T]):
     ) -> R:
         """
         Generalized collector, replicating Java's Stream API .collect method.
-        :param supplier: A function that provides the initial container.
-        :param accumulator: A function that adds one item into the container.
-        :param finisher: Optional function to finalize the container into another form.
+
+        :param supplier: Provides the initial container.
+        :param accumulator: Accepts (accumulator, item) to process each item.
+        :param finisher: Final transformation to obtain a result.
         :return: The collected result.
         """
         acc = supplier()
         for item in self.values:
             accumulator(acc, item)
         return finisher(acc)
+
+    def stateful_collect[A, S, R](
+        self: Collection[T],
+        supplier: Callable[[], A],
+        state_supplier: Callable[[], S],
+        accumulator: Callable[[A, T, S], None],
+        finisher: Callable[[A, S], R] = lambda x, _: x
+    ) -> R:
+        """
+        A generalized collector with internal state, inspired by Java's Stream API.
+
+        :param supplier: Provides the initial container.
+        :param state_supplier: Provides the initial state object.
+        :param accumulator: Accepts (accumulator, item, state) to process each item.
+        :param finisher: Final transformation combining accumulator and state to a result.
+        :return: The final collected result.
+        """
+        acc = supplier()
+        state = state_supplier()
+        for item in self.values:
+            accumulator(acc, item, state)
+        return finisher(acc, state)
 
 
 class AbstractSequence[T](Collection[T]):
@@ -313,10 +366,7 @@ class AbstractSequence[T](Collection[T]):
         return type(self)(self.values * n, _skip_validation=True)
 
     def __sub__(self: AbstractSequence[T], other) -> AbstractSequence[T]:
-        from type_validation import _validate_collection_type_and_get_values
-        other_values = _validate_collection_type_and_get_values(other, self.item_type)
-        filtered_values = [value for value in self.values if value not in other_values]
-        return type(self)(filtered_values, _skip_validation=True)
+        return self.filter(lambda item : item not in other)
 
     def __reversed__(self: AbstractSequence[T]):
         return reversed(self.values)
@@ -374,7 +424,7 @@ class AbstractSet[T](Collection[T]):
 
     def union(
         self: AbstractSet[T],
-        *others: Iterable[T],
+        *others: Iterable[T] | Collection[T],
         _coerce: bool = False
     ) -> AbstractSet[T]:
         from type_validation import _validate_or_coerce_iterable_of_iterables
@@ -557,7 +607,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
             raise TypeError(f"Not all generic types were provided. Key: {key_type} | Value: {value_type}")
 
         if isinstance(key_type, TypeVar) or isinstance(value_type, TypeVar):
-            raise TypeError(f"Generic types must be fully specified for {type(self).__name__}. Use {type(self).__name__}.of(...) to infer types from iterable.")
+            raise TypeError(f"Generic types must be fully specified for {type(self).__name__}. Use {type(self)._origin.__name__}.of(...) to infer types from iterable.")
 
         object.__setattr__(self, "key_type", key_type)
         object.__setattr__(self, "value_type", value_type)
@@ -648,6 +698,12 @@ class AbstractDict[K, V](GenericBase[K, V]):
 
     def __repr__(self: AbstractDict[K, V]) -> str:
         return f"{class_name(type(self))}{dict(self.data)}"
+
+    def to_dict(self: AbstractDict[K, V]) -> dict[K, V]:
+        return dict(self.data)
+
+    def to_immutable_dict(self: AbstractDict[K, V]) -> immutabledict[K, V]:
+        return immutabledict(self.data)
 
     def copy(self: AbstractDict[K, V]) -> AbstractDict[K, V]:
         return type(self)(self.data.copy())

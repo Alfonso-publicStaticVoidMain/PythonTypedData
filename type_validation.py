@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import collections
-import types
+from types import UnionType
 from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Literal, Mapping
 
 from abstract_classes import Collection, AbstractDict
@@ -270,7 +270,7 @@ def _validate_type(obj: Any, expected_type: type) -> bool:
         origin = expected_type._origin
         args = expected_type._args
 
-    if origin in (Union, types.UnionType):
+    if origin in (Union, UnionType):
         return any(_validate_type(obj, arg) for arg in args)
 
     if origin is Annotated:
@@ -289,7 +289,7 @@ def _validate_type(obj: Any, expected_type: type) -> bool:
         return _validate_mapping(obj, origin, args)
 
     if isinstance(origin, type) and issubclass(origin, Maybe):
-        return _validate_maybe(obj, origin, args[0])
+        return _validate_maybe(obj, args[0])
 
     if origin is None:
         return isinstance(obj, expected_type)
@@ -322,7 +322,7 @@ def _validate_tuple(obj: Any, args: tuple) -> bool:
     return all(_validate_type(v, t) for v, t in zip(obj, args))
 
 
-def _validate_maybe(obj: Any, origin: Any, args: Any) -> bool:
-    if not isinstance(obj, origin):
+def _validate_maybe(obj: Any, args: Any) -> bool:
+    if not isinstance(obj, Maybe):
         return False
     return obj.value is None or _validate_type(obj.value, args)
