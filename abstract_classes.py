@@ -123,7 +123,9 @@ class Collection[T](GenericBase[T]):
     def __iter__(self: Collection[T]) -> Iterable[T]:
         return iter(self.values)
 
-    def __contains__(self: Collection[T], item: object) -> bool:
+    def __contains__(self: Collection[T], item: T | Iterable[T]) -> bool:
+        if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
+            return all(i in self.values for i in item)
         return item in self.values
 
     def __eq__(self: Collection[T], other: Any) -> bool:
@@ -370,6 +372,9 @@ class AbstractSequence[T](Collection[T]):
     def __reversed__(self: AbstractSequence[T]):
         return reversed(self.values)
 
+    def reversed(self) -> AbstractSequence[T]:
+        return type(self)(reversed(self.values), _skip_validation=True)
+
     def index(self: AbstractSequence[T], value) -> int:
         return self.values.index(value)
 
@@ -414,6 +419,20 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
 
     def sort(self: AbstractMutableSequence[T], key: Callable[[T], Any] | None = None, reverse: bool = False) -> None:
         self.values.sort(key=key, reverse=reverse)
+
+    def insert(self, index: int, value: T, *, _coerce: bool = False) -> None:
+        from type_validation import _validate_or_coerce_value
+        self.values.insert(index, _validate_or_coerce_value(value, self.item_type, _coerce=_coerce))
+
+    def extend(self, other: Iterable[T], *, _coerce: bool = False) -> None:
+        from type_validation import _validate_or_coerce_iterable
+        self.values.extend(_validate_or_coerce_iterable(other, self.item_type, _coerce=_coerce))
+
+    def pop(self, index: int = -1) -> T:
+        return self.values.pop(index)
+
+    def remove(self, value: T) -> None:
+        self.values.remove(value)
 
 
 class AbstractSet[T](Collection[T]):

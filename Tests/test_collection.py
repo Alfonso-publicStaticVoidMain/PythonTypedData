@@ -35,6 +35,19 @@ class TestCollection(unittest.TestCase):
         s.add('a')
         self.assertTrue(s)
 
+    def test_contains(self):
+        mus = MutableSet[int](0, 1, 2)
+        self.assertTrue(0 in mus)
+        self.assertTrue([0, 1] in mus)
+        self.assertFalse([2, 3] in mus)
+
+        mul = MutableList[str]('a', 'b', 'c', 2)
+        self.assertTrue('a' in mul)
+        self.assertTrue('2' in mul)
+        self.assertFalse(2 in mul)
+        self.assertTrue({'a', 'b', '2'} in mul)
+        self.assertFalse({'d'} in mul)
+
     def test_copy(self):
         lst = MutableList[int](1, 2)
         new_lst = lst.copy()
@@ -156,7 +169,6 @@ class TestCollection(unittest.TestCase):
             True : MutableList[TestClass](cosa_2, cosa_3, cosa_4),
             False : MutableList[TestClass](cosa_0, cosa_1)
         })
-
 
     def test_map_thoroughly(self):
         mul = MutableList[int](1, 2, 3)
