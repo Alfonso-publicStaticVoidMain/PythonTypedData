@@ -47,18 +47,18 @@ class TestList(unittest.TestCase):
         self.assertFalse(empty_list)
 
     def test_type_coercion(self):
-        # '1' is coerced to int when coerce parameter is set to True
+        # '1' is coerced to int when _coerce parameter is set to True
         lst = MutableList[int](['1', 2], _coerce=True)
         self.assertEqual(lst.values, [1, 2])
 
-        # 1 is coerced to float even when coerce parameter is False
+        # 1 is coerced to float even when _coerce parameter is False
         iml = ImmutableList[float]([1, 2.25], _coerce=False)
         self.assertEqual(iml.values, (1.0, 2.25))
         # This is because Python considers it equal to both the int and a float representation of 1
         self.assertEqual(iml[0], 1)
         self.assertEqual(iml[0], 1.0)
 
-        # '3' is not coerced to int if coerce parameter is False, and a TypeError is raised.
+        # '3' is not coerced to int if _coerce parameter is False, and a TypeError is raised.
         with self.assertRaises(TypeError):
             mul = MutableList[int]([1, 2, '3'], _coerce=False)
 
@@ -173,14 +173,14 @@ class TestList(unittest.TestCase):
 
     def test_append(self):
         int_lst = MutableList[int]()
-        # '0' is safely coerced to int when coerce = True
+        # '0' is safely coerced to int when _coerce = True
         int_lst.append('0', _coerce=True)
         self.assertEqual(int_lst[0], 0)
-        # '1' won't be coerced to int when coerce = False
+        # '1' won't be coerced to int when _coerce = False
         with self.assertRaises(TypeError):
             int_lst.append('1', _coerce=False)
 
-        # 0 and 1 will be coerced to str no matter if coerce is set to True or not.
+        # 0 and 1 will be coerced to str no matter if _coerce is set to True or not.
         str_lst = MutableList[str]()
         str_lst.append(0, _coerce=True)
         str_lst.append(1, _coerce=False)

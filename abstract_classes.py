@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import field
 from functools import reduce
-from typing import Iterable, Any, Callable, Mapping, TYPE_CHECKING, TypeVar
+from typing import Iterable, Any, Callable, Mapping, TYPE_CHECKING, TypeVar, ClassVar
 from collections import defaultdict
 
 from immutabledict import immutabledict
@@ -117,6 +117,9 @@ class Collection[T](GenericBase[T]):
 
         This method is used internally for runtime type enforcement and generic introspection, and it fetches the generic
         type from the _args attribute the class inherits from GenericBase which is set on its __class_getitem__ method.
+
+        :return: The generic type T that this class was called upon, stored on its attribute _args by the __class_getitem__
+        method inherited from GenericBase. If unable to retrieve it, returns None.
         """
         try:
             return cls._args[0]
@@ -131,8 +134,9 @@ class Collection[T](GenericBase[T]):
         Acts as a type-safe factory method for dynamically constructing properly parameterized collections when the type
         is not known statically.
 
+        :param values: One or more parameters, or an Iterable of values to initialize the new Collection with.
         :raises ValueError: If no values are provided.
-        :return: A new Collection of the same type as cls containing the passed values, and inferring its item_type from
+        :return: A new Collection of the same type as cls containing the passed values, inferring its item_type from
         with type_validation.py's _infer_type_contained_in_iterable method.
         """
         if len(values) == 1 and isinstance(values[0], Iterable) and not isinstance(values[0], (str, bytes)):
@@ -147,6 +151,7 @@ class Collection[T](GenericBase[T]):
 
         Useful for initialization of empty collections with known type context.
 
+        :param item_type: Type of the to-be elements of the empty Collection.
         :raises ValueError: If item_type is None.
         :return: An empty Collection of the same type as cls with the given item_type.
         """
@@ -170,8 +175,8 @@ class Collection[T](GenericBase[T]):
         """
         Returns True if the provided item (or iterable of items) is contained in the Collection's internal container.
 
-        If an iterable is passed (excluding strings/bytes), checks that all its elements are in the collection's
-        container.
+        :return: True if item is an object of the item_type of the Collection and is contained in its values, or if it's
+        an Iterable whose elements are all contained on self's values. False otherwise.
         """
         if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
             return all(i in self.values for i in item)
@@ -201,7 +206,9 @@ class Collection[T](GenericBase[T]):
 
     def __bool__(self: Collection[T]) -> bool:
         """
-        Returns True if the Collection contains at least one value, False otherwise.
+        Implements the __bool__ dunder method delegating to the values' attribute implementation.
+
+        :return: True if the Collection contains at least one value, False otherwise.
         """
         return bool(self.values)
 
@@ -248,10 +255,12 @@ class Collection[T](GenericBase[T]):
         value_mapper: Callable[[T], V] = lambda x : x
     ) -> dict[K, V]:
         """
-        Returns a dictionary derived from the Collection by mapping each item to a (key, value) pair using the provided
-        key_mapper and value_mapper callables. Defaults to identity mappings for both key and value.
-        :param key_mapper: Callable to obtain the keys from.
-        :param value_mapper: Callable to obtain the values from.
+        Returns a dictionary obtained by calling the key and value mappers on each item of the Collection.
+
+        :param key_mapper: Callable to obtain the keys from. Defaults to identity mapping.
+        :param value_mapper: Callable to obtain the values from. Defaults to identity mapping.
+        :return: A dictionary derived from the Collection by mapping each item to a (key, value) pair using the provided
+        key_mapper and value_mapper callables.
         """
         return {
             key_mapper(item) : value_mapper(item)
@@ -260,9 +269,11 @@ class Collection[T](GenericBase[T]):
 
     def count(self: Collection[T], value: Any) -> int:
         """
-        Returns the number of occurrences of the given value in the Collection. If the underlying container supports
-        `.count`, it uses that method; otherwise, falls back to manual equality counting. Supports unhashable values.
+        Returns the number of occurrences of the given value in the Collection.
+
         :param value: Value to count within the Collection.
+        :return: The number of appearances of the value in the Collection. If the underlying container supports
+        `.count`, it uses that method; otherwise, falls back to manual equality counting. Supports unhashable values.
         """
         try:
             return self.values.count(value)
@@ -280,12 +291,13 @@ class Collection[T](GenericBase[T]):
         _coerce: bool = False
     ) -> Collection[R]:
         """
-        Maps each value of the Collection to its image by the function `f` and returns a new Collection of the same type
-        as self containing those values. If result_type is given, it is used as the type of the returned Collection, if
-        not that is inferred.
+        Maps each value of the Collection to its image by the function `f` and returns a new Collection of them.
+
         :param f: Callable object to map the Collection with.
         :param result_type: Type expected to be returned by the Callable.
         :param _coerce: State parameter to try to force coercion to the expected result type if it's not None.
+        :return: A new Collection of the same type as self containing those values. If result_type is given, it is used
+        as the type of the returned Collection, if not that is inferred.
         """
         mapped_values = [f(value) for value in self.values]
         return (
@@ -297,14 +309,21 @@ class Collection[T](GenericBase[T]):
         self: Collection[T],
         f: Callable[[T], Iterable[R]],
         result_type: type[R] | None = None,
-        coerce: bool = False
+        *,
+        _coerce: bool = False
     ) -> Collection[R]:
         """
-        Applies the function `f` to each element of the Collection and flattens the resulting iterables into a single
-        Collection.
+        Maps and flattens each element of the Collection and returns a new Collection containing the results.
 
-        Requires that `f` returns an iterable (excluding str and bytes) for each element. The resulting type is either
-        inferred or provided explicitly.
+        :param f: Callable object to map the Collection with.
+        :type f: Callable[[T], Iterable[R]]
+        :param result_type: Type of Iterable expected to be returned by the Callable.
+        :type result_type: type[R] | None
+        :param _coerce: State parameter to try to force coercion to the expected result type if it's not None.
+        :return: A new Collection of the same type as self containing those values. If result_type is given, it is used
+        as the type of the returned Collection, if not that is inferred. Requires that `f` returns an iterable
+        (excluding str and bytes) for each element.
+        :rtype: Collection[R]
         """
 
         flattened = []
@@ -313,35 +332,100 @@ class Collection[T](GenericBase[T]):
             if not isinstance(result, Iterable) or isinstance(result, (str, bytes)):
                 raise TypeError("flatmap function must return a non-string iterable")
             flattened.extend(result)
-        return type(self)[result_type](flattened, _coerce=coerce) if result_type is not None else type(self).of(flattened)
+        return type(self)[result_type](flattened, _coerce=_coerce) if result_type is not None else type(self).of(flattened)
 
     def filter(self: Collection[T], predicate: Callable[[T], bool]) -> Collection[T]:
+        """
+        Filter the collection by a predicate function.
+
+        :param predicate: A function from T to the booleans that the kept values will satisfy.
+        :type predicate: Callable[[T], bool]
+        :return: A filtered collection containing only the values that were evaluated to True by the predicate.
+        :rtype: Collection[T]
+        """
         return type(self)([value for value in self.values if predicate(value)], _skip_validation=True)
 
     def all_match(self: Collection[T], predicate: Callable[[T], bool]) -> bool:
+        """
+        Returns True if all elements in the collection satisfy the given predicate.
+
+        :param predicate: A function from T to the booleans.
+        :type predicate: Callable[[T], bool]
+        :return: True if all elements match the predicate, False otherwise.
+        :rtype: bool
+        """
         return all(predicate(value) for value in self.values)
 
     def any_match(self: Collection[T], predicate: Callable[[T], bool]) -> bool:
+        """
+        Returns True if any element in the collection satisfies the given predicate.
+
+        :param predicate: A function from T to the booleans.
+        :type predicate: Callable[[T], bool]
+        :return: True if at least one element matches the predicate, False otherwise.
+        :rtype: bool
+        """
         return any(predicate(value) for value in self.values)
 
     def none_match(self: Collection[T], predicate: Callable[[T], bool]) -> bool:
+        """
+        Returns True if no element in the collection satisfies the given predicate.
+
+        :param predicate: A function from T to the booleans.
+        :type predicate: Callable[[T], bool]
+        :return: True if no elements match the predicate, False otherwise.
+        :rtype: bool
+        """
         return not any(predicate(value) for value in self.values)
 
     def reduce(self: Collection[T], f: Callable[[T, T], T], unit: T | None = None) -> T:
+        """
+        Reduces the collection to a single value using a binary operator function and an optional initial unit.
+
+        :param f: A function that combines two elements of type T into one.
+        :type f: Callable[[T, T], T]
+        :param unit: Optional initial value for the reduction. If provided, the reduction starts with this.
+        :type unit: T | None
+        :return: The result of the reduction, as done after being delegated to the reduce() function applied to the
+        internal container.
+        :rtype: T
+        """
         if unit is not None:
             return reduce(f, self.values, unit)
         return reduce(f, self.values)
 
     def for_each(self: Collection[T], consumer: Callable[[T], None]) -> None:
+        """
+        Performs the given consumer function on each element in the collection.
+
+        :param consumer: A function that takes an element of type T and returns None.
+        :type consumer: Callable[[T], None]
+        """
         for value in self.values:
             consumer(value)
 
     def peek(self: Collection[T], consumer: Callable[[T], None]) -> Collection[T]:
+        """
+        Performs the given consumer function on each element for side effects and returns the original collection.
+
+        :param consumer: A function that takes an element of type T and returns None.
+        :type consumer: Callable[[T], None]
+        :return: The original collection (self).
+        :rtype: Collection[T]
+        """
         for item in self.values:
             consumer(item)
         return self
 
     def distinct[K](self: Collection[T], key: Callable[[T], K] = lambda x: x) -> Collection[T]:
+        """
+        Returns a new collection with only distinct elements, determined by a key function.
+
+        :param key: A function mapping each element to a hashable key. Defaults to identity mapping.
+        :type key: Callable[[T], K]
+        :return: A Collection of the same type as self with duplicates removed based on the key.
+        :rtype: Collection[T]
+        """
         seen = set()
         result = []
         for value in self.values:
@@ -351,14 +435,34 @@ class Collection[T](GenericBase[T]):
                 result.append(value)
         return type(self)(result, _skip_validation=True)
 
-    def max(self: Collection[T], *, default: T = None, key: Callable[[T], Any] = None) -> T | None:
+    def max(self: Collection[T], *, default: T | None = None, key: Callable[[T], Any] = None) -> T | None:
+        """
+        Returns the maximum element in the collection, optionally using a key function or default value.
+
+        :param default: A value to return if the collection is empty.
+        :type default: T | None
+        :param key: A function to extract a comparison key from each element.
+        :type key: Callable[[T], Any], optional
+        :return: The maximum element, or default if provided and self is empty.
+        :rtype: T | None
+        """
         if default is not None:
             return max(self.values, default=default, key=key)
         if not self.values:
             return None
         return max(self.values, key=key)
 
-    def min(self: Collection[T], *, default: T = None, key: Callable[[T], Any] = None) -> T | None:
+    def min(self: Collection[T], *, default: T | None = None, key: Callable[[T], Any] = None) -> T | None:
+        """
+        Returns the minimum element in the collection, optionally using a key function or default.
+
+        :param default: A value to return if the collection is empty.
+        :type default: T | None
+        :param key: A function to extract a comparison key from each element.
+        :type key: Callable[[T], Any], optional
+        :return: The minimum element, or default if provided and self is empty.
+        :rtype: T | None
+        """
         if default is not None:
             return min(self.values, default=default, key=key)
         if not self.values:
@@ -370,10 +474,11 @@ class Collection[T](GenericBase[T]):
         key: Callable[[T], K]
     ) -> dict[K, Collection[T]]:
         """
-        Groups the items in the Collection by their value by the key Callable parameter.
+        Groups the items in the Collection on a dict by their value by the key function.
+
         :param key: Callable to group the items by.
         :return: A dict mapping each found value of key onto a Collection of the same type as self containing the items
-        in the original Collection that were mapped to that key value by the key Callable.
+        in the original Collection that were mapped to that value by the key function.
         """
         groups: dict[K, list[T]] = defaultdict(list)
         for item in self.values:
@@ -387,6 +492,14 @@ class Collection[T](GenericBase[T]):
         self: Collection[T],
         predicate: Callable[[T], bool]
     ) -> dict[bool, Collection[T]]:
+        """
+        A specialized binary version of group_by grouping by a predicate to bool.
+
+        :param predicate: Function from T to the booleans to partition the Collection by.
+        :type predicate: Callable[[T], bool]
+        :return: A dict whose True key is mapped to a Collection of the same type as self containing all items in it
+        that satisfied the predicate, likewise for False.
+        """
         return self.group_by(predicate)
 
     def collect[A, R](
@@ -399,8 +512,11 @@ class Collection[T](GenericBase[T]):
         Generalized collector, replicating Java's Stream API .collect method.
 
         :param supplier: Provides the initial container.
+        :type supplier: Callable[[], A]
         :param accumulator: Accepts (accumulator, item) to process each item.
-        :param finisher: Final transformation to obtain a result.
+        :type accumulator: Callable[[A, T], None]
+        :param finisher: Final transformation to obtain a result. Defaults to identity mapping.
+        :type finisher: Callable[[A], R]
         :return: The collected result.
         """
         acc = supplier()
@@ -419,9 +535,13 @@ class Collection[T](GenericBase[T]):
         A generalized collector with internal state, inspired by Java's Stream API.
 
         :param supplier: Provides the initial container.
+        :type supplier: Callable[[], A]
         :param state_supplier: Provides the initial state object.
+        :type state_supplier: Callable[[], S]
         :param accumulator: Accepts (accumulator, item, state) to process each item.
+        :type accumulator: Callable[[A, T, S], None]
         :param finisher: Final transformation combining accumulator and state to a result.
+        :type finisher: Callable[[A, S], R]
         :return: The final collected result.
         """
         acc = supplier()
@@ -433,10 +553,30 @@ class Collection[T](GenericBase[T]):
 
 @forbid_instantiation
 class AbstractSequence[T](Collection[T]):
+    """
+    Abstract base class for sequence-like collections with ordering and indexing capabilities.
 
-    _finisher: Callable[[Iterable[T]], Iterable[T]] = tuple
+    Provides standard sequence operations such as indexing, slicing, comparison, addition, multiplication, and sorting.
+    Must be subclassed to create concrete implementations.
+
+    This class will be further extended by `AbstractMutableSequence` to add the methods that modify the internal data
+    container of the class.
+
+    WIP
+    """
+
+    _finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
+        """
+        Returns the item at the given index or a new sliced sequence.
+
+        :param index: An integer index or slice object.
+        :type index: int | slice
+        :return: The item at the given index or a new sliced sequence.
+        :rtype: T | AbstractSequence[T]
+        :raises TypeError: If index is not an int or slice.
+        """
         if isinstance(index, slice):
             return type(self)[self.item_type](self.values[index])
         elif isinstance(index, int):
@@ -445,6 +585,14 @@ class AbstractSequence[T](Collection[T]):
             raise TypeError("Invalid index type: must be int or slice")
 
     def __eq__(self: AbstractSequence[T], other: Any) -> bool:
+        """
+        Checks equality with another `AbstractSequence` based on their item type and values.
+
+        :param other: Object to compare against.
+        :type other: Any
+        :return: True if both have the same item type and the same values on the same order.
+        :rtype: bool
+        """
         return (
             isinstance(other, AbstractSequence)
             and self.item_type == other.item_type
@@ -452,6 +600,14 @@ class AbstractSequence[T](Collection[T]):
         )
 
     def __lt__(self: AbstractSequence[T], other) -> bool:
+        """
+        Checks if this sequence is lexicographically less than another.
+
+        :param other: Another sequence or iterable.
+        :type other: AbstractSequence | list | tuple
+        :return: True if less than `other`.
+        :rtype: bool
+        """
         if isinstance(other, (AbstractSequence, list, tuple)):
             return tuple(self.values) < tuple(other.values if isinstance(other, AbstractSequence) else other)
         return NotImplemented
