@@ -19,52 +19,68 @@ if TYPE_CHECKING:
     )
 
 
-def _forbid_instantiation[T](forbidden_type: type[T]) -> Callable[..., T]:
+def forbid_instantiation(cls):
     """
-    Generates a __new__ method that raises a TypeError if the class that is trying to be instantiated is of the
-    forbidden type.
-    :param forbidden_type: Type for the instantiation to be forbidden.
-    :return: A __new__ method that, no matter the arguments received, raises a TypeError if the class that tried
-    to call it was of the forbidden type.
+    Class decorator that forbids direct instantiation of the given class.
+    Subclasses are allowed.
     """
-    def __new__(cls: type[T], *args, **kwargs) -> T:
-        if cls is forbidden_type:
+    original_new = cls.__new__
+
+    def __new__(subcls, *args, **kwargs):
+        if subcls is cls:
             raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
-        return super(forbidden_type, cls).__new__(cls)
-    return __new__
+        return original_new(subcls, *args, **kwargs)
+
+    cls.__new__ = staticmethod(__new__)
+    return cls
 
 
+@forbid_instantiation
 class Collection[T](GenericBase[T]):
+    """
+    Abstract base class representing a generic collection of items of type T.
+
+    Provides a foundational interface for storing and operating on collections of uniformly-typed items. It uses
+    generics to enforce runtime type safety and supports fluent and functional-style operations inspired by Java's
+    Stream API.
+
+    The class enforces runtime generic type tracking using a metaclass extension (GenericBase), allowing validation
+    and coercion of elements during construction and transformations. It cannot be directly instantiated and must be
+    parameterized by a concrete type when the constructor is called (e.g., Collection[int]).
+
+    :param item_type: The inferred type of elements stored in the collection, derived from the generic.
+    :type item_type: type[T]
+    :param values: The internal container of stored values, usually of one of Python's built-in Iterables (list, tuple,
+    set, frozenset, etc.).
+    :type values: Any
+    """
 
     item_type: type[T]
     values: Any
 
-    def __new__(cls, *args, **kwargs) -> Collection[T] | None:
-        return _forbid_instantiation(Collection)(cls, *args, **kwargs)
-
     def __init__(
         self: Collection[T],
-        *values: Iterable[T] | Collection[T] | T,
+        *values: T,
         _coerce: bool = False,
         _forbidden_iterable_types: tuple[type, ...] = (),
         _finisher: Callable[[Iterable[T]], Any] = None,
         _skip_validation: bool = False
     ) -> None:
         """
-        Basic constructor for the Collection abstract class, to be inherited by all subclasses.
+        Basic constructor for the Collection abstract class, to be invoked by all subclasses.
+
+        The attribute item_type is inferred from the generic with which the class was called, which was stored on the
+        _args attribute of the class itself returned by __class_getitem__ and fetched by _inferred_item_type.
+
         :param values: Values, received as an iterable or one by one, to store in the Collection.
         :param _coerce: State parameter to force type coercion or not. Some numeric type coercions are always performed.
         :param _forbidden_iterable_types: Tuple of types that the values parameter cannot be.
         :param _finisher: Callable to be applied to the values before storing them on the values attribute of the object.
         :param _skip_validation: State parameter to skip type validation of the values. Only use it in cases where it's
-        known that the values received will match the inferred generic type.
-        :raises: TypeError if the generic types weren't provided or were a TypeVar.
-        TypeError if the values iterable parameter is of one of the forbidden iterable types.
-
-        The attribute item_type is inferred from the generic with which the class was called, which was stored on the
-        _args attribute of the class itself returned by __class_getitem__ and fetched by _inferred_item_type.
+        known that the values received will match the generic type.
+        :raises TypeError: If the generic types weren't provided or were a TypeVar.
+        :raises TypeError: If the values iterable parameter is of one of the forbidden iterable types.
         """
-
         from type_validation import _validate_or_coerce_iterable, _validate_type
 
         # Fetches the generic type of the Collection from its _args attribute inherited from GenericBase.
@@ -96,40 +112,81 @@ class Collection[T](GenericBase[T]):
 
     @classmethod
     def _inferred_item_type(cls: type[Collection[T]]) -> type[T] | None:
+        """
+        Returns the generic type argument T with which this Collection subclass was parameterized, or None.
+
+        This method is used internally for runtime type enforcement and generic introspection, and it fetches the generic
+        type from the _args attribute the class inherits from GenericBase which is set on its __class_getitem__ method.
+        """
         try:
             return cls._args[0]
         except (AttributeError, IndexError, TypeError, KeyError):
             return None
 
     @classmethod
-    def of(cls: type[Collection[T]], *values: T):
-        if not values:
-            raise ValueError(f"Can't create a {cls.__name__} object from empty iterable.")
+    def of(cls: type[Collection], *values: T) -> Collection[T]:
+        """
+        Creates a Collection object containing the given values, inferring their common type.
 
+        Acts as a type-safe factory method for dynamically constructing properly parameterized collections when the type
+        is not known statically.
+
+        :raises ValueError: If no values are provided.
+        :return: A new Collection of the same type as cls containing the passed values, and inferring its item_type from
+        with type_validation.py's _infer_type_contained_in_iterable method.
+        """
         if len(values) == 1 and isinstance(values[0], Iterable) and not isinstance(values[0], (str, bytes)):
             values = tuple(values[0])
-
         from type_validation import _infer_type_contained_in_iterable
-        return cls[_infer_type_contained_in_iterable(values)](values)
+        return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
 
     @classmethod
-    def empty[R](cls: type[Collection[R]], item_type: type[R]) -> Collection[R]:
+    def empty[R](cls: type[Collection], item_type: type[R]) -> Collection[R]:
+        """
+        Creates an empty Collection subclass of the current class, parameterized with the given item type.
+
+        Useful for initialization of empty collections with known type context.
+
+        :raises ValueError: If item_type is None.
+        :return: An empty Collection of the same type as cls with the given item_type.
+        """
         if item_type is None:
             raise ValueError(f"Trying to call {cls.__name__}.empty with a None type.")
         return cls[item_type]()
 
     def __len__(self: Collection[T]) -> int:
+        """
+        Returns the number of elements in the Collection by delegating to the internal container's __len__ method.
+        """
         return len(self.values)
 
     def __iter__(self: Collection[T]) -> Iterable[T]:
+        """
+        Returns an iterator over the values in the Collection's internal container.
+        """
         return iter(self.values)
 
     def __contains__(self: Collection[T], item: T | Iterable[T]) -> bool:
+        """
+        Returns True if the provided item (or iterable of items) is contained in the Collection's internal container.
+
+        If an iterable is passed (excluding strings/bytes), checks that all its elements are in the collection's
+        container.
+        """
         if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
             return all(i in self.values for i in item)
         return item in self.values
 
     def __eq__(self: Collection[T], other: Any) -> bool:
+        """
+        Performs structural and type-based equality comparison between two Collection instances.
+
+        :return: True if self and other share:
+        - The same subclass
+        - The same item type
+        - The same underlying values (compared with ==)
+        False otherwise.
+        """
         return (
             isinstance(other, Collection)
             and self.item_type == other.item_type
@@ -137,26 +194,52 @@ class Collection[T](GenericBase[T]):
         )
 
     def __repr__(self: Collection[T]) -> str:
+        """
+        Returns a string representation of the Collection, showing its generic type name and contained values.
+        """
         return f"{class_name(type(self))}{self.values}"
 
     def __bool__(self: Collection[T]) -> bool:
+        """
+        Returns True if the Collection contains at least one value, False otherwise.
+        """
         return bool(self.values)
 
     def copy(self: Collection[T], deep: bool = False) -> Collection[T]:
+        """
+        Returns a shallow or deep copy of the Collection.
+
+        If the underlying values implement `.copy()`, it uses that method. Otherwise, directly references the original
+        values or uses `deepcopy` if requested. Skips re-validation for performance.
+
+        :param deep: Boolean state parameter to control if the copy is shallow or deep.
+        """
         from copy import deepcopy
         values = deepcopy(self.values) if deep else (self.values.copy() if hasattr(self.values, 'copy') else self.values)
         return type(self)[self.item_type](values, _skip_validation=True)
 
     def to_list(self: Collection[T]) -> list[T]:
+        """
+        Returns the contents of the Collection as a list.
+        """
         return list(self.values)
 
     def to_tuple(self: Collection[T]) -> tuple[T]:
+        """
+        Returns the contents of the Collection as a tuple.
+        """
         return tuple(self.values)
 
     def to_set(self: Collection[T]) -> set[T]:
+        """
+        Returns the contents of the Collection as a set.
+        """
         return set(self.values)
 
     def to_frozen_set(self: Collection[T]) -> frozenset[T]:
+        """
+        Returns the contents of the Collection as a frozenset.
+        """
         return frozenset(self.values)
 
     def to_dict[K, V](
@@ -164,12 +247,23 @@ class Collection[T](GenericBase[T]):
         key_mapper: Callable[[T], K] = lambda x : x,
         value_mapper: Callable[[T], V] = lambda x : x
     ) -> dict[K, V]:
+        """
+        Returns a dictionary derived from the Collection by mapping each item to a (key, value) pair using the provided
+        key_mapper and value_mapper callables. Defaults to identity mappings for both key and value.
+        :param key_mapper: Callable to obtain the keys from.
+        :param value_mapper: Callable to obtain the values from.
+        """
         return {
             key_mapper(item) : value_mapper(item)
             for item in self
         }
 
-    def count(self: Collection[T], value) -> int:
+    def count(self: Collection[T], value: Any) -> int:
+        """
+        Returns the number of occurrences of the given value in the Collection. If the underlying container supports
+        `.count`, it uses that method; otherwise, falls back to manual equality counting. Supports unhashable values.
+        :param value: Value to count within the Collection.
+        """
         try:
             return self.values.count(value)
         except (AttributeError, TypeError, ValueError):
@@ -186,12 +280,12 @@ class Collection[T](GenericBase[T]):
         _coerce: bool = False
     ) -> Collection[R]:
         """
-        Maps each value of the Collection to its image through the given Callable parameter.
+        Maps each value of the Collection to its image by the function `f` and returns a new Collection of the same type
+        as self containing those values. If result_type is given, it is used as the type of the returned Collection, if
+        not that is inferred.
         :param f: Callable object to map the Collection with.
         :param result_type: Type expected to be returned by the Callable.
         :param _coerce: State parameter to try to force coercion to the expected result type if it's not None.
-        :return: A Collection of the same class as self, containing the mapped values of the original Collection. If
-        result_type is None, the generic type of the result is inferred from the mapped values using the classmethod .of.
         """
         mapped_values = [f(value) for value in self.values]
         return (
@@ -205,6 +299,14 @@ class Collection[T](GenericBase[T]):
         result_type: type[R] | None = None,
         coerce: bool = False
     ) -> Collection[R]:
+        """
+        Applies the function `f` to each element of the Collection and flattens the resulting iterables into a single
+        Collection.
+
+        Requires that `f` returns an iterable (excluding str and bytes) for each element. The resulting type is either
+        inferred or provided explicitly.
+        """
+
         flattened = []
         for value in self.values:
             result = f(value)
@@ -329,12 +431,10 @@ class Collection[T](GenericBase[T]):
         return finisher(acc, state)
 
 
+@forbid_instantiation
 class AbstractSequence[T](Collection[T]):
 
     _finisher: Callable[[Iterable[T]], Iterable[T]] = tuple
-
-    def __new__(cls, *args, **kwargs) -> AbstractSequence[T] | None:
-        return _forbid_instantiation(AbstractSequence)(cls, *args, **kwargs)
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
         if isinstance(index, slice):
@@ -402,13 +502,11 @@ class AbstractSequence[T](Collection[T]):
         return type(self)(sorted(self.values, key=key, reverse=reverse), _skip_validation=True)
 
 
+@forbid_instantiation
 class AbstractMutableSequence[T](AbstractSequence[T]):
 
     _finisher: Callable[[Iterable[T]], Iterable[T]] = list
     _mutable: bool = True
-
-    def __new__(cls, *args, **kwargs) -> AbstractMutableSequence[T] | None:
-        return _forbid_instantiation(AbstractMutableSequence)(cls, *args, **kwargs)
 
     def append(
         self: AbstractMutableSequence[T],
@@ -469,12 +567,10 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         self.values.remove(value)
 
 
+@forbid_instantiation
 class AbstractSet[T](Collection[T]):
 
     _finisher: Callable[[Iterable[T]], Iterable[T]] = frozenset
-
-    def __new__(cls, *args, **kwargs) -> AbstractSet[T] | None:
-        return _forbid_instantiation(AbstractSet)(cls, *args, **kwargs)
 
     def __eq__(self: AbstractSet[T], other: Any) -> bool:
         return (
@@ -584,13 +680,11 @@ class AbstractSet[T](Collection[T]):
         return self.values.isdisjoint(_validate_collection_type_and_get_values(other, self.item_type, _coerce=_coerce))
 
 
+@forbid_instantiation
 class AbstractMutableSet[T](AbstractSet[T]):
 
     _finisher: Callable[[Iterable[T]], Iterable[T]] = set
     _mutable: bool = True
-
-    def __new__(cls, *args, **kwargs) -> AbstractMutableSet[T] | None:
-        return _forbid_instantiation(AbstractMutableSet)(cls, *args, **kwargs)
 
     def __ior__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
         self.values |= other.values
@@ -685,14 +779,12 @@ class AbstractMutableSet[T](AbstractSet[T]):
             self.values.symmetric_difference_update(validated_set)
 
 
+@forbid_instantiation
 class AbstractDict[K, V](GenericBase[K, V]):
 
     key_type: type[K]
     value_type: type[V]
     data: dict[K, V]
-
-    def __new__(cls, *args, **kwargs) -> AbstractDict[K, V] | None:
-        return _forbid_instantiation(AbstractDict)(cls, *args, **kwargs)
 
     def __init__(
         self: AbstractDict[K, V],
@@ -913,13 +1005,11 @@ class AbstractDict[K, V](GenericBase[K, V]):
         return type(self)({key : value for key, value in self.data.items() if predicate(key, value)})
 
 
+@forbid_instantiation
 class AbstractMutableDict[K, V](AbstractDict[K, V]):
 
     _finisher: Callable[[dict[K, V]], Mapping[K, V]] = immutabledict
     _mutable: bool = True
-
-    def __new__(cls, *args, **kwargs) -> AbstractMutableDict[K, V] | None:
-        return _forbid_instantiation(AbstractMutableDict)(cls, *args, **kwargs)
 
     def __setitem__(self: AbstractMutableDict[K, V], key: K, value: V) -> None:
         from type_validation import _validate_or_coerce_value
