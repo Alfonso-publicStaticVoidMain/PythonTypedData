@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Mapping, get_args
+from typing import Iterable, Mapping, get_args, Callable
 from immutabledict import immutabledict
 
 from abstract_classes import (
@@ -36,6 +36,20 @@ class MutableList[T](AbstractMutableSequence[T]):
     def to_immutable_set(self: MutableList[T]) -> ImmutableSet[T]:
         return ImmutableSet[self.item_type](self.values, _skip_validation=True)
 
+    def to_mutable_dict[K, V](
+        self: MutableList[T],
+        key_mapper: Callable[[T], K] = lambda x : x,
+        value_mapper: Callable[[T], V] = lambda x : x
+    ) -> MutableDict[K, V]:
+        return MutableDict.of(self.to_dict(key_mapper, value_mapper))
+
+    def to_immutable_dict[K, V](
+        self: MutableList[T],
+        key_mapper: Callable[[T], K] = lambda x : x,
+        value_mapper: Callable[[T], V] = lambda x : x
+    ) -> MutableDict[K, V]:
+        return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))
+
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
 class ImmutableList[T](AbstractSequence[T]):
@@ -49,7 +63,7 @@ class ImmutableList[T](AbstractSequence[T]):
         _coerce: bool = False,
         _skip_validation: bool = False
     ) -> None:
-        Collection.__init__(self, *values, _forbidden_iterable_types=(AbstractSet, set, frozenset), _coerce=_coerce, _finisher=tuple, _skip_validation=_skip_validation)
+        Collection.__init__(self, *values, _forbidden_iterable_types=(AbstractSet, set, frozenset), _coerce=_coerce, _skip_validation=_skip_validation)
 
     def __repr__(self: Collection[T]) -> str:
         return f"{class_name(type(self))}{list(self.values)}"
@@ -62,6 +76,20 @@ class ImmutableList[T](AbstractSequence[T]):
 
     def to_immutable_set(self: ImmutableList[T]) -> ImmutableSet[T]:
         return ImmutableSet[self.item_type](self.values, _skip_validation=True)
+
+    def to_mutable_dict[K, V](
+        self: ImmutableList[T],
+        key_mapper: Callable[[T], K] = lambda x : x,
+        value_mapper: Callable[[T], V] = lambda x : x
+    ) -> MutableDict[K, V]:
+        return MutableDict.of(self.to_dict(key_mapper, value_mapper))
+
+    def to_immutable_dict[K, V](
+        self: ImmutableList[T],
+        key_mapper: Callable[[T], K] = lambda x : x,
+        value_mapper: Callable[[T], V] = lambda x : x
+    ) -> MutableDict[K, V]:
+        return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))
 
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
@@ -76,10 +104,24 @@ class MutableSet[T](AbstractMutableSet[T]):
         _coerce: bool = False,
         _skip_validation: bool = False
     ) -> None:
-        Collection.__init__(self, *values, _coerce=_coerce, _finisher=set, _skip_validation=_skip_validation)
+        Collection.__init__(self, *values, _coerce=_coerce, _skip_validation=_skip_validation)
 
     def to_immutable_set(self: MutableSet[T]) -> ImmutableSet[T]:
         return ImmutableSet[self.item_type](self.values, _skip_validation=True)
+
+    def to_mutable_dict[K, V](
+        self: MutableSet[T],
+        key_mapper: Callable[[T], K] = lambda x : x,
+        value_mapper: Callable[[T], V] = lambda x : x
+    ) -> MutableDict[K, V]:
+        return MutableDict.of(self.to_dict(key_mapper, value_mapper))
+
+    def to_immutable_dict[K, V](
+        self: MutableSet[T],
+        key_mapper: Callable[[T], K] = lambda x : x,
+        value_mapper: Callable[[T], V] = lambda x : x
+    ) -> MutableDict[K, V]:
+        return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))
 
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
@@ -94,13 +136,27 @@ class ImmutableSet[T](AbstractSet[T]):
         _coerce: bool = False,
         _skip_validation: bool = False
     ) -> None:
-        Collection.__init__(self, *values, _coerce=_coerce, _finisher=frozenset, _skip_validation=_skip_validation)
+        Collection.__init__(self, *values, _coerce=_coerce, _skip_validation=_skip_validation)
 
     def __repr__(self: Collection[T]) -> str:
         return f"{type(self).__name__}{set(self.values)}"
 
     def to_mutable_set(self: ImmutableSet[T]) -> MutableSet[T]:
         return MutableSet[self.item_type](self.values, _skip_validation=True)
+
+    def to_mutable_dict[K, V](
+        self: ImmutableSet[T],
+        key_mapper: Callable[[T], K] = lambda x : x,
+        value_mapper: Callable[[T], V] = lambda x : x
+    ) -> MutableDict[K, V]:
+        return MutableDict.of(self.to_dict(key_mapper, value_mapper))
+
+    def to_immutable_dict[K, V](
+        self: ImmutableSet[T],
+        key_mapper: Callable[[T], K] = lambda x : x,
+        value_mapper: Callable[[T], V] = lambda x : x
+    ) -> MutableDict[K, V]:
+        return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))
 
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
@@ -123,7 +179,31 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         AbstractDict.__init__(self, keys_values, _coerce_keys=_coerce_keys, _coerce_values=_coerce_values, _keys=_keys, _values=_values, _skip_validation=_skip_validation)
 
     def to_immutable_dict(self: MutableDict[K, V]) -> ImmutableDict[K, V]:
-        return ImmutableDict[self.key_type, self.value_type](self.data)
+        return ImmutableDict[self.key_type, self.value_type](self.data, _skip_validation=True)
+
+    def to_keys_mutable_list(self: MutableDict[K, V]) -> MutableList[K]:
+        return MutableList[self.key_type](self.keys())
+
+    def to_keys_immutable_list(self: MutableDict[K, V]) -> ImmutableList[K]:
+        return ImmutableList[self.key_type](self.keys())
+
+    def to_keys_mutable_set(self: MutableDict[K, V]) -> MutableSet[K]:
+        return MutableSet[self.key_type](self.keys())
+
+    def to_keys_immutable_set(self: MutableDict[K, V]) -> ImmutableSet[K]:
+        return ImmutableSet[self.key_type](self.keys())
+
+    def to_values_mutable_list(self: MutableDict[K, V]) -> MutableList[V]:
+        return MutableList[self.value_type](self.values())
+
+    def to_values_immutable_list(self: MutableDict[K, V]) -> ImmutableList[V]:
+        return ImmutableList[self.value_type](self.values())
+
+    def to_values_mutable_set(self: MutableDict[K, V]) -> MutableSet[V]:
+        return MutableSet[self.value_type](self.values())
+
+    def to_values_immutable_set(self: MutableDict[K, V]) -> ImmutableSet[V]:
+        return ImmutableSet[self.value_type](self.values())
 
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
@@ -143,7 +223,34 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         _values: Iterable[V] | None = None,
         _skip_validation: bool = False
     ) -> None:
-        AbstractDict.__init__(self, keys_values, _coerce_keys=_coerce_keys, _coerce_values=_coerce_values, _finisher=immutabledict, _keys=_keys, _values=_values, _skip_validation=_skip_validation)
+        AbstractDict.__init__(self, keys_values, _coerce_keys=_coerce_keys, _coerce_values=_coerce_values, _keys=_keys, _values=_values, _skip_validation=_skip_validation)
 
     def to_mutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
-        return MutableDict[self.key_type, self.value_type](self.data)
+        return MutableDict[self.key_type, self.value_type](self.data, _skip_validation=True)
+
+    def to_mutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
+        return MutableDict[self.key_type, self.value_type](self.data, _skip_validation=True)
+
+    def to_keys_mutable_list(self: ImmutableDict[K, V]) -> MutableList[K]:
+        return MutableList[self.key_type](self.keys())
+
+    def to_keys_immutable_list(self: ImmutableDict[K, V]) -> ImmutableList[K]:
+        return ImmutableList[self.key_type](self.keys())
+
+    def to_keys_mutable_set(self: ImmutableDict[K, V]) -> MutableSet[K]:
+        return MutableSet[self.key_type](self.keys())
+
+    def to_keys_immutable_set(self: ImmutableDict[K, V]) -> ImmutableSet[K]:
+        return ImmutableSet[self.key_type](self.keys())
+
+    def to_values_mutable_list(self: ImmutableDict[K, V]) -> MutableList[V]:
+        return MutableList[self.value_type](self.values())
+
+    def to_values_immutable_list(self: ImmutableDict[K, V]) -> ImmutableList[V]:
+        return ImmutableList[self.value_type](self.values())
+
+    def to_values_mutable_set(self: ImmutableDict[K, V]) -> MutableSet[V]:
+        return MutableSet[self.value_type](self.values())
+
+    def to_values_immutable_set(self: ImmutableDict[K, V]) -> ImmutableSet[V]:
+        return ImmutableSet[self.value_type](self.values())

@@ -7,7 +7,7 @@ Ts = TypeVarTuple("Ts")
 class GenericBase[*Ts]:
 
     _generic_type_registry: WeakValueDictionary[tuple[type, tuple[type, ...]], type] = WeakValueDictionary()
-    _args: ClassVar[tuple[type]]
+    _args: ClassVar[tuple[type, ...]]
     _origin: ClassVar[type]
 
     @classmethod
@@ -27,7 +27,6 @@ class GenericBase[*Ts]:
 
         subclass._args = item
         subclass._origin = cls
-        subclass._immutable = getattr(cls, "_immutable", False)
         cls._generic_type_registry[cache_key] = subclass
         return subclass
 

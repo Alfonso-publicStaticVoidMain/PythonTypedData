@@ -300,16 +300,16 @@ def _validate_type(obj: Any, expected_type: type) -> bool:
 def _validate_iterable(obj: Any, iterable_type: type, item_type: Any) -> bool:
     if not isinstance(obj, iterable_type) or isinstance(obj, str):
         return False
-    return all(_validate_type(v, item_type) for v in obj)
+    return all(_validate_type(item, item_type) for item in obj)
 
 
-def _validate_mapping(obj: Any, mapping_type: type, key_value_types: tuple) -> bool:
+def _validate_mapping(obj: Any, mapping_type: type, key_value_types: tuple[type, type]) -> bool:
     if not isinstance(obj, mapping_type):
         return False
     if len(key_value_types) != 2:
         raise ValueError(f"_validate_mapping_type method called with a tuple argument {key_value_types} of length {len(key_value_types)} != 2.")
     key_type, val_type = key_value_types
-    return all(_validate_type(k, key_type) and _validate_type(v, val_type) for k, v in obj.items())
+    return all(_validate_type(key, key_type) and _validate_type(value, val_type) for key, value in obj.items())
 
 
 def _validate_tuple(obj: Any, args: tuple) -> bool:

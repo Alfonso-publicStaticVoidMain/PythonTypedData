@@ -99,7 +99,7 @@ class DictionaryTest(unittest.TestCase):
 
     def test_subdict(self):
         d = ImmutableDict[str, int]({'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5})
-        sd = d.subdict('b', 'd')
+        sd = d['b' : 'd']
         self.assertEqual(sd, ImmutableDict[str, int]({'b': 2, 'c': 3, 'd': 4}))
 
         tpl_dic = ImmutableDict[tuple[int, str], float]({
@@ -109,7 +109,7 @@ class DictionaryTest(unittest.TestCase):
             (2, 'a') : 3.1415,
             (3, 'c') : 2.71
         })
-        tpl_subdic = tpl_dic.subdict((1, 'j'), (3, 'a'))
+        tpl_subdic = tpl_dic[(1, 'j') : (3, 'a')]
         self.assertEqual(tpl_subdic.data, {(1, 'z') : 2.25, (2, 'a') : 3.1415})
 
 

@@ -47,7 +47,7 @@ class Collection[T](GenericBase[T]):
         *values: Iterable[T] | Collection[T] | T,
         _coerce: bool = False,
         _forbidden_iterable_types: tuple[type, ...] = (),
-        _finisher: Callable[[Iterable[T]], Any] = lambda x : x,
+        _finisher: Callable[[Iterable[T]], Any] = None,
         _skip_validation: bool = False
     ) -> None:
         """
@@ -63,7 +63,6 @@ class Collection[T](GenericBase[T]):
 
         The attribute item_type is inferred from the generic with which the class was called, which was stored on the
         _args attribute of the class itself returned by __class_getitem__ and fetched by _inferred_item_type.
-
         """
 
         from type_validation import _validate_or_coerce_iterable, _validate_type
@@ -90,6 +89,8 @@ class Collection[T](GenericBase[T]):
         object.__setattr__(self, 'item_type', generic_item_type)
 
         final_values = values if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce)
+
+        _finisher = _finisher or getattr(type(self), '_finisher', lambda x : x)
 
         object.__setattr__(self, 'values', _finisher(final_values))
 
@@ -157,6 +158,16 @@ class Collection[T](GenericBase[T]):
 
     def to_frozen_set(self: Collection[T]) -> frozenset[T]:
         return frozenset(self.values)
+
+    def to_dict[K, V](
+        self: Collection[T],
+        key_mapper: Callable[[T], K] = lambda x : x,
+        value_mapper: Callable[[T], V] = lambda x : x
+    ) -> dict[K, V]:
+        return {
+            key_mapper(item) : value_mapper(item)
+            for item in self
+        }
 
     def count(self: Collection[T], value) -> int:
         try:
@@ -320,6 +331,8 @@ class Collection[T](GenericBase[T]):
 
 class AbstractSequence[T](Collection[T]):
 
+    _finisher: Callable[[Iterable[T]], Iterable[T]] = tuple
+
     def __new__(cls, *args, **kwargs) -> AbstractSequence[T] | None:
         return _forbid_instantiation(AbstractSequence)(cls, *args, **kwargs)
 
@@ -330,6 +343,13 @@ class AbstractSequence[T](Collection[T]):
             return self.values[index]
         else:
             raise TypeError("Invalid index type: must be int or slice")
+
+    def __eq__(self: AbstractSequence[T], other: Any) -> bool:
+        return (
+            isinstance(other, AbstractSequence)
+            and self.item_type == other.item_type
+            and list(self.values) == list(other.values)
+        )
 
     def __lt__(self: AbstractSequence[T], other) -> bool:
         if isinstance(other, (AbstractSequence, list, tuple)):
@@ -384,6 +404,9 @@ class AbstractSequence[T](Collection[T]):
 
 class AbstractMutableSequence[T](AbstractSequence[T]):
 
+    _finisher: Callable[[Iterable[T]], Iterable[T]] = list
+    _mutable: bool = True
+
     def __new__(cls, *args, **kwargs) -> AbstractMutableSequence[T] | None:
         return _forbid_instantiation(AbstractMutableSequence)(cls, *args, **kwargs)
 
@@ -431,14 +454,66 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
     def pop(self, index: int = -1) -> T:
         return self.values.pop(index)
 
-    def remove(self, value: T) -> None:
+    def remove(
+        self: AbstractSequence[T],
+        value: T,
+        *,
+        _coerce: bool = False
+    ) -> None:
+        from type_validation import _validate_or_coerce_value
+        if _coerce:
+            try:
+                value = _validate_or_coerce_value(value, self.item_type)
+            except (TypeError, ValueError):
+                pass
         self.values.remove(value)
 
 
 class AbstractSet[T](Collection[T]):
 
+    _finisher: Callable[[Iterable[T]], Iterable[T]] = frozenset
+
     def __new__(cls, *args, **kwargs) -> AbstractSet[T] | None:
         return _forbid_instantiation(AbstractSet)(cls, *args, **kwargs)
+
+    def __eq__(self: AbstractSet[T], other: Any) -> bool:
+        return (
+            isinstance(other, AbstractSet)
+            and self.item_type == other.item_type
+            and set(self.values) == set(other.values)
+        )
+
+    def __lt__(self: AbstractSet[T], other: Any) -> bool:
+        if isinstance(other, AbstractSet):
+            return self.values < other.values
+        return NotImplemented
+
+    def __le__(self: AbstractSet[T], other: Any) -> bool:
+        if isinstance(other, AbstractSet):
+            return self.values <= other.values
+        return NotImplemented
+
+    def __gt__(self: AbstractSet[T], other: Any) -> bool:
+        if isinstance(other, AbstractSet):
+            return self.values > other.values
+        return NotImplemented
+
+    def __ge__(self: AbstractSet[T], other: Any) -> bool:
+        if isinstance(other, AbstractSet):
+            return self.values >= other.values
+        return NotImplemented
+
+    def __or__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+        return type(self)(self.values | other.values)
+
+    def __and__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+        return type(self)(self.values & other.values)
+
+    def __sub__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+        return type(self)(self.values - other.values)
+
+    def __xor__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+        return type(self)(self.values ^ other.values)
 
     def union(
         self: AbstractSet[T],
@@ -511,8 +586,27 @@ class AbstractSet[T](Collection[T]):
 
 class AbstractMutableSet[T](AbstractSet[T]):
 
+    _finisher: Callable[[Iterable[T]], Iterable[T]] = set
+    _mutable: bool = True
+
     def __new__(cls, *args, **kwargs) -> AbstractMutableSet[T] | None:
         return _forbid_instantiation(AbstractMutableSet)(cls, *args, **kwargs)
+
+    def __ior__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
+        self.values |= other.values
+        return self
+
+    def __iand__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
+        self.values &= other.values
+        return self
+
+    def __isub__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
+        self.values -= other.values
+        return self
+
+    def __ixor__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
+        self.values ^= other.values
+        return self
 
     def add(
         self: AbstractMutableSet[T],
@@ -532,8 +626,7 @@ class AbstractMutableSet[T](AbstractSet[T]):
         from type_validation import _validate_or_coerce_value
         if _coerce:
             try:
-                self.values.remove(_validate_or_coerce_value(value, self.item_type))
-                return
+                value = _validate_or_coerce_value(value, self.item_type)
             except (TypeError, ValueError):
                 pass
         self.values.remove(value)
@@ -547,8 +640,7 @@ class AbstractMutableSet[T](AbstractSet[T]):
         from type_validation import _validate_or_coerce_value
         if _coerce:
             try:
-                self.values.discard(_validate_or_coerce_value(value, self.item_type))
-                return
+                value = _validate_or_coerce_value(value, self.item_type)
             except (TypeError, ValueError):
                 pass
         self.values.discard(value)
@@ -610,7 +702,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
         _values: Iterable[V] | None = None,
         _coerce_keys: bool = False,
         _coerce_values: bool = False,
-        _finisher: Callable[[dict[K, V]], Any] = lambda x : x,
+        _finisher: Callable[[dict[K, V]], Any] = None,
         _skip_validation: bool = False
     ) -> None:
         from type_validation import (
@@ -629,6 +721,8 @@ class AbstractDict[K, V](GenericBase[K, V]):
 
         object.__setattr__(self, "key_type", key_type)
         object.__setattr__(self, "value_type", value_type)
+
+        _finisher = _finisher or getattr(type(self), '_finisher', lambda x: x)
 
         if keys_values is None and (_keys is None or _values is None):
             object.__setattr__(self, "data", _finisher({}))
@@ -662,7 +756,10 @@ class AbstractDict[K, V](GenericBase[K, V]):
         return key_type, value_type
 
     @classmethod
-    def of(cls: type[AbstractDict[K, V]], keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]):
+    def of(
+        cls: type[AbstractDict[K, V]],
+        keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]
+    ) -> AbstractDict[K, V]:
         if keys_values is None or not keys_values:
             raise ValueError(f"Can't create a {cls.__name__} object from empty iterable.")
         from type_validation import _infer_type_contained_in_iterable, _split_keys_values
@@ -672,20 +769,55 @@ class AbstractDict[K, V](GenericBase[K, V]):
         return cls[key_type, value_type](_keys=keys, _values=values)
 
     @classmethod
-    def of_keys_values(cls: type[AbstractDict[K, V]], keys: Iterable[K], values: Iterable[V]):
+    def of_keys_values(
+        cls: type[AbstractDict[K, V]],
+        keys: Iterable[K],
+        values: Iterable[V]
+    ) -> AbstractDict[K, V]:
         keys = list(keys)
         values = list(values)
 
         if len(keys) != len(values):
             raise ValueError("Keys and iterable must be of the same length when using .of_keys_values")
 
-        from type_validation import _infer_type_contained_in_iterable, _validate_duplicates_and_hash
+        from type_validation import _infer_type_contained_in_iterable
         key_type = _infer_type_contained_in_iterable(keys)
         value_type = _infer_type_contained_in_iterable(values)
         return cls[key_type, value_type](_keys=keys, _values=values)
 
-    def __getitem__(self: AbstractDict[K, V], key: K) -> V:
-        return self.data[key]
+    def __getitem__(self: AbstractDict[K, V], key: K | slice) -> V | AbstractDict[K, V]:
+        """
+        Returns its assigned value if key is of type K, or if it's a slice, the AbstractDict of the same type as self
+        constructed by taking all the keys that fall on that slice.
+        :param key: Key or slice to get.
+        :return: The value assigned to the key, or the subdict of all the keys falling on the slice.
+        """
+        if isinstance(key, slice):
+            # Subdict slicing
+            if key.step is not None:
+                raise TypeError("Step is not supported in dict slicing.")
+
+            start, stop = key.start, key.stop
+
+            sample_key: K | None = next(iter(self.data), None)
+            if sample_key is None:
+                return type(self)({})
+
+            try:
+                # Try comparing sample_key with start/stop if provided
+                if start is not None:
+                    sample_key >= start
+                if stop is not None:
+                    sample_key <= stop
+            except TypeError:
+                raise TypeError("Keys must support ordering for subdict slicing.")
+
+            return self.filter_keys(
+                lambda k: (start is None or start <= k) and (stop is None or k <= stop)
+            )
+        else:
+            # Regular key access
+            return self.data[key]
 
     def __iter__(self: AbstractDict[K, V]) -> Iterable[K]:
         return iter(self.data)
@@ -707,8 +839,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
 
     def __eq__(self: AbstractDict[K, V], other: Any) -> bool:
         return (
-            issubclass(type(self), AbstractDict)
-            and issubclass(type(other), AbstractDict)
+            isinstance(other, AbstractDict)
             and self.key_type == other.key_type
             and self.value_type == other.value_type
             and self.data == other.data
@@ -716,6 +847,19 @@ class AbstractDict[K, V](GenericBase[K, V]):
 
     def __repr__(self: AbstractDict[K, V]) -> str:
         return f"{class_name(type(self))}{dict(self.data)}"
+
+    def __or__(self: AbstractDict[K, V], other: Mapping[K, V]) -> AbstractDict[K, V]:
+        return type(self)(dict(self.data) | dict(other))
+
+    def __and__(self: AbstractDict[K, V], other: Mapping[K, V]) -> AbstractDict[K, V]:
+        return type(self)({k: self.data[k] for k in self.data.keys() & other.keys()})
+
+    def __sub__(self: AbstractDict[K, V], other: Mapping[K, V]) -> AbstractDict[K, V]:
+        return type(self)({k: v for k, v in self.data.items() if k not in other})
+
+    def __xor__(self: AbstractDict[K, V], other: Mapping[K, V]) -> AbstractDict[K, V]:
+        sym_keys = self.data.keys() ^ other.keys()
+        return type(self)({k: (self.data.get(k) or other.get(k)) for k in sym_keys})
 
     def to_dict(self: AbstractDict[K, V]) -> dict[K, V]:
         return dict(self.data)
@@ -735,15 +879,14 @@ class AbstractDict[K, V](GenericBase[K, V]):
         _coerce_values: bool = False
     ) -> V | None:
         from type_validation import _validate_or_coerce_value
-        if _coerce_keys:
-            try:
-                key = _validate_or_coerce_value(key, self.key_type, _coerce=_coerce_keys)
-            except TypeError:
-                pass
-        return self.data.get(
-            key,
-            _validate_or_coerce_value(fallback, self.value_type, _coerce=_coerce_values) if fallback is not None else None
-        )
+        try:
+            return self.data[key]
+        except KeyError:
+            return (
+                _validate_or_coerce_value(fallback, self.value_type, _coerce=_coerce_values)
+                if fallback is not None
+                else None
+            )
 
     def map_values[R](
         self: AbstractDict[K, V],
@@ -769,18 +912,11 @@ class AbstractDict[K, V](GenericBase[K, V]):
     def filter_items(self: AbstractDict[K, V], predicate: Callable[[K, V], bool]) -> AbstractDict[K, V]:
         return type(self)({key : value for key, value in self.data.items() if predicate(key, value)})
 
-    def subdict(self: AbstractDict[K, V], start: K, end: K) -> AbstractDict[K, V]:
-        try:
-            if start >= end:
-                raise ValueError()
-        except TypeError:
-            raise TypeError("Keys must support ordering for subdict slicing.")
-        except ValueError:
-            raise ValueError("Start must be lower than end.")
-        return self.filter_keys(lambda key : start <= key <= end)
-
 
 class AbstractMutableDict[K, V](AbstractDict[K, V]):
+
+    _finisher: Callable[[dict[K, V]], Mapping[K, V]] = immutabledict
+    _mutable: bool = True
 
     def __new__(cls, *args, **kwargs) -> AbstractMutableDict[K, V] | None:
         return _forbid_instantiation(AbstractMutableDict)(cls, *args, **kwargs)
@@ -794,6 +930,29 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
 
     def clear(self: AbstractMutableDict[K, V]) -> None:
         self.data.clear()
+
+    def __ior__(self: AbstractMutableDict[K, V], other: Mapping[K, V]) -> AbstractMutableDict[K, V]:
+        self.update(other)
+        return self
+
+    def __iand__(self: AbstractMutableDict[K, V], other: Mapping[K, V]) -> AbstractMutableDict[K, V]:
+        keys_to_remove = set(self.data) - set(other)
+        for key in keys_to_remove:
+            del self.data[key]
+        return self
+
+    def __isub__(self: AbstractMutableDict[K, V], other: Mapping[K, V]) -> AbstractMutableDict[K, V]:
+        for key in other:
+            self.data.pop(key, None)
+        return self
+
+    def __ixor__(self: AbstractMutableDict[K, V], other: Mapping[K, V]) -> AbstractMutableDict[K, V]:
+        for key in other:
+            if key in self.data:
+                del self.data[key]
+            else:
+                self.data[key] = other[key]
+        return self
 
     def update(
         self: AbstractMutableDict[K, V],

@@ -181,6 +181,15 @@ class TestCollection(unittest.TestCase):
         mapped_to_str = mul.map(lambda x : 'a' * x)
         self.assertEqual(mapped_to_str, MutableList[str]('a', 'aa', 'aaa'))
 
+    def test_to_dict(self):
+        mul = MutableList[int](0, 1, 2)
+        dic = mul.to_dict(key_mapper=str)
+        self.assertEqual(dic, {'0':0, '1':1, '2':2})
+
+        iml = ImmutableList[str]('1_a', '2_b')
+        dic = iml.to_dict(lambda s : int(s[0]), lambda s : s[-1])
+        self.assertEqual(dic, {1:'a', 2:'b'})
+
     def test_abstract_classes(self):
         lst = MutableList[AbstractSet[int]]()
         lst.append(MutableSet[int](1, 2))
