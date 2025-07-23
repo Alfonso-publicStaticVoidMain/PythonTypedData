@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import field
 from functools import reduce
-from typing import Iterable, Any, Callable, Mapping, TYPE_CHECKING, TypeVar, ClassVar
+from typing import Iterable, Any, Callable, Mapping, TYPE_CHECKING, TypeVar, ClassVar, Iterator
 from collections import defaultdict
 
 from immutabledict import immutabledict
@@ -25,7 +25,10 @@ def forbid_instantiation(cls):
 
     :raises TypeError: If the decorated class is instantiated directly, but allows instantiation of its subclasses.
     """
+
     def __new__(subcls, *args, **kwargs):
+        if getattr(subcls, "_origin", None) is cls:
+            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated, even with generics.")
         if subcls is cls:
             raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
         return object.__new__(subcls)
@@ -37,21 +40,26 @@ def forbid_instantiation(cls):
 @forbid_instantiation
 class Collection[T](GenericBase[T]):
     """
-    Abstract base class representing a generic collection of items of type T.
+    Abstract base class representing a collection of items of type T, wrapping an underlying container and its type.
 
-    Provides a base class for storing and operating on collections of items with a common type. It uses generics to
-    enforce runtime type safety and supports fluent and functional-style operations inspired by Java's Stream API.
+    Provides a base class for storing and operating on collections of items with a common type, without any further
+    structure, which will be added on certain extensions. It uses generics to enforce runtime type safety and supports
+    fluent and functional-style operations inspired by Java's Stream API.
 
-    The class enforces runtime generic type tracking using a metaclass extension (GenericBase), allowing validation
-    and coercion of elements during construction and transformations. It cannot be directly instantiated and must be
-    parameterized by a concrete type when the constructor is called (e.g., MutableList[int]).
+    The class enforces runtime generic type tracking using the metaclass extension GenericBase, from which it inherits
+    its __class_getitem__ method, which stores the generic types the Collection subclasses are called upon on an _args
+    attribute, and that base subclass as an _origin attribute of a new dynamic subclass, which can then be used to
+    instantiate new objects, or perform type validation with full access to the generic types.
+
+    It is an abstract class and cannot be directly instantiated. Its subclasses must be parameterized by a concrete type
+    when the constructor is called (e.g., MutableList[int]).
 
     Attributes:
-        item_type (type[T]): The inferred type of elements stored in the collection, derived from the generic.
+        item_type (type[T]): The inferred type of elements stored in the collection, derived from the generic types.
 
         values (Any): The internal container of stored values, usually of one of Python's built-in Iterables.
 
-        _finisher (ClassVar[Callable]): A function applied to the values during __init__ before setting it as the
+        _finisher (ClassVar[Callable]): A function that is applied to the values during __init__ before setting it as the
         attribute of the object. It's generally used to transform them into another Iterable type. If missing, it's
         assumed to be the identity mapping on Collection's __init__ method.
 
@@ -83,8 +91,8 @@ class Collection[T](GenericBase[T]):
         """
         Basic constructor for the Collection abstract class, to be invoked by all subclasses.
 
-        The attribute item_type is inferred from the generic with which the class was called, which was stored on the
-        _args attribute of the class itself returned by __class_getitem__ and fetched by _inferred_item_type.
+        The attribute item_type is inferred from the generic the class was called upon, which was stored on the
+        _args attribute of the class returned by __class_getitem__ and fetched by _inferred_item_type.
 
         :param values: Values, received as an iterable or one by one, to store in the Collection.
         :type values: T
@@ -103,7 +111,7 @@ class Collection[T](GenericBase[T]):
         known that the values received will match the generic type.
         :type _skip_validation: bool
 
-        :raises TypeError: If the generic types weren't provided or were a TypeVar.
+        :raises TypeError: If the generic type wasn't provided or was a TypeVar.
         :raises TypeError: If the values iterable parameter is of one of the forbidden iterable types.
         """
         from type_validation import _validate_or_coerce_iterable, _validate_type
@@ -202,12 +210,12 @@ class Collection[T](GenericBase[T]):
         """
         return len(self.values)
 
-    def __iter__(self: Collection[T]) -> Iterable[T]:
+    def __iter__(self: Collection[T]) -> Iterator[T]:
         """
         Returns an iterator over the values in the Collection's internal container.
 
         :return: An iterable over the values of the Collection.
-        :rtype: Iterable[T]
+        :rtype: Iterator[T]
         """
         return iter(self.values)
 
@@ -577,17 +585,53 @@ class Collection[T](GenericBase[T]):
         """
         Generalized collector, replicating Java's Stream API .collect method.
 
+        The supplier gives the initial container for the result. For each item in self, the accumulator is called on
+        that container and that item to process the item, then the finisher is applied to the container before returning.
+
         :param supplier: Provides the initial container.
         :type supplier: Callable[[], A]
-        :param accumulator: Accepts (accumulator, item) to process each item.
+
+        :param accumulator: Accepts (container, item) to process each item.
         :type accumulator: Callable[[A, T], None]
+
         :param finisher: Final transformation to obtain a result. Defaults to identity mapping.
         :type finisher: Callable[[A], R]
+
         :return: The collected result.
+        :rtype: R
         """
         acc = supplier()
         for item in self.values:
             accumulator(acc, item)
+        return finisher(acc)
+
+    def collect_pure[A, R](
+        self: Collection[T],
+        supplier: Callable[[], A],
+        accumulator: Callable[[A, T], A],
+        finisher: Callable[[A], R] = lambda x: x
+    ) -> R:
+        """
+        Generalized collector, replicating Java's Stream API .collect method. The accumulator is now a pure function.
+
+        The supplier an initial value of type A. For each item in self, the accumulator is called on that value and that
+        item to process the item and update the value, then the finisher is applied to the last value before returning.
+
+        :param supplier: Provides the initial container.
+        :type supplier: Callable[[], A]
+
+        :param accumulator: Accepts (container, item) to process each item and return an updated container.
+        :type accumulator: Callable[[A, T], A]
+
+        :param finisher: Final transformation to obtain a result. Defaults to identity mapping.
+        :type finisher: Callable[[A], R]
+
+        :return: The collected result.
+        :rtype: R
+        """
+        acc = supplier()
+        for item in self.values:
+            acc = accumulator(acc, item)
         return finisher(acc)
 
     def stateful_collect[A, S, R](
@@ -600,20 +644,64 @@ class Collection[T](GenericBase[T]):
         """
         A generalized collector with internal state, inspired by Java's Stream API.
 
+        The supplier gives the initial container for the result. The state_supplier the initial value for the state.
+        For each item in self, the accumulator is called on the container, item and state to process the item and
+        modify the state, or not, then the finisher is applied to the container and state before returning.
+
         :param supplier: Provides the initial container.
         :type supplier: Callable[[], A]
+
         :param state_supplier: Provides the initial state object.
         :type state_supplier: Callable[[], S]
+
         :param accumulator: Accepts (accumulator, item, state) to process each item.
         :type accumulator: Callable[[A, T, S], None]
+
         :param finisher: Final transformation combining accumulator and state to a result.
         :type finisher: Callable[[A, S], R]
+
         :return: The final collected result.
+        :rtype: R
         """
         acc = supplier()
         state = state_supplier()
         for item in self.values:
             accumulator(acc, item, state)
+        return finisher(acc, state)
+
+    def stateful_collect_pure[A, S, R](
+        self: Collection[T],
+        supplier: Callable[[], A],
+        state_supplier: Callable[[], S],
+        accumulator: Callable[[A, T, S], tuple[A, S]],
+        finisher: Callable[[A, S], R] = lambda x, _: x
+    ) -> R:
+        """
+        A generalized collector with internal state, inspired by Java's Stream API.
+
+        The supplier provides an initial value of type A. The state_supplier the initial value of type S for the state.
+        For each item in self, the accumulator is called on the container, item and state to process the item and
+        return the value and state, then the finisher is applied to the last value and state before returning.
+
+        :param supplier: Provides the initial container.
+        :type supplier: Callable[[], A]
+
+        :param state_supplier: Provides the initial state object.
+        :type state_supplier: Callable[[], S]
+
+        :param accumulator: Accepts (accumulator, item, state) to process each item.
+        :type accumulator: Callable[[A, T, S], None]
+
+        :param finisher: Final transformation combining accumulator and state to a result.
+        :type finisher: Callable[[A, S], R]
+
+        :return: The final collected result.
+        :rtype: R
+        """
+        acc = supplier()
+        state = state_supplier()
+        for item in self.values:
+            acc, state = accumulator(acc, item, state)
         return finisher(acc, state)
 
 
@@ -635,18 +723,19 @@ class AbstractSequence[T](Collection[T]):
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
         """
-        Returns the item at the given index or a new sliced sequence.
+        Returns the item at the given index or a new sliced AbstractSequence.
 
         :param index: An integer index or slice object.
         :type index: int | slice
 
-        :return: The item at the given index or a new sliced sequence.
+        :return: The item at the given index or an AbstractSequence of the same dynamic subclass as self containing
+        the sliced values.
         :rtype: T | AbstractSequence[T]
 
         :raises TypeError: If index is not an int or slice.
         """
         if isinstance(index, slice):
-            return type(self)[self.item_type](self.values[index])
+            return type(self)(self.values[index])
         elif isinstance(index, int):
             return self.values[index]
         else:
@@ -654,7 +743,7 @@ class AbstractSequence[T](Collection[T]):
 
     def __eq__(self: AbstractSequence[T], other: Any) -> bool:
         """
-        Checks equality with another `AbstractSequence` based on their item type and values.
+        Checks equality with another AbstractSequence based on their item type and values.
 
         :param other: Object to compare against.
         :type other: Any
@@ -726,10 +815,10 @@ class AbstractSequence[T](Collection[T]):
 
     def __add__(
         self: AbstractSequence[T],
-        other: AbstractSequence[T] | list[T] | tuple[T]
+        other: AbstractSequence[T] | list[T] | tuple[T, ...]
     ) -> AbstractSequence[T]:
         """
-        Concatenates this sequence with another sequence of the same item type.
+        Concatenates this AbstractSequence with another AbstractSequence, list or tuple of the same item type.
 
         :param other: The sequence or iterable to concatenate.
         :type other: AbstractSequence[T] | list[T] | tuple[T]
@@ -741,6 +830,8 @@ class AbstractSequence[T](Collection[T]):
         :raises TypeError: If `other` has incompatible types.
         """
         from type_validation import _validate_collection_type_and_get_values
+        if not isinstance(other, (AbstractSequence, list, tuple)):
+            return NotImplemented
         return type(self)(self.values + _validate_collection_type_and_get_values(other, self.item_type))
 
     def __mul__(
@@ -762,23 +853,23 @@ class AbstractSequence[T](Collection[T]):
             return NotImplemented
         return type(self)(self.values * n, _skip_validation=True)
 
-    def __sub__(self: AbstractSequence[T], other) -> AbstractSequence[T]:
+    def __sub__(self: AbstractSequence[T], other: Iterable[T]) -> AbstractSequence[T]:
         """
-        Removes elements from this sequence that appear in `other`.
+        Returns a new AbstractSequence where the elements of `other`have been removed.
 
         :param other: A collection of elements to exclude.
         :type other: Iterable
 
-        :return: A filtered sequence with matching elements removed.
+        :return: A new AbstractSequence of the same dynamic subclass as self with all elements present in `other` removed.
         :rtype: AbstractSequence[T]
         """
         return self.filter(lambda item : item not in other)
 
-    def __reversed__(self: AbstractSequence[T]):
+    def __reversed__(self: AbstractSequence[T]) -> Iterator[T]:
         """
         Returns a reversed iterator over the sequence.
 
-        :return: A reversed iterator, delegated to the __reversed__ of the underlying values container.
+        :return: A reversed iterator, delegated to the __reversed__ of the underlying container.
         :rtype: Iterator[T]
         """
         return reversed(self.values)
@@ -1754,12 +1845,12 @@ class AbstractDict[K, V](GenericBase[K, V]):
             # Regular key access
             return self.data[key]
 
-    def __iter__(self: AbstractDict[K, V]) -> Iterable[K]:
+    def __iter__(self: AbstractDict[K, V]) -> Iterator[K]:
         """
         Returns an iterator over the keys of this AbstractDict.
 
         :return: An iterator over all keys.
-        :rtype: Iterable[K]
+        :rtype: Iterator[K]
         """
         return iter(self.data)
 

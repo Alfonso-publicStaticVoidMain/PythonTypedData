@@ -7,19 +7,19 @@ class TestAbstractClasses(unittest.TestCase):
 
     def test_forbidden_instantiation(self):
         with self.assertRaises(TypeError):
-            col = Collection(item_type=str)
+            col = Collection[int]()
         with self.assertRaises(TypeError):
-            dic = AbstractDict(int, float)
+            dic = AbstractDict[int, float]()
         with self.assertRaises(TypeError):
-            aml = AbstractMutableDict(int, float)
+            aml = AbstractMutableDict[int, float]()
         with self.assertRaises(TypeError):
-            seq = AbstractSequence(str)
+            seq = AbstractSequence[str]()
         with self.assertRaises(TypeError):
-            amseq = AbstractMutableSequence(str)
+            amseq = AbstractMutableSequence[str]()
         with self.assertRaises(TypeError):
-            ast = AbstractSet(bool)
+            ast = AbstractSet[bool]()
         with self.assertRaises(TypeError):
-            amset = AbstractMutableSet(bool)
+            amset = AbstractMutableSet[bool]()
 
 if __name__ == '__main__':
     unittest.main()
