@@ -22,14 +22,13 @@ if TYPE_CHECKING:
 def forbid_instantiation(cls):
     """
     Class decorator that forbids direct instantiation of the given class.
-    Subclasses are allowed.
-    """
-    original_new = cls.__new__
 
+    :raises TypeError: If the decorated class is instantiated directly, but allows instantiation of its subclasses.
+    """
     def __new__(subcls, *args, **kwargs):
         if subcls is cls:
             raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
-        return original_new(subcls, *args, **kwargs)
+        return object.__new__(subcls)
 
     cls.__new__ = staticmethod(__new__)
     return cls
@@ -40,19 +39,34 @@ class Collection[T](GenericBase[T]):
     """
     Abstract base class representing a generic collection of items of type T.
 
-    Provides a foundational interface for storing and operating on collections of uniformly-typed items. It uses
-    generics to enforce runtime type safety and supports fluent and functional-style operations inspired by Java's
-    Stream API.
+    Provides a base class for storing and operating on collections of items with a common type. It uses generics to
+    enforce runtime type safety and supports fluent and functional-style operations inspired by Java's Stream API.
 
     The class enforces runtime generic type tracking using a metaclass extension (GenericBase), allowing validation
     and coercion of elements during construction and transformations. It cannot be directly instantiated and must be
-    parameterized by a concrete type when the constructor is called (e.g., Collection[int]).
+    parameterized by a concrete type when the constructor is called (e.g., MutableList[int]).
 
-    :param item_type: The inferred type of elements stored in the collection, derived from the generic.
-    :type item_type: type[T]
-    :param values: The internal container of stored values, usually of one of Python's built-in Iterables (list, tuple,
-    set, frozenset, etc.).
-    :type values: Any
+    Attributes:
+        item_type (type[T]): The inferred type of elements stored in the collection, derived from the generic.
+
+        values (Any): The internal container of stored values, usually of one of Python's built-in Iterables.
+
+        _finisher (ClassVar[Callable]): A function applied to the values during __init__ before setting it as the
+        attribute of the object. It's generally used to transform them into another Iterable type. If missing, it's
+        assumed to be the identity mapping on Collection's __init__ method.
+
+    Note:
+        Any method that returns a new Collection instance (e.g., filter, union, sorted, etc.) constructs the returned
+        value using type(self)(...). This ensures that:
+
+            - The returned object has the same concrete runtime subclass as self.
+            - Generic type parameters (T) are preserved without reapplying __class_getitem__, because they are
+              already bound via the dynamic subclassing mechanism in __class_getitem__.
+
+        This makes behavior consistent across all subclasses of Collection: type(self) guarantees the returned value
+        matches the exact type and structure of self, unless otherwise explicitly overridden. Also, calling
+        type(self)[another_item_type] correctly creates a new dynamic subclass with the same base class as self but
+        with the new generic type.
     """
 
     item_type: type[T]
@@ -73,11 +87,22 @@ class Collection[T](GenericBase[T]):
         _args attribute of the class itself returned by __class_getitem__ and fetched by _inferred_item_type.
 
         :param values: Values, received as an iterable or one by one, to store in the Collection.
+        :type values: T
+
         :param _coerce: State parameter to force type coercion or not. Some numeric type coercions are always performed.
+        :type _coerce: bool
+
         :param _forbidden_iterable_types: Tuple of types that the values parameter cannot be.
+        :type _forbidden_iterable_types: tuple[type, ...]
+
         :param _finisher: Callable to be applied to the values before storing them on the values attribute of the object.
+        Defaults to None, and in that case is later assigned to the identity mapping.
+        :type _finisher: Callable[[Iterable[T]], Any]
+
         :param _skip_validation: State parameter to skip type validation of the values. Only use it in cases where it's
         known that the values received will match the generic type.
+        :type _skip_validation: bool
+
         :raises TypeError: If the generic types weren't provided or were a TypeVar.
         :raises TypeError: If the values iterable parameter is of one of the forbidden iterable types.
         """
@@ -118,8 +143,9 @@ class Collection[T](GenericBase[T]):
         This method is used internally for runtime type enforcement and generic introspection, and it fetches the generic
         type from the _args attribute the class inherits from GenericBase which is set on its __class_getitem__ method.
 
-        :return: The generic type T that this class was called upon, stored on its attribute _args by the __class_getitem__
-        method inherited from GenericBase. If unable to retrieve it, returns None.
+        :return: The generic type T that this class was called upon, as stored on its attribute _args by the
+        __class_getitem__ method inherited from GenericBase. If unable to retrieve it, returns None.
+        :rtype: type[T] | None
         """
         try:
             return cls._args[0]
@@ -135,9 +161,13 @@ class Collection[T](GenericBase[T]):
         is not known statically.
 
         :param values: One or more parameters, or an Iterable of values to initialize the new Collection with.
+        :type values: T
+
+        :return: A new Collection that is instance of cls containing the passed values, inferring its item_type from
+        _infer_type_contained_in_iterable method.
+        :rtype: Collection[T]
+
         :raises ValueError: If no values are provided.
-        :return: A new Collection of the same type as cls containing the passed values, inferring its item_type from
-        with type_validation.py's _infer_type_contained_in_iterable method.
         """
         if len(values) == 1 and isinstance(values[0], Iterable) and not isinstance(values[0], (str, bytes)):
             values = tuple(values[0])
@@ -152,8 +182,12 @@ class Collection[T](GenericBase[T]):
         Useful for initialization of empty collections with known type context.
 
         :param item_type: Type of the to-be elements of the empty Collection.
+        :type item_type: type[R]
+
+        :return: An empty Collection that is an instance of cls with the given item_type.
+        :rtype: Collection[R]
+
         :raises ValueError: If item_type is None.
-        :return: An empty Collection of the same type as cls with the given item_type.
         """
         if item_type is None:
             raise ValueError(f"Trying to call {cls.__name__}.empty with a None type.")
@@ -162,12 +196,18 @@ class Collection[T](GenericBase[T]):
     def __len__(self: Collection[T]) -> int:
         """
         Returns the number of elements in the Collection by delegating to the internal container's __len__ method.
+
+        :return: The length of the internal container.
+        :rtype: int
         """
         return len(self.values)
 
     def __iter__(self: Collection[T]) -> Iterable[T]:
         """
         Returns an iterator over the values in the Collection's internal container.
+
+        :return: An iterable over the values of the Collection.
+        :rtype: Iterable[T]
         """
         return iter(self.values)
 
@@ -177,6 +217,7 @@ class Collection[T](GenericBase[T]):
 
         :return: True if item is an object of the item_type of the Collection and is contained in its values, or if it's
         an Iterable whose elements are all contained on self's values. False otherwise.
+        :rtype: bool
         """
         if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
             return all(i in self.values for i in item)
@@ -186,11 +227,9 @@ class Collection[T](GenericBase[T]):
         """
         Performs structural and type-based equality comparison between two Collection instances.
 
-        :return: True if self and other share:
-        - The same subclass
-        - The same item type
-        - The same underlying values (compared with ==)
+        :return: True if self and other share the same subclass, item type and underlying values (compared with ==),
         False otherwise.
+        :rtype: bool
         """
         return (
             isinstance(other, Collection)
@@ -201,14 +240,18 @@ class Collection[T](GenericBase[T]):
     def __repr__(self: Collection[T]) -> str:
         """
         Returns a string representation of the Collection, showing its generic type name and contained values.
+
+        :return: A string representation of the object.
+        :rtype: str
         """
         return f"{class_name(type(self))}{self.values}"
 
     def __bool__(self: Collection[T]) -> bool:
         """
-        Implements the __bool__ dunder method delegating to the values' attribute implementation.
+        Returns a boolean interpretation of the Collection delegating to the underlying container's __bool__ method.
 
         :return: True if the Collection contains at least one value, False otherwise.
+        :rtype: bool
         """
         return bool(self.values)
 
@@ -220,6 +263,8 @@ class Collection[T](GenericBase[T]):
         values or uses `deepcopy` if requested. Skips re-validation for performance.
 
         :param deep: Boolean state parameter to control if the copy is shallow or deep.
+        :return: A shallow or deep copy of the object.
+        :rtype: Collection[T]
         """
         from copy import deepcopy
         values = deepcopy(self.values) if deep else (self.values.copy() if hasattr(self.values, 'copy') else self.values)
@@ -228,24 +273,36 @@ class Collection[T](GenericBase[T]):
     def to_list(self: Collection[T]) -> list[T]:
         """
         Returns the contents of the Collection as a list.
+
+        :return: A list containing the values of the collection.
+        :rtype: list[T]
         """
         return list(self.values)
 
     def to_tuple(self: Collection[T]) -> tuple[T]:
         """
         Returns the contents of the Collection as a tuple.
+
+        :return: A tuple containing the values of the collection.
+        :rtype: tuple[T]
         """
         return tuple(self.values)
 
     def to_set(self: Collection[T]) -> set[T]:
         """
         Returns the contents of the Collection as a set.
+
+        :return: A set containing the values of the collection.
+        :rtype: set[T]
         """
         return set(self.values)
 
     def to_frozen_set(self: Collection[T]) -> frozenset[T]:
         """
         Returns the contents of the Collection as a frozenset.
+
+        :return: A frozenset containing the values of the collection.
+        :rtype: frozenset[T]
         """
         return frozenset(self.values)
 
@@ -258,22 +315,27 @@ class Collection[T](GenericBase[T]):
         Returns a dictionary obtained by calling the key and value mappers on each item of the Collection.
 
         :param key_mapper: Callable to obtain the keys from. Defaults to identity mapping.
+        :type key_mapper: Callable[[T], K]
         :param value_mapper: Callable to obtain the values from. Defaults to identity mapping.
+        :type value_mapper: Callable[[T], V]
         :return: A dictionary derived from the Collection by mapping each item to a (key, value) pair using the provided
         key_mapper and value_mapper callables.
+        :rtype: dict[K, V]
         """
         return {
             key_mapper(item) : value_mapper(item)
             for item in self
         }
 
-    def count(self: Collection[T], value: Any) -> int:
+    def count(self: Collection[T], value: T) -> int:
         """
         Returns the number of occurrences of the given value in the Collection.
 
         :param value: Value to count within the Collection.
+        :type value: T
         :return: The number of appearances of the value in the Collection. If the underlying container supports
         `.count`, it uses that method; otherwise, falls back to manual equality counting. Supports unhashable values.
+        :rtype: int
         """
         try:
             return self.values.count(value)
@@ -294,10 +356,14 @@ class Collection[T](GenericBase[T]):
         Maps each value of the Collection to its image by the function `f` and returns a new Collection of them.
 
         :param f: Callable object to map the Collection with.
+        :type f: Callable[[T], R]
         :param result_type: Type expected to be returned by the Callable.
+        :type result_type: type[R] | None
         :param _coerce: State parameter to try to force coercion to the expected result type if it's not None.
-        :return: A new Collection of the same type as self containing those values. If result_type is given, it is used
-        as the type of the returned Collection, if not that is inferred.
+        :type _coerce: bool
+        :return: A new Collection of the same subclass as self containing those values. If result_type is given,
+        it is used as the item_type of the returned Collection, if not that is inferred from the mapped values.
+        :rtype: Collection[R]
         """
         mapped_values = [f(value) for value in self.values]
         return (
@@ -315,17 +381,17 @@ class Collection[T](GenericBase[T]):
         """
         Maps and flattens each element of the Collection and returns a new Collection containing the results.
 
+        Requires that f returns an iterable (excluding str and bytes) for each element.
+
         :param f: Callable object to map the Collection with.
         :type f: Callable[[T], Iterable[R]]
         :param result_type: Type of Iterable expected to be returned by the Callable.
         :type result_type: type[R] | None
         :param _coerce: State parameter to try to force coercion to the expected result type if it's not None.
-        :return: A new Collection of the same type as self containing those values. If result_type is given, it is used
-        as the type of the returned Collection, if not that is inferred. Requires that `f` returns an iterable
-        (excluding str and bytes) for each element.
+        :return: A new Collection of the same subclass as self containing those values. If result_type is given,
+        it is used as the type of the returned Collection, if not that is inferred.
         :rtype: Collection[R]
         """
-
         flattened = []
         for value in self.values:
             result = f(value)
@@ -423,7 +489,7 @@ class Collection[T](GenericBase[T]):
 
         :param key: A function mapping each element to a hashable key. Defaults to identity mapping.
         :type key: Callable[[T], K]
-        :return: A Collection of the same type as self with duplicates removed based on the key.
+        :return: A Collection of the same dynamic subclass as self with duplicates removed based on the key.
         :rtype: Collection[T]
         """
         seen = set()
@@ -477,14 +543,14 @@ class Collection[T](GenericBase[T]):
         Groups the items in the Collection on a dict by their value by the key function.
 
         :param key: Callable to group the items by.
-        :return: A dict mapping each found value of key onto a Collection of the same type as self containing the items
-        in the original Collection that were mapped to that value by the key function.
+        :return: A dict mapping each found value of key onto a Collection of the same dynamic subclass as self
+        containing the items in the original Collection that were mapped to that value by the key function.
         """
         groups: dict[K, list[T]] = defaultdict(list)
         for item in self.values:
             groups[key(item)].append(item)
         return {
-            key : type(self)[self.item_type](group, _skip_validation=True)
+            key : type(self)(group, _skip_validation=True)
             for key, group in groups.items()
         }
 
@@ -497,8 +563,8 @@ class Collection[T](GenericBase[T]):
 
         :param predicate: Function from T to the booleans to partition the Collection by.
         :type predicate: Callable[[T], bool]
-        :return: A dict whose True key is mapped to a Collection of the same type as self containing all items in it
-        that satisfied the predicate, likewise for False.
+        :return: A dict whose True key is mapped to a Collection of the same dynamic subclass as self containing all
+        items in it that satisfied the predicate, likewise for False.
         """
         return self.group_by(predicate)
 
@@ -554,15 +620,15 @@ class Collection[T](GenericBase[T]):
 @forbid_instantiation
 class AbstractSequence[T](Collection[T]):
     """
-    Abstract base class for sequence-like collections with ordering and indexing capabilities.
+    Abstract base class for sequence-like Collections of a type T, with ordering and indexing capabilities.
 
     Provides standard sequence operations such as indexing, slicing, comparison, addition, multiplication, and sorting.
-    Must be subclassed to create concrete implementations.
+    It is still an abstract class, so it must be subclassed to create concrete implementations.
 
-    This class will be further extended by `AbstractMutableSequence` to add the methods that modify the internal data
+    This class will be further extended by AbstractMutableSequence to add the methods that modify the internal data
     container of the class.
 
-    WIP
+    This class sets the ClassVar attribute _finisher to tuple to ensure the immutability of the internal container.
     """
 
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
@@ -573,8 +639,10 @@ class AbstractSequence[T](Collection[T]):
 
         :param index: An integer index or slice object.
         :type index: int | slice
+
         :return: The item at the given index or a new sliced sequence.
         :rtype: T | AbstractSequence[T]
+
         :raises TypeError: If index is not an int or slice.
         """
         if isinstance(index, slice):
@@ -590,6 +658,7 @@ class AbstractSequence[T](Collection[T]):
 
         :param other: Object to compare against.
         :type other: Any
+
         :return: True if both have the same item type and the same values on the same order.
         :rtype: bool
         """
@@ -605,7 +674,8 @@ class AbstractSequence[T](Collection[T]):
 
         :param other: Another sequence or iterable.
         :type other: AbstractSequence | list | tuple
-        :return: True if less than `other`.
+
+        :return: True if self is less than `other`.
         :rtype: bool
         """
         if isinstance(other, (AbstractSequence, list, tuple)):
@@ -613,16 +683,43 @@ class AbstractSequence[T](Collection[T]):
         return NotImplemented
 
     def __gt__(self: AbstractSequence[T], other) -> bool:
+        """
+        Checks if this sequence is lexicographically greater than another.
+
+        :param other: Another sequence or iterable.
+        :type other: AbstractSequence | list | tuple
+
+        :return: True if self is greater than `other`.
+        :rtype: bool
+        """
         if isinstance(other, (AbstractSequence, list, tuple)):
             return tuple(self.values) > tuple(other.values if isinstance(other, AbstractSequence) else other)
         return NotImplemented
 
     def __le__(self: AbstractSequence[T], other) -> bool:
+        """
+        Checks if this sequence is less than or equal to another.
+
+        :param other: Another sequence or iterable.
+        :type other: AbstractSequence | list | tuple
+
+        :return: True if self is less than or equal to `other`.
+        :rtype: bool
+        """
         if isinstance(other, (AbstractSequence, list, tuple)):
             return tuple(self.values) <= tuple(other.values if isinstance(other, AbstractSequence) else other)
         return NotImplemented
 
     def __ge__(self: AbstractSequence[T], other) -> bool:
+        """
+        Checks if this sequence is greater than or equal to another.
+
+        :param other: Another sequence or iterable.
+        :type other: AbstractSequence | list | tuple
+
+        :return: True if self is greater than or equal to `other`.
+        :rtype: bool
+        """
         if isinstance(other, (AbstractSequence, list, tuple)):
             return tuple(self.values) >= tuple(other.values if isinstance(other, AbstractSequence) else other)
         return NotImplemented
@@ -631,6 +728,18 @@ class AbstractSequence[T](Collection[T]):
         self: AbstractSequence[T],
         other: AbstractSequence[T] | list[T] | tuple[T]
     ) -> AbstractSequence[T]:
+        """
+        Concatenates this sequence with another sequence of the same item type.
+
+        :param other: The sequence or iterable to concatenate.
+        :type other: AbstractSequence[T] | list[T] | tuple[T]
+
+        :return: A new AbstractSequence of the same dynamic subclass as self containing the elements from `other` added
+        right after the ones from self, as done by the __add__ method of the underlying value container.
+        :rtype: AbstractSequence[T]
+
+        :raises TypeError: If `other` has incompatible types.
+        """
         from type_validation import _validate_collection_type_and_get_values
         return type(self)(self.values + _validate_collection_type_and_get_values(other, self.item_type))
 
@@ -638,31 +747,118 @@ class AbstractSequence[T](Collection[T]):
         self: AbstractSequence[T],
         n: int
     ) -> AbstractSequence[T]:
+        """
+        Repeats this sequence `n` times.
+
+        :param n: Number of times to repeat the sequence.
+        :type n: int
+
+        :return: A new AbstractSequence of the same dynamic subclass as self with its elements repeated `n` times.
+        :rtype: AbstractSequence[T]
+
+        :raises TypeError: If n is not an integer.
+        """
         if not isinstance(n, int):
             return NotImplemented
         return type(self)(self.values * n, _skip_validation=True)
 
     def __sub__(self: AbstractSequence[T], other) -> AbstractSequence[T]:
+        """
+        Removes elements from this sequence that appear in `other`.
+
+        :param other: A collection of elements to exclude.
+        :type other: Iterable
+
+        :return: A filtered sequence with matching elements removed.
+        :rtype: AbstractSequence[T]
+        """
         return self.filter(lambda item : item not in other)
 
     def __reversed__(self: AbstractSequence[T]):
+        """
+        Returns a reversed iterator over the sequence.
+
+        :return: A reversed iterator, delegated to the __reversed__ of the underlying values container.
+        :rtype: Iterator[T]
+        """
         return reversed(self.values)
 
     def reversed(self) -> AbstractSequence[T]:
+        """
+        Returns a new sequence with elements in reverse order.
+
+        :return: A new reversed sequence of the same dynamic subclass as self containing its elements in reversed order.
+        :rtype: AbstractSequence[T]
+        """
         return type(self)(reversed(self.values), _skip_validation=True)
 
-    def index(self: AbstractSequence[T], value) -> int:
+    def index(self: AbstractSequence[T], value: T) -> int:
+        """
+        Returns the index of the first occurrence of a value.
+
+        :param value: The value to search for.
+        :type value: T
+
+        :return: Index of the first appearance of the value.
+        :rtype: int
+
+        :raises ValueError: If the value is not found.
+        """
         return self.values.index(value)
 
-    def sorted(self: AbstractSequence[T], key=None, reverse=False) -> AbstractSequence[T]:
+    def get_index(self: AbstractSequence[T], value: T, fallback: int = -1) -> int:
+        """
+        Returns the index of the first occurrence of a value, or a fallback if it isn't found.
+
+        :param value: The value to search for.
+        :type value: T
+
+        :param fallback: Number to return if the value isn't found. Defaulted to -1.
+        :type fallback: int
+
+        :return: Index of the first appearance of the value.
+        :rtype: int
+        """
+        try:
+            return self.values.index(value)
+        except ValueError:
+            return fallback
+
+    def sorted(
+        self: AbstractSequence[T],
+        *,
+        key: Callable[[T], Any] | None = None,
+        reverse: bool = False
+    ) -> AbstractSequence[T]:
+        """
+        Returns a new sequence with its elements sorted by an optional key.
+
+        :param key: Optional function to extract comparison key from elements.
+        :type key: Callable[[T], Any] | None
+
+        :param reverse: Whether to sort in descending order.
+        :type reverse: bool
+
+        :return: A sorted sequence.
+        :rtype: AbstractSequence[T]
+        """
         return type(self)(sorted(self.values, key=key, reverse=reverse), _skip_validation=True)
 
 
 @forbid_instantiation
 class AbstractMutableSequence[T](AbstractSequence[T]):
+    """
+    Abstract base class for mutable and ordered sequences containing values of a type T.
 
-    _finisher: Callable[[Iterable[T]], Iterable[T]] = list
-    _mutable: bool = True
+    This class extends AbstractSequence by adding mutation capabilities such as appending, inserting, removing, and
+    sorting. It is still an abstract class, so it must be subclassed to create concrete implementations.
+
+    It overrides _finisher to list to ensure the mutability of the internal container, and also adds the attribute
+    _mutable set to True as class metadata, that for now is unused.
+    """
+
+    _finisher: ClassVar[Callable[[Iterable], Iterable]] = list
+    _mutable: ClassVar[bool] = True
 
     def append(
         self: AbstractMutableSequence[T],
@@ -670,6 +866,15 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         *,
         _coerce: bool = False
     ) -> None:
+        """
+        Appends a value to the end of the sequence, delegating on the underlying values container's __append__ method.
+
+        :param value: The value to append.
+        :type value: T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the value into the expected type.
+        :type _coerce: bool
+        """
         from type_validation import _validate_or_coerce_value
         self.values.append(_validate_or_coerce_value(value, self.item_type, _coerce=_coerce))
 
@@ -680,6 +885,20 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         *,
         _coerce: bool = False
     ) -> None:
+        """
+        Replaces an item or slice in the sequence with new value(s) delegating on the underlying container's __setitem__.
+
+        :param index: Index or slice to replace.
+        :type index: int | slice
+
+        :param value: Value(s) to assign.
+        :type value: T | AbstractSequence[T] | list[T] | tuple[T]
+
+        :param _coerce: State parameter that, if True, attempts to coerce the value(s) into the expected type.
+        :type _coerce: bool
+
+        :raises TypeError: If index is not int or slice.
+        """
         from type_validation import _validate_collection_type_and_get_values, _validate_or_coerce_value
 
         if isinstance(index, slice):
@@ -692,20 +911,69 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
             raise TypeError("Invalid index type: must be int or slice")
 
     def __delitem__(self: AbstractMutableSequence[T], index: int | slice) -> None:
+        """
+        Deletes an item or slice from the sequence delegating on the underlying container's __delitem__.
+
+        :param index: Index or slice to delete.
+        :type index: int | slice
+        """
         del self.values[index]
 
-    def sort(self: AbstractMutableSequence[T], key: Callable[[T], Any] | None = None, reverse: bool = False) -> None:
+    def sort(
+        self: AbstractMutableSequence[T],
+        key: Callable[[T], Any] | None = None,
+        reverse: bool = False
+    ) -> None:
+        """
+        Sorts the sequence in place according to an optional key.
+
+        :param key: Optional function to extract comparison key from elements.
+        :type key: Callable[[T], Any] | None
+
+        :param reverse: State parameter that, if True, sorts in descending order.
+        :type reverse: bool
+        """
         self.values.sort(key=key, reverse=reverse)
 
     def insert(self, index: int, value: T, *, _coerce: bool = False) -> None:
+        """
+        Inserts a value at the specified index delegating on the underlying container's insert method.
+
+        :param index: The index at which to insert.
+        :type index: int
+
+        :param value: The value to insert.
+        :type value: T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the value into the expected type.
+        :type _coerce: bool
+        """
         from type_validation import _validate_or_coerce_value
         self.values.insert(index, _validate_or_coerce_value(value, self.item_type, _coerce=_coerce))
 
     def extend(self, other: Iterable[T], *, _coerce: bool = False) -> None:
+        """
+        Extends the sequence with elements from another iterable.
+
+        :param other: The iterable whose elements to add.
+        :type other: Iterable[T]
+
+        :param _coerce: If True, attempts to coerce each value into the expected type.
+        :type _coerce: bool
+        """
         from type_validation import _validate_or_coerce_iterable
         self.values.extend(_validate_or_coerce_iterable(other, self.item_type, _coerce=_coerce))
 
     def pop(self, index: int = -1) -> T:
+        """
+        Removes and returns the item at the given position (default at the last position).
+
+        :param index: Index of the element to remove. Defaults to -1 (last element).
+        :type index: int
+
+        :return: The removed element, as returned by the underlying container's pop method.
+        :rtype: T
+        """
         return self.values.pop(index)
 
     def remove(
@@ -714,6 +982,15 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         *,
         _coerce: bool = False
     ) -> None:
+        """
+        Removes the first occurrence of a value from the sequence.
+
+        :param value: The value to remove.
+        :type value: T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the value before removing it.
+        :type _coerce: bool
+        """
         from type_validation import _validate_or_coerce_value
         if _coerce:
             try:
@@ -725,10 +1002,31 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
 
 @forbid_instantiation
 class AbstractSet[T](Collection[T]):
+    """
+    Abstract base class for hashable Collections of type T supporting set operations.
 
-    _finisher: Callable[[Iterable[T]], Iterable[T]] = frozenset
+    This class extends Collection, providing standard set-theoretic operations (union, intersection, difference,
+    symmetric difference) and comparison methods specifically tailored to sets. It is still an abstract class, so it
+    must be subclassed to create concrete implementations.
+
+    It overrides _finisher to frozenset to ensure the immutability and set properties of the underlying container.
+
+    This class will be further extended by AbstractMutableSet, adding mutability capabilities to it.
+    """
+
+    _finisher: ClassVar[Callable[[Iterable], Iterable]] = frozenset
 
     def __eq__(self: AbstractSet[T], other: Any) -> bool:
+        """
+        Checks whether two AbstractSet instances are equal in both type and contents.
+
+        :param other: The object to compare with.
+        :type other: Any
+
+        :return: True if both sets contain the same items and item type, False otherwise.
+        :rtype: bool
+        """
+
         return (
             isinstance(other, AbstractSet)
             and self.item_type == other.item_type
@@ -736,35 +1034,108 @@ class AbstractSet[T](Collection[T]):
         )
 
     def __lt__(self: AbstractSet[T], other: Any) -> bool:
+        """
+        Checks whether this set is a proper subset of another AbstractSet.
+
+        :param other: The set to compare against.
+        :type other: Any
+
+        :return: True if this set is a proper subset of `other`, False otherwise.
+        :rtype: bool
+        """
         if isinstance(other, AbstractSet):
             return self.values < other.values
         return NotImplemented
 
     def __le__(self: AbstractSet[T], other: Any) -> bool:
+        """
+        Checks whether this set is a subset (or equal to) another AbstractSet.
+
+        :param other: The set to compare against.
+        :type other: Any
+
+        :return: True if this set is a subset or equal to `other`, False otherwise.
+        :rtype: bool
+        """
         if isinstance(other, AbstractSet):
             return self.values <= other.values
         return NotImplemented
 
     def __gt__(self: AbstractSet[T], other: Any) -> bool:
+        """
+        Checks whether this set is a proper superset of another AbstractSet.
+
+        :param other: The set to compare against.
+        :type other: Any
+
+        :return: True if this set is a proper superset of `other`, False otherwise.
+        :rtype: bool
+        """
         if isinstance(other, AbstractSet):
             return self.values > other.values
         return NotImplemented
 
     def __ge__(self: AbstractSet[T], other: Any) -> bool:
+        """
+        Checks whether this set is a superset (or equal to) another AbstractSet.
+
+        :param other: The set to compare against.
+        :type other: Any
+
+        :return: True if this set is a superset or equal to `other`, False otherwise.
+        :rtype: bool
+        """
         if isinstance(other, AbstractSet):
             return self.values >= other.values
         return NotImplemented
 
     def __or__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+        """
+        Computes the union of two AbstractSet instances.
+
+        :param other: The set to union with.
+        :type other: AbstractSet[T]
+
+        :return: A new AbstractSet of the same dynamic subclass as self containing all elements from both sets.
+        :rtype: AbstractSet[T]
+        """
         return type(self)(self.values | other.values)
 
     def __and__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+        """
+        Computes the intersection of two AbstractSet instances.
+
+        :param other: The set to intersect with.
+        :type other: AbstractSet[T]
+
+        :return: A new AbstractSet of the same dynamic subclass as self containing all elements present in both sets.
+        :rtype: AbstractSet[T]
+        """
         return type(self)(self.values & other.values)
 
     def __sub__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+        """
+        Computes the difference between two AbstractSet instances.
+
+        :param other: The set whose elements to subtract.
+        :type other: AbstractSet[T]
+
+        :return: A new AbstractSet of the same dynamic subclass as self containing all elements of self not present
+        in `other`.
+        :rtype: AbstractSet[T]
+        """
         return type(self)(self.values - other.values)
 
     def __xor__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+        """
+        Computes the symmetric difference between two AbstractSet instances.
+
+        :param other: The set to symmetric-difference with.
+        :type other: AbstractSet[T]
+
+        :return: A new AbstractSet of the same dynamic subclass as self containing all elements in either set but not both.
+        :rtype: AbstractSet[T]
+        """
         return type(self)(self.values ^ other.values)
 
     def union(
@@ -772,6 +1143,22 @@ class AbstractSet[T](Collection[T]):
         *others: Iterable[T] | Collection[T],
         _coerce: bool = False
     ) -> AbstractSet[T]:
+        """
+        Returns the union of this set with one or more iterables or collections.
+
+        The operation is delegated to the underlying container's union method, which should support passing multiple
+        iterable arguments.
+
+        :param others: One or more iterables or collections to union with.
+        :type others: Iterable[T] | Collection[T]
+
+        :param _coerce: State parameter that, if True, attempts to coerce the incoming values.
+        :type _coerce: bool
+
+        :return: A new AbstractSet of the same dynamic subclass as self containing all distinct elements of self and
+        all the iterables passed.
+        :rtype: AbstractSet[T]
+        """
         from type_validation import _validate_or_coerce_iterable_of_iterables
         return type(self)(self.values.union(*_validate_or_coerce_iterable_of_iterables(others, self.item_type, _coerce=_coerce)))
 
@@ -780,6 +1167,22 @@ class AbstractSet[T](Collection[T]):
         *others: Iterable[T] | Collection[T],
         _coerce: bool = False
     ) -> AbstractSet[T]:
+        """
+        Returns the intersection of this set with one or more iterables or collections.
+
+        The operation is delegated to the underlying container's union method, which should support passing multiple
+        iterable arguments.
+
+        :param others: One or more iterables or collections to intersect with.
+        :type others: Iterable[T] | Collection[T]
+
+        :param _coerce: State parameter that, if True, attempts to coerce the incoming values.
+        :type _coerce: bool
+
+        :return: A new AbstractSet of the same dynamic subclass as self containing the elements common to self and all
+        passed iterables.
+        :rtype: AbstractSet[T]
+        """
         from type_validation import _validate_or_coerce_iterable_of_iterables
         return type(self)(self.values.intersection(*_validate_or_coerce_iterable_of_iterables(others, self.item_type, _coerce=_coerce)))
 
@@ -788,6 +1191,22 @@ class AbstractSet[T](Collection[T]):
         *others: Iterable[T] | Collection[T],
         _coerce: bool = False
     ) -> AbstractSet[T]:
+        """
+        Returns the difference between this set and one or more iterables or collections.
+
+        The operation is delegated to the underlying container's union method, which should support passing multiple
+        iterable arguments.
+
+        :param others: One or more iterables or collections to subtract.
+        :type others: Iterable[T] | Collection[T]
+
+        :param _coerce: State parameter that, if True, attempts to coerce the incoming values.
+        :type _coerce: bool
+
+        :return: A new AbstractSet of the same dynamic subclass as self containing its elements that are not present in
+        any of the others.
+        :rtype: AbstractSet[T]
+        """
         from type_validation import _validate_or_coerce_iterable_of_iterables
         return type(self)(self.values.difference(*_validate_or_coerce_iterable_of_iterables(others, self.item_type,_coerce=_coerce)))
 
@@ -796,6 +1215,19 @@ class AbstractSet[T](Collection[T]):
         *others: Iterable[T] | Collection[T],
         _coerce: bool = False
     ) -> AbstractSet[T]:
+        """
+        Returns the symmetric difference between this set and one or more iterables or collections.
+
+        :param others: One or more iterables or collections to compare.
+        :type others: Iterable[T] | Collection[T]
+
+        :param _coerce: State parameter that, if True, attempts to coerce the incoming values.
+        :type _coerce: bool
+
+        :return: A new AbstractSet of the same dynamic subclass as self containing the elements that are present in only
+        one of self or the passed iterables.
+        :rtype: AbstractSet[T]
+        """
         from type_validation import _validate_or_coerce_iterable_of_iterables
         new_values = self.values
         for validated_set in _validate_or_coerce_iterable_of_iterables(others, self.item_type, _coerce=_coerce):
@@ -808,6 +1240,18 @@ class AbstractSet[T](Collection[T]):
         *,
         _coerce: bool = False
     ) -> bool:
+        """
+        Checks if this set is a subset of another set or AbstractSet.
+
+        :param other: The set to compare against.
+        :type other: AbstractSet[T] | set[T] | frozenset[T]
+
+        :param _coerce: State parameter that, if True, attempts to coerce values before checking.
+        :type _coerce: bool
+
+        :return: True if this set is a subset of `other`, False otherwise.
+        :rtype: bool
+        """
         from type_validation import _validate_collection_type_and_get_values
         if not _coerce and isinstance(other, Collection) and other.item_type != self.item_type:
             return False
@@ -819,6 +1263,18 @@ class AbstractSet[T](Collection[T]):
         *,
         _coerce: bool = False
     ) -> bool:
+        """
+        Checks if this set is a superset of another set or AbstractSet.
+
+        :param other: The set to compare against.
+        :type other: AbstractSet[T] | set[T] | frozenset[T]
+
+        :param _coerce: State parameter that, if True, attempts to coerce values before checking.
+        :type _coerce: bool
+
+        :return: True if this set is a superset of `other`, False otherwise.
+        :rtype: bool
+        """
         from type_validation import _validate_collection_type_and_get_values
         if not _coerce and isinstance(other, Collection) and other.item_type != self.item_type:
             return False
@@ -830,6 +1286,18 @@ class AbstractSet[T](Collection[T]):
         *,
         _coerce: bool = False
     ) -> bool:
+        """
+        Checks if this set is disjoint with another set or AbstractSet.
+
+        :param other: The set to compare against.
+        :type other: AbstractSet[T] | set[T] | frozenset[T]
+
+        :param _coerce: State parameter that, if True, attempts to coerce values before checking.
+        :type _coerce: bool
+
+        :return: True if this set has no elements in common with `other`, False otherwise.
+        :rtype: bool
+        """
         from type_validation import _validate_collection_type_and_get_values
         if not _coerce and isinstance(other, Collection) and other.item_type != self.item_type:
             return False
@@ -838,19 +1306,62 @@ class AbstractSet[T](Collection[T]):
 
 @forbid_instantiation
 class AbstractMutableSet[T](AbstractSet[T]):
+    """
+    Abstract base class for mutable, hashable Collections of type T.
 
-    _finisher: Callable[[Iterable[T]], Iterable[T]] = set
-    _mutable: bool = True
+    This class extends AbstractSet and adds methods capable of mutating its underlying internal container, such as
+    various updates and in-place operations. It is still an abstract class, so it must be subclassed to create concrete
+    implementations.
+
+    It overrides _finisher to set to ensure the mutability of the internal container, and also adds the attribute
+    _mutable set to True as class metadata, that for now is unused.
+    """
+
+    _finisher: ClassVar[Callable[[Iterable], Iterable]] = set
+    _mutable: ClassVar[bool] = True
 
     def __ior__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
+        """
+        In-place union update with another AbstractSet.
+
+        Delegates the operation to the underlying container's __ior__ method.
+
+        :param other: The set to union with.
+        :type other: AbstractSet[T]
+
+        :return: This updated AbstractMutableSet.
+        :rtype: AbstractMutableSet[T]
+        """
         self.values |= other.values
         return self
 
     def __iand__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
+        """
+        In-place intersection update with another AbstractSet.
+
+        Delegates the operation to the underlying container's __iadd__ method.
+
+        :param other: The set to intersect with.
+        :type other: AbstractSet[T]
+
+        :return: This updated AbstractMutableSet.
+        :rtype: AbstractMutableSet[T]
+        """
         self.values &= other.values
         return self
 
     def __isub__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
+        """
+        In-place difference update with another AbstractSet.
+
+        Delegates the operation to the underlying container's __isub__ method.
+
+        :param other: The set whose elements should be removed from this set.
+        :type other: AbstractSet[T]
+
+        :return: This updated AbstractMutableSet.
+        :rtype: AbstractMutableSet[T]
+        """
         self.values -= other.values
         return self
 
@@ -864,6 +1375,17 @@ class AbstractMutableSet[T](AbstractSet[T]):
         *,
         _coerce: bool = False
     ) -> None:
+        """
+        Add a single element to the set.
+
+        Delegates the operation to the underlying container's add method.
+
+        :param value: The element to add.
+        :type value: T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the value to the expected item type.
+        :type _coerce: bool
+        """
         from type_validation import _validate_or_coerce_value
         self.values.add(_validate_or_coerce_value(value, self.item_type, _coerce=_coerce))
 
@@ -873,6 +1395,19 @@ class AbstractMutableSet[T](AbstractSet[T]):
         *,
         _coerce: bool = False
     ) -> None:
+        """
+        Remove a single element from the set, or raises a KeyError if not present.
+
+        Delegates the operation to the underlying container's remove method.
+
+        :param value: The element to remove.
+        :type value: T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the value before removal.
+        :type _coerce: bool
+
+        :raise KeyError: If the element is not present.
+        """
         from type_validation import _validate_or_coerce_value
         if _coerce:
             try:
@@ -887,6 +1422,17 @@ class AbstractMutableSet[T](AbstractSet[T]):
         *,
         _coerce: bool = False
     ) -> None:
+        """
+        Discard an element from the set if present. No error is raised if the element is absent.
+
+        Delegates the operation to the underlying container's discard method.
+
+        :param value: The element to discard.
+        :type value: T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the value before discarding.
+        :type _coerce: bool
+        """
         from type_validation import _validate_or_coerce_value
         if _coerce:
             try:
@@ -896,9 +1442,20 @@ class AbstractMutableSet[T](AbstractSet[T]):
         self.values.discard(value)
 
     def clear(self: AbstractMutableSet[T]) -> None:
+        """
+        Remove all elements from the set.
+        """
         self.values.clear()
 
     def pop(self: AbstractMutableSet[T]) -> T:
+        """
+        Remove and return an arbitrary element from the set.
+
+        Delegates the operation to the underlying container's pop method.
+
+        :return: The element that was removed.
+        :rtype: T
+        """
         return self.values.pop()
 
     def update(
@@ -906,6 +1463,14 @@ class AbstractMutableSet[T](AbstractSet[T]):
         *others: Iterable[T] | Collection[T],
         _coerce: bool = False
     ) -> None:
+        """
+        Update the set with elements from one or more iterables or Collections.
+
+        :param others: One or more iterables or Collections whose elements will be added to this set.
+        :type others: Iterable[T] | Collection[T]
+        :param _coerce: State parameter that, if True, attempts to coerce all elements to the expected type.
+        :type _coerce: bool
+        """
         from type_validation import _validate_or_coerce_iterable_of_iterables
         self.values.update(*_validate_or_coerce_iterable_of_iterables(others, self.item_type, _coerce=_coerce))
 
@@ -914,6 +1479,14 @@ class AbstractMutableSet[T](AbstractSet[T]):
         *others: Iterable[T] | Collection[T],
         _coerce: bool = False
     ) -> None:
+        """
+        Remove all elements found in one or more provided collections.
+
+        :param others: One or more iterables or Collections whose elements will be removed from this set.
+        :type others: Iterable[T] | Collection[T]
+        :param _coerce: State parameter that, if True, attempts to coerce all elements before removal.
+        :type _coerce: bool
+        """
         from type_validation import _validate_or_coerce_iterable_of_iterables
         self.values.difference_update(*_validate_or_coerce_iterable_of_iterables(others, self.item_type, _coerce=_coerce))
 
@@ -922,6 +1495,14 @@ class AbstractMutableSet[T](AbstractSet[T]):
         *others: Iterable[T] | Collection[T],
         _coerce: bool = False
     ) -> None:
+        """
+        Retain only elements that are also in all provided collections.
+
+        :param others: One or more iterables or Collections to intersect and update with.
+        :type others: Iterable[T] | Collection[T]
+        :param _coerce: State parameter that, if True, attempts to coerce all elements before intersection.
+        :type _coerce: bool
+        """
         from type_validation import _validate_or_coerce_iterable_of_iterables
         self.values.intersection_update(*_validate_or_coerce_iterable_of_iterables(others, self.item_type, _coerce=_coerce))
 
@@ -930,6 +1511,14 @@ class AbstractMutableSet[T](AbstractSet[T]):
         *others: Iterable[T] | Collection[T],
         _coerce: bool = False
     ) -> None:
+        """
+        Update the set to contain elements that are in exactly one of the sets.
+
+        :param others: One or more iterables or Collections to symmetrically differ with.
+        :type others: Iterable[T] | Collection[T]
+        :param _coerce: State parameter that, if True, attempts to coerce all elements before processing.
+        :type _coerce: bool
+        """
         from type_validation import _validate_or_coerce_iterable_of_iterables
         for validated_set in _validate_or_coerce_iterable_of_iterables(others, self.item_type, _coerce=_coerce):
             self.values.symmetric_difference_update(validated_set)
@@ -937,10 +1526,41 @@ class AbstractMutableSet[T](AbstractSet[T]):
 
 @forbid_instantiation
 class AbstractDict[K, V](GenericBase[K, V]):
+    """
+    Abstract base class representing a dictionary with type enforced keys and values given by generic types.
+
+    Provides a base class for storing and operating on dictionaries with keys and values of a common type each. It uses
+    generics to enforce runtime type safety and supports fluent and functional-style operations inspired by Java's
+    Stream API.
+
+    The class enforces runtime generic type tracking using a metaclass extension (GenericBase), allowing validation
+    and coercion of elements during construction and transformations. It cannot be directly instantiated and must be
+    parameterized by two concrete types when the constructor is called (e.g., MutableDict[int, str]).
+
+    Attributes:
+        key_type (type[K]): The type constraint for keys.
+        value_type (type[V]): The type constraint for values.
+        data (dict[K, V]): The underlying dictionary storage.
+
+    Note:
+        Any method that returns a new AbstractDict instance (e.g., filter, map, etc.) constructs the returned
+        value using type(self)(...). This ensures that:
+
+            - The returned object has the same concrete runtime subclass as self.
+            - Generic type parameters (K, V) are preserved without reapplying __class_getitem__, because they are
+              already bound via the dynamic subclassing mechanism in __class_getitem__.
+
+        This makes behavior consistent across all subclasses of AbstractDict: type(self) guarantees the returned value
+        matches the exact type and structure of self, unless otherwise explicitly overridden. Also, calling
+        type(self)[new_key_type, new_value_type] correctly creates a new dynamic subclass with the same base class as
+        self but with the new generic types.
+    """
 
     key_type: type[K]
     value_type: type[V]
     data: dict[K, V]
+
+    _finisher: ClassVar[Callable[[dict], Any]] = immutabledict
 
     def __init__(
         self: AbstractDict[K, V],
@@ -953,6 +1573,30 @@ class AbstractDict[K, V](GenericBase[K, V]):
         _finisher: Callable[[dict[K, V]], Any] = None,
         _skip_validation: bool = False
     ) -> None:
+        """
+        Initialize an AbstractDict with type validation and optional coercion.
+
+        :param keys_values: A dict, mapping, iterable of (key, value) tuples, or another AbstractDict.
+        :type keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None
+
+        :param _keys: Optional keys iterable used in conjunction with `_values`.
+        :type _keys: Iterable[K] | None
+
+        :param _values: Optional values iterable used in conjunction with `_keys`.
+        :type _values: Iterable[V] | None
+
+        :param _coerce_keys: Whether to coerce keys to the declared type.
+        :type _coerce_keys: bool
+
+        :param _coerce_values: Whether to coerce values to the declared type.
+        :type _coerce_values: bool
+
+        :param _finisher: Callable applied to the final dict (defaults to identity).
+        :type _finisher: Callable[[dict[K, V]], Any]
+
+        :param _skip_validation: If True, skips all type validation and coercion.
+        :type _skip_validation: bool
+        """
         from type_validation import (
             _validate_or_coerce_iterable,
             _split_keys_values,
@@ -995,6 +1639,15 @@ class AbstractDict[K, V](GenericBase[K, V]):
 
     @classmethod
     def _inferred_key_value_types(cls: AbstractDict[K, V]) -> tuple[type[K] | None, type[V] | None]:
+        """
+        Returns the inferred key and value types for this class if they were provided.
+
+        This method inspects the generic arguments applied to the class, stored in its _args attribute inherited from
+        GenericBase and returns them. It returns (None, None) if the types are not yet specified.
+
+        :return: Tuple of (key_type, value_type) or (None, None) if not inferred.
+        :rtype: tuple[type[K] | None, type[V] | None]
+        """
         try:
             key_type = cls._args[0]
             value_type = cls._args[1]
@@ -1008,6 +1661,16 @@ class AbstractDict[K, V](GenericBase[K, V]):
         cls: type[AbstractDict[K, V]],
         keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]
     ) -> AbstractDict[K, V]:
+        """
+        Infer key/value types from the input and construct an AbstractDict containing them.
+
+        :param keys_values: The data to infer types from and use to initialize the dictionary.
+        :type keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]
+
+        :return: A new AbstractDict with inferred generic types and properly validated contents (hashable and not
+        duplicated keys).
+        :rtype: AbstractDict[K, V]
+        """
         if keys_values is None or not keys_values:
             raise ValueError(f"Can't create a {cls.__name__} object from empty iterable.")
         from type_validation import _infer_type_contained_in_iterable, _split_keys_values
@@ -1022,6 +1685,20 @@ class AbstractDict[K, V](GenericBase[K, V]):
         keys: Iterable[K],
         values: Iterable[V]
     ) -> AbstractDict[K, V]:
+        """
+        Constructs an AbstractDict from separate keys and values iterables, inferring their types.
+
+        :param keys: An iterable of keys.
+        :type keys: Iterable[K]
+
+        :param values: An iterable of values, matching the length of `keys`.
+        :type values: Iterable[V]
+
+        :return: A new AbstractDict initialized from the given key-value pairs.
+        :rtype: AbstractDict[K, V]
+
+        :raises ValueError: If `keys` and `values` do not have the same length.
+        """
         keys = list(keys)
         values = list(values)
 
@@ -1035,10 +1712,20 @@ class AbstractDict[K, V](GenericBase[K, V]):
 
     def __getitem__(self: AbstractDict[K, V], key: K | slice) -> V | AbstractDict[K, V]:
         """
-        Returns its assigned value if key is of type K, or if it's a slice, the AbstractDict of the same type as self
-        constructed by taking all the keys that fall on that slice.
-        :param key: Key or slice to get.
-        :return: The value assigned to the key, or the subdict of all the keys falling on the slice.
+        Returns a value for a given key, or a sliced subdictionary for a slice of keys.
+
+        - If a single key is passed, returns its associated value.
+        - If a `slice` is passed (e.g., `dict[start:stop]`), returns a new `AbstractDict[K, V]`
+          with all keys within that range. Step is not supported.
+
+        :param key: A key of type K or a slice over the key space.
+        :type key: K | slice
+
+        :return: The value associated with the key, or a sliced subdictionary.
+        :rtype: V | AbstractDict[K, V]
+
+        :raises TypeError: If the keys are not orderable for slicing or if the slice step is not None.
+        :raises KeyError: If the key is not found.
         """
         if isinstance(key, slice):
             # Subdict slicing
@@ -1068,24 +1755,68 @@ class AbstractDict[K, V](GenericBase[K, V]):
             return self.data[key]
 
     def __iter__(self: AbstractDict[K, V]) -> Iterable[K]:
+        """
+        Returns an iterator over the keys of this AbstractDict.
+
+        :return: An iterator over all keys.
+        :rtype: Iterable[K]
+        """
         return iter(self.data)
 
     def keys(self: AbstractDict[K, V]):
+        """
+        Returns a view of the dictionary's keys.
+        :rtype: dict_keys[K]
+        """
         return self.data.keys()
 
     def values(self: AbstractDict[K, V]):
+        """
+        Returns a view of the dictionary's values.
+        :rtype: dict_values[V]
+        """
         return self.data.values()
 
     def items(self: AbstractDict[K, V]):
+        """
+        Returns a view of the dictionary's key-value pairs.
+        :rtype: dict_items[K, V]
+        """
         return self.data.items()
 
     def __len__(self: AbstractDict[K, V]) -> int:
+        """
+        Returns the number of items in this AbstractDict.
+
+        :return: The number of key-value pairs present.
+        :rtype: int
+        """
         return len(self.data)
 
-    def __contains__(self: AbstractDict[K, V], key: object) -> bool:
+    def __contains__(self: AbstractDict[K, V], key: Any) -> bool:
+        """
+        Checks whether the given key is present on the AbstractDict.
+
+        :param key: The key to check.
+        :type key: Any
+
+        :return: True if the key exists, False otherwise.
+        :rtype: bool
+        """
         return key in self.data
 
     def __eq__(self: AbstractDict[K, V], other: Any) -> bool:
+        """
+        Checks equality with another AbstractDict.
+
+        Two dictionaries are considered equal if they share the same class, key/value types, and contents.
+
+        :param other: The object to compare against.
+        :type other: Any
+
+        :return: True if `other` is an AbstractDict with the same key and values types and contents, False otherwise.
+        :rtype: bool
+        """
         return (
             isinstance(other, AbstractDict)
             and self.key_type == other.key_type
@@ -1094,29 +1825,101 @@ class AbstractDict[K, V](GenericBase[K, V]):
         )
 
     def __repr__(self: AbstractDict[K, V]) -> str:
+        """
+        Returns a concise string representation of this AbstractDict, including its generic types for keys and values.
+
+        :return: A string representation of this AbstractDict.
+        :rtype: str
+        """
+
         return f"{class_name(type(self))}{dict(self.data)}"
 
-    def __or__(self: AbstractDict[K, V], other: Mapping[K, V]) -> AbstractDict[K, V]:
+    def __or__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
+        """
+        Returns the union of this AbstractDict and another mapping.
+
+        :param other: The other mapping to merge.
+        :type other: AbstractDict[K, V] | Mapping[K, V]
+
+        :return: A new AbstractDict of the same dynamic subclass as self containing all key-value pairs from both, with
+        `other` overriding duplicate keys.
+        :rtype: AbstractDict[K, V]
+        """
         return type(self)(dict(self.data) | dict(other))
 
-    def __and__(self: AbstractDict[K, V], other: Mapping[K, V]) -> AbstractDict[K, V]:
+    def __and__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
+        """
+        Returns the intersection of this AbstractDict with another mapping.
+
+        :param other: The other mapping.
+        :type other: AbstractDict[K, V] | Mapping[K, V]
+
+        :return: A new AbstractDict of the same dynamic subclass as self with only keys present in both mappings.
+        :rtype: AbstractDict[K, V]
+        """
         return type(self)({k: self.data[k] for k in self.data.keys() & other.keys()})
 
-    def __sub__(self: AbstractDict[K, V], other: Mapping[K, V]) -> AbstractDict[K, V]:
+    def __sub__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
+        """
+        Returns a new dictionary with the keys that are not in `other`.
+
+        :param other: The mapping to subtract from this one.
+        :type other: AbstractDict[K, V] | Mapping[K, V]
+
+        :return: A new AbstractDict of the same dynamic subclass as self without the keys found in `other`.
+        :rtype: AbstractDict[K, V]
+        """
         return type(self)({k: v for k, v in self.data.items() if k not in other})
 
-    def __xor__(self: AbstractDict[K, V], other: Mapping[K, V]) -> AbstractDict[K, V]:
+    def __xor__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
+        """
+        Returns the symmetric difference between this AbstractDict and another mapping.
+
+        :param other: The other mapping.
+        :type other: AbstractDict[K, V] | Mapping[K, V]
+
+        :return: A new AbstractDict of the same dynamic subclass as self containing keys only in one of the two mappings.
+        :rtype: AbstractDict[K, V]
+        """
         sym_keys = self.data.keys() ^ other.keys()
         return type(self)({k: (self.data.get(k) or other.get(k)) for k in sym_keys})
 
     def to_dict(self: AbstractDict[K, V]) -> dict[K, V]:
+        """
+        Returns a shallow copy of the underlying data dictionary as a Python dict.
+
+        :return: A native Python dictionary with the same contents.
+        :rtype: dict[K, V]
+        """
         return dict(self.data)
 
     def to_immutable_dict(self: AbstractDict[K, V]) -> immutabledict[K, V]:
+        """
+        Returns an immutabledict representation of the AbstractDict.
+
+        :return: A frozen version of the current dictionary.
+        :rtype: immutabledict[K, V]
+        """
         return immutabledict(self.data)
 
-    def copy(self: AbstractDict[K, V]) -> AbstractDict[K, V]:
-        return type(self)(self.data.copy())
+    def copy(self: AbstractDict[K, V], deep: bool = False) -> AbstractDict[K, V]:
+        """
+        Returns a shallow or deep copy of the AbstractDict.
+
+        If the underlying data dictionary implements `.copy()`, it uses that method for shallow copies. For deep copies,
+        it uses `deepcopy` to recursively duplicate all contents. Skips re-validation for performance.
+
+        The result is of the same dynamic subclass as `self`, with identical key and value types.
+
+        :param deep: Boolean state parameter to control if the copy is shallow or deep.
+        :type deep: bool
+
+        :return: A shallow or deep copy of the object.
+        :rtype: AbstractDict[K, V]
+        """
+        from copy import deepcopy
+        data = deepcopy(self.data) if deep else (self.data.copy() if hasattr(self.data, 'copy') else self.data)
+        return type(self)(data, _skip_validation=True)
 
     def get(
         self: AbstractDict[K, V],
@@ -1126,6 +1929,24 @@ class AbstractDict[K, V](GenericBase[K, V]):
         _coerce_keys: bool = False,
         _coerce_values: bool = False
     ) -> V | None:
+        """
+        Returns the value for a given key if present, else returns a fallback (after optional coercion).
+
+        :param key: The key to search for.
+        :type key: K
+
+        :param fallback: The fallback value if the key is missing.
+        :type fallback: V | None
+
+        :param _coerce_keys: Whether to coerce the input key to the key type.
+        :type _coerce_keys: bool
+
+        :param _coerce_values: Whether to coerce the fallback value if returned.
+        :type _coerce_values: bool
+
+        :return: The value assigned to the key in the dictionary, or the fallback.
+        :rtype: V | None
+        """
         from type_validation import _validate_or_coerce_value
         try:
             return self.data[key]
@@ -1143,6 +1964,25 @@ class AbstractDict[K, V](GenericBase[K, V]):
         *,
         _coerce_values: bool = False
     ) -> AbstractDict[K, R]:
+        """
+        Applies a function to all values and returns a new AbstractDict with the updated values.
+
+        The key type is preserved, and the resulting value type can either be inferred or provided manually.
+        The output dictionary is of the same subclass as self.
+
+        :param f: A function mapping each value to a new value.
+        :type f: Callable[[V], R]
+
+        :param result_type: Optional explicit result type for values after transformation.
+        :type result_type: type[R] | None
+
+        :param _coerce_values: State parameter that, if True, coerces the transformed values to the given result type.
+        :type _coerce_values: bool
+
+        :return: A new AbstractDict of the same subclass as self with transformed values. Its key type is the same as
+        self, and its value type is either inferred from the mapped values or taken from result_type if it's not None.
+        :rtype: AbstractDict[K, R]
+        """
         from type_validation import _infer_type_contained_in_iterable
         new_data = {key : f(value) for key, value in self.data.items()}
         if result_type is not None:
@@ -1152,47 +1992,142 @@ class AbstractDict[K, V](GenericBase[K, V]):
             return type(self)[self.key_type, inferred_return_type](new_data, _skip_validation=True)
 
     def filter_keys(self: AbstractDict[K, V], predicate: Callable[[K], bool]) -> AbstractDict[K, V]:
+        """
+        Returns a new AbstractDict containing only the key-value pairs whose keys satisfy a predicate.
+
+        :param predicate: A function to the booleans that returns True for keys to retain.
+        :type predicate: Callable[[K], bool]
+
+        :return: A new AbstractDict of the same dynamic subclass as self containing the filtered key-value pairs.
+        :rtype: AbstractDict[K, V]
+        """
         return type(self)({key : value for key, value in self.data.items() if predicate(key)})
 
     def filter_values(self: AbstractDict[K, V], predicate: Callable[[V], bool]) -> AbstractDict[K, V]:
+        """
+        Returns a new AbstractDict containing only the key-value pairs whose values satisfy a predicate.
+
+        :param predicate: A function to the booleans that returns True for values to retain.
+        :type predicate: Callable[[V], bool]
+
+        :return: A new AbstractDict of the same dynamic subclass as self containing the filtered key-value pairs.
+        :rtype: AbstractDict[K, V]
+        """
         return type(self)({key : value for key, value in self.data.items() if predicate(value)})
 
     def filter_items(self: AbstractDict[K, V], predicate: Callable[[K, V], bool]) -> AbstractDict[K, V]:
+        """
+        Returns a new AbstractDict containing only the key-value pairs that satisfy a (key, value) predicate.
+
+        :param predicate: A function that returns True for pairs to retain.
+        :type predicate: Callable[[K, V], bool]
+
+        :return: A new AbstractDict of the same dynamic subclass as self containing the filtered key-value pairs.
+        :rtype: AbstractDict[K, V]
+        """
         return type(self)({key : value for key, value in self.data.items() if predicate(key, value)})
 
 
 @forbid_instantiation
 class AbstractMutableDict[K, V](AbstractDict[K, V]):
+    """
+    Abstract base class for mutable dictionaries with type enforced keys and values.
 
-    _finisher: Callable[[dict[K, V]], Mapping[K, V]] = immutabledict
+    Inherits from AbstractDict, extending it with mutation operations such as item assignment, deletion, and updates.
+    It is still an abstract class, so it must be subclassed to create concrete implementations.
+
+    It overrides _finisher to dict to ensure the mutability of the internal container, and also adds the attribute
+    _mutable set to True as class metadata, that for now is unused.
+    """
+
+    _finisher: ClassVar[Callable[[dict], Mapping]] = dict
     _mutable: bool = True
 
     def __setitem__(self: AbstractMutableDict[K, V], key: K, value: V) -> None:
+        """
+        Inserts or updates a key-value pair in this AbstractMutableDict.
+
+        Both the key and value are validated against their expected types.
+
+        :param key: The key to insert or update.
+        :type key: K
+
+        :param value: The value to associate with the key.
+        :type value: V
+        """
         from type_validation import _validate_or_coerce_value
         self.data[_validate_or_coerce_value(key, self.key_type)] = _validate_or_coerce_value(value, self.value_type)
 
     def __delitem__(self: AbstractMutableDict[K, V], key: K) -> None:
+        """
+        Deletes a key-value pair from this AbstractMutableDict by key.
+
+        :param key: The key to remove.
+        :type key: K
+        :raises KeyError: If the key does not exist.
+        """
         del self.data[key]
 
     def clear(self: AbstractMutableDict[K, V]) -> None:
+        """
+        Removes all key-value pairs from this AbstractMutableDict.
+        """
         self.data.clear()
 
-    def __ior__(self: AbstractMutableDict[K, V], other: Mapping[K, V]) -> AbstractMutableDict[K, V]:
+    def __ior__(self: AbstractMutableDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractMutableDict[K, V]:
+        """
+        In-place union update with another mapping.
+
+        Equivalent to calling `.update()` with the given mapping. Values from `other` override any existing values.
+
+        :param other: A mapping containing the new key-value pairs to update.
+        :type other: AbstractDict[K, V] | Mapping[K, V]
+
+        :return: The updated AbstractMutableDict.
+        :rtype: AbstractMutableDict[K, V]
+        """
         self.update(other)
         return self
 
-    def __iand__(self: AbstractMutableDict[K, V], other: Mapping[K, V]) -> AbstractMutableDict[K, V]:
+    def __iand__(self: AbstractMutableDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractMutableDict[K, V]:
+        """
+        In-place intersection with another mapping by removing keys not present in `other`.
+
+        :param other: The mapping to intersect keys with.
+        :type other: AbstractDict[K, V] | Mapping[K, V]
+
+        :return: The updated AbstractMutableDict.
+        :rtype: AbstractMutableDict[K, V]
+        """
         keys_to_remove = set(self.data) - set(other)
         for key in keys_to_remove:
             del self.data[key]
         return self
 
-    def __isub__(self: AbstractMutableDict[K, V], other: Mapping[K, V]) -> AbstractMutableDict[K, V]:
+    def __isub__(self: AbstractMutableDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractMutableDict[K, V]:
+        """
+        In-place difference by removing keys found in `other`.
+
+        :param other: The mapping whose keys will be removed.
+        :type other: AbstractDict[K, V] | Mapping[K, V]
+
+        :return: The updated AbstractMutableDict.
+        :rtype: AbstractMutableDict[K, V]
+        """
         for key in other:
             self.data.pop(key, None)
         return self
 
-    def __ixor__(self: AbstractMutableDict[K, V], other: Mapping[K, V]) -> AbstractMutableDict[K, V]:
+    def __ixor__(self: AbstractMutableDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractMutableDict[K, V]:
+        """
+        In-place symmetric difference update with another mapping, keeping only the keys found in one but not both.
+
+        :param other: The mapping to symmetrically differentiate with.
+        :type other: AbstractDict[K, V] | Mapping[K, V]
+
+        :return: The updated AbstractMutableDict.
+        :rtype: AbstractMutableDict[K, V]
+        """
         for key in other:
             if key in self.data:
                 del self.data[key]
@@ -1207,6 +2142,20 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         _coerce_keys: bool = True,
         _coerce_values: bool = True
     ) -> None:
+        """
+        Updates this AbstractMutableDict with the contents of another mapping.
+
+        Values from `other` override existing values for their keys.
+
+        :param other: The mapping to merge into this AbstractMutableDict.
+        :type other: dict[K, V] | Mapping[K, V] | AbstractDict[K, V]
+
+        :param _coerce_keys: State parameter that, if True, attempts to coerce keys before validation.
+        :type _coerce_keys: bool
+
+        :param _coerce_values: State parameter that, if True, attempts to coerce values before validation.
+        :type _coerce_values: bool
+        """
         from type_validation import _validate_or_coerce_iterable
 
         validated_keys = _validate_or_coerce_iterable(other.keys(), self.key_type, _coerce=_coerce_keys)
@@ -1224,6 +2173,24 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         _coerce_keys: bool = None,
         _coerce_values: bool = None
     ) -> V:
+        """
+        Removes and returns the value associated with a key, or a fallback if not found.
+
+        :param key: The key to remove.
+        :type key: K
+
+        :param fallback: Optional fallback value if key is not present.
+        :type fallback: V | None
+
+        :param _coerce_keys: State parameter that, if True, attempts to coerce the key before popping.
+        :type _coerce_keys: bool | None
+
+        :param _coerce_values: State parameter that, if True, attempts to coerce the fallback before returning it.
+        :type _coerce_values: bool | None
+
+        :return: The value associated with the removed key or the fallback.
+        :rtype: V
+        """
         from type_validation import _validate_or_coerce_value
         if fallback is not None:
             return self.data.pop(
@@ -1233,10 +2200,30 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         return self.data.pop(_validate_or_coerce_value(key, self.key_type, _coerce=_coerce_keys))
 
     def popitem(self: AbstractMutableDict[K, V]) -> tuple[K, V]:
+        """
+        Removes and returns the last inserted key-value pair.
+
+        :return: A tuple of the removed key and value.
+        :rtype: tuple[K, V]
+        """
         return self.data.popitem()
 
-    def setdefault(self: AbstractMutableDict[K, V], key: K, default: V) -> V:
+    def setdefault(self: AbstractMutableDict[K, V], key: K, default: V | None = None) -> V:
+        """
+        Returns the value for a key, inserting a default value if the key is not present.
+
+        :param key: The key to look up or insert.
+        :type key: K
+
+        :param default: The value to insert if the key is not present.
+        :type default: V
+
+        :return: The existing or newly inserted value.
+        :rtype: V
+        """
         from type_validation import _validate_or_coerce_value
+        if default is None:
+            return self.data.setdefault(_validate_or_coerce_value(key, self.key_type))
         return self.data.setdefault(
             _validate_or_coerce_value(key, self.key_type),
             _validate_or_coerce_value(default, self.value_type)

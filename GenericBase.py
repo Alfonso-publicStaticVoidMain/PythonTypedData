@@ -15,17 +15,21 @@ class GenericBase[*Ts]:
     the memory to creating a new subclass.
     """
 
-    _generic_type_registry: WeakValueDictionary[tuple[type, tuple[type, ...]], type] = WeakValueDictionary()
+    _generic_type_registry: ClassVar[WeakValueDictionary[tuple[type, tuple[type, ...]], type]] = WeakValueDictionary()
     _args: ClassVar[tuple[type, ...]]
     _origin: ClassVar[type]
 
     @classmethod
     def __class_getitem__(cls, item: type | tuple[type, ...]):
         """
-        Extends the class cls to store the generic arguments it was called upon to store them and use them on runtime.
+        Extends the class cls to store the generic arguments it was called upon (item) and use them on runtime.
+
         :param item: type or tuple of types that represents the generic types applied to the class.
+        :type item: type | tuple[type, ...]
+
         :return: A class inheriting from cls with the generic arguments stored on an _args attribute and the original
         class on an _origin attribute.
+        :rtype: type[cls]
         """
         if not isinstance(item, tuple):
             item = (item,)
@@ -42,13 +46,14 @@ class GenericBase[*Ts]:
 
         subclass._args = item
         subclass._origin = cls
-        cls._generic_type_registry[cache_key] = subclass
+        GenericBase._generic_type_registry[cache_key] = subclass
         return subclass
 
 
 def class_name(cls: type) -> str:
     """
     Gives a str representation of a given type or class, including generics info handled recursively.
+
     :param cls: Class whose name will be represented.
     :return: If the type is a Union or UnionType, it's represented using the pipe operator |. If it's a class that
     extends GenericBase (it has an _args attribute), then it is assumed the class has already been properly formatted
