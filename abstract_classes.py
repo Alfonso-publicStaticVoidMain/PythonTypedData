@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 def forbid_instantiation(cls):
     """
-    Class decorator that forbids direct instantiation of the given class.
+    Class decorator that forbids direct instantiation of the given class with or without generics.
 
     :raises TypeError: If the decorated class is instantiated directly, but allows instantiation of its subclasses.
     """
@@ -710,8 +710,9 @@ class AbstractSequence[T](Collection[T]):
     """
     Abstract base class for sequence-like Collections of a type T, with ordering and indexing capabilities.
 
-    Provides standard sequence operations such as indexing, slicing, comparison, addition, multiplication, and sorting.
-    It is still an abstract class, so it must be subclassed to create concrete implementations.
+    Provides standard sequence operations such as indexing, slicing, comparison, addition of other sequences,
+    multiplication by integers, and sorting. It is still an abstract class, so it must be subclassed to create concrete
+    implementations.
 
     This class will be further extended by AbstractMutableSequence to add the methods that modify the internal data
     container of the class.
@@ -728,7 +729,7 @@ class AbstractSequence[T](Collection[T]):
         :param index: An integer index or slice object.
         :type index: int | slice
 
-        :return: The item at the given index or an AbstractSequence of the same dynamic subclass as self containing
+        :return: The item at the given index or a new AbstractSequence of the same dynamic subclass as self containing
         the sliced values.
         :rtype: T | AbstractSequence[T]
 
@@ -743,7 +744,7 @@ class AbstractSequence[T](Collection[T]):
 
     def __eq__(self: AbstractSequence[T], other: Any) -> bool:
         """
-        Checks equality with another AbstractSequence based on their item type and values.
+        Checks equality with another sequence based on their item type and values.
 
         :param other: Object to compare against.
         :type other: Any
@@ -757,12 +758,12 @@ class AbstractSequence[T](Collection[T]):
             and list(self.values) == list(other.values)
         )
 
-    def __lt__(self: AbstractSequence[T], other) -> bool:
+    def __lt__(self: AbstractSequence[T], other: AbstractSequence[T] | list[T] | tuple[T, ...]) -> bool:
         """
         Checks if this sequence is lexicographically less than another.
 
-        :param other: Another sequence or iterable.
-        :type other: AbstractSequence | list | tuple
+        :param other: Another sequence to compare with.
+        :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
 
         :return: True if self is less than `other`.
         :rtype: bool
@@ -771,12 +772,12 @@ class AbstractSequence[T](Collection[T]):
             return tuple(self.values) < tuple(other.values if isinstance(other, AbstractSequence) else other)
         return NotImplemented
 
-    def __gt__(self: AbstractSequence[T], other) -> bool:
+    def __gt__(self: AbstractSequence[T], other: AbstractSequence[T] | list[T] | tuple[T, ...]) -> bool:
         """
         Checks if this sequence is lexicographically greater than another.
 
-        :param other: Another sequence or iterable.
-        :type other: AbstractSequence | list | tuple
+        :param other: Another sequence to compare with.
+        :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
 
         :return: True if self is greater than `other`.
         :rtype: bool
@@ -785,12 +786,12 @@ class AbstractSequence[T](Collection[T]):
             return tuple(self.values) > tuple(other.values if isinstance(other, AbstractSequence) else other)
         return NotImplemented
 
-    def __le__(self: AbstractSequence[T], other) -> bool:
+    def __le__(self: AbstractSequence[T], other: AbstractSequence[T] | list[T] | tuple[T, ...]) -> bool:
         """
         Checks if this sequence is less than or equal to another.
 
-        :param other: Another sequence or iterable.
-        :type other: AbstractSequence | list | tuple
+        :param other: Another sequence to compare with.
+        :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
 
         :return: True if self is less than or equal to `other`.
         :rtype: bool
@@ -799,12 +800,12 @@ class AbstractSequence[T](Collection[T]):
             return tuple(self.values) <= tuple(other.values if isinstance(other, AbstractSequence) else other)
         return NotImplemented
 
-    def __ge__(self: AbstractSequence[T], other) -> bool:
+    def __ge__(self: AbstractSequence[T], other: AbstractSequence[T] | list[T] | tuple[T, ...]) -> bool:
         """
         Checks if this sequence is greater than or equal to another.
 
-        :param other: Another sequence or iterable.
-        :type other: AbstractSequence | list | tuple
+        :param other: Another sequence to compare with.
+        :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
 
         :return: True if self is greater than or equal to `other`.
         :rtype: bool
@@ -818,7 +819,7 @@ class AbstractSequence[T](Collection[T]):
         other: AbstractSequence[T] | list[T] | tuple[T, ...]
     ) -> AbstractSequence[T]:
         """
-        Concatenates this AbstractSequence with another AbstractSequence, list or tuple of the same item type.
+        Concatenates this sequence with another sequence, list or tuple of compatible types.
 
         :param other: The sequence or iterable to concatenate.
         :type other: AbstractSequence[T] | list[T] | tuple[T]
@@ -855,7 +856,7 @@ class AbstractSequence[T](Collection[T]):
 
     def __sub__(self: AbstractSequence[T], other: Iterable[T]) -> AbstractSequence[T]:
         """
-        Returns a new AbstractSequence where the elements of `other`have been removed.
+        Returns a new sequence with the elements of `other` removed.
 
         :param other: A collection of elements to exclude.
         :type other: Iterable
@@ -869,7 +870,7 @@ class AbstractSequence[T](Collection[T]):
         """
         Returns a reversed iterator over the sequence.
 
-        :return: A reversed iterator, delegated to the __reversed__ of the underlying container.
+        :return: A reversed iterator, delegated to the __reversed__ method of the underlying container.
         :rtype: Iterator[T]
         """
         return reversed(self.values)
@@ -878,7 +879,8 @@ class AbstractSequence[T](Collection[T]):
         """
         Returns a new sequence with elements in reverse order.
 
-        :return: A new reversed sequence of the same dynamic subclass as self containing its elements in reversed order.
+        :return: A new reversed AbstractSequence of the same dynamic subclass as self containing its elements in
+        reversed order.
         :rtype: AbstractSequence[T]
         """
         return type(self)(reversed(self.values), _skip_validation=True)
@@ -930,7 +932,8 @@ class AbstractSequence[T](Collection[T]):
         :param reverse: Whether to sort in descending order.
         :type reverse: bool
 
-        :return: A sorted sequence.
+        :return: A new AbstractSequence of the same dynamic subclass as self with the same elements but sorted
+        according to the key and reverse parameters.
         :rtype: AbstractSequence[T]
         """
         return type(self)(sorted(self.values, key=key, reverse=reverse), _skip_validation=True)
@@ -958,7 +961,7 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         _coerce: bool = False
     ) -> None:
         """
-        Appends a value to the end of the sequence, delegating on the underlying values container's __append__ method.
+        Appends a value to the end of the sequence, delegating on the underlying container's __append__ method.
 
         :param value: The value to append.
         :type value: T
@@ -977,7 +980,7 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         _coerce: bool = False
     ) -> None:
         """
-        Replaces an item or slice in the sequence with new value(s) delegating on the underlying container's __setitem__.
+        Replaces an item or slice in the sequence with new value(s), delegating on the underlying container's __setitem__.
 
         :param index: Index or slice to replace.
         :type index: int | slice

@@ -21,14 +21,22 @@ def _validate_or_coerce_value[T](
         - int -> float
         - int, float -> complex
         - bool -> int, float
+        - bool, int, float, complex -> str
     Allows conversions from str only if _coerce=True:
         - str -> int, float, complex
 
-    :param expected_type: Type to validate the obj for, or _coerce iterable into.
     :param obj: Value to validate or _coerce.
+    :type obj: object
+
+    :param expected_type: Type to validate the obj for, or _coerce iterable into.
+    :type expected_type: type[T]
+
     :param _coerce: True if you want "unsafe" coercions to happen. Defaulted to False.
-    :returns: The obj itself if iterable's of the expected type, or its coercion to that type if that is safe or manually
-    enabled via the _coerce parameter, and iterable can be performed.
+    :type _coerce: bool
+
+    :returns: The obj itself if it's of the expected type, or its coercion to that type if it's valid.
+    :rtype: T
+
     :raises: TypeError if obj doesn't match expected_type and cannot be safely coerced.
     """
     if _validate_type(obj, expected_type):
