@@ -1,6 +1,6 @@
 import unittest
 
-from concrete_classes import MutableList, ImmutableList
+from concrete_classes import MutableList, ImmutableList, ImmutableSet
 
 
 class TestList(unittest.TestCase):
@@ -200,6 +200,31 @@ class TestList(unittest.TestCase):
         iml = ImmutableList[tuple[str, int]](('a', 1), ('b', 2), ('c', 1))
         self.assertEqual(iml.distinct(lambda tup: tup[1]), ImmutableList.of(('a', 1), ('b', 2)))
 
+    def test_in_place_add_mul_sub(self):
+        mul = MutableList[str]('a')
+        mul += ImmutableList[str]('b')
+        self.assertEqual(mul, MutableList[str]('a', 'b'))
+
+        mul += ['c']
+        self.assertEqual(mul, MutableList[str]('a', 'b', 'c'))
+
+        mul += ('d',)
+        self.assertEqual(mul, MutableList[str]('a', 'b', 'c', 'd'))
+
+        mul -= {'d'}
+        self.assertEqual(mul, MutableList[str]('a', 'b', 'c'))
+
+        mul -= frozenset({'c'})
+        self.assertEqual(mul, MutableList[str]('a', 'b'))
+
+        mul -= ImmutableSet[str]('b')
+        self.assertEqual(mul, MutableList[str]('a'))
+
+        mul *= 3
+        self.assertEqual(mul, MutableList[str]('a', 'a', 'a'))
+
+        with self.assertRaises(TypeError):
+            mul *= 'c'
 
 if __name__ == '__main__':
     unittest.main()

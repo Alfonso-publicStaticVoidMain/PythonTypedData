@@ -152,6 +152,20 @@ class TestSet(unittest.TestCase):
         for n in ims:
             self.assertIn(n, values)
 
+    def test_in_place_updates(self):
+        st = MutableSet[int](0)
+        st |= ImmutableSet[int](0, 1, 2, 3) # Union = {0, 1, 2, 3}
+        self.assertEqual(st, MutableSet[int](0, 1, 2, 3))
+
+        st &= {2, 3} # Intersection = {2, 3}
+        self.assertEqual(st, MutableSet[int](2, 3))
+
+        st -= frozenset({3, 4}) # Difference = {2}
+        self.assertEqual(st, MutableSet[int](2))
+
+        st ^= {2, 0} # Symmetric Difference = {0}
+        self.assertEqual(st, MutableSet[int](0))
+
 
 if __name__ == '__main__':
     unittest.main()

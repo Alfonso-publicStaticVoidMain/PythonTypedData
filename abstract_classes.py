@@ -171,7 +171,7 @@ class Collection[T](GenericBase[T]):
         :param values: One or more parameters, or an Iterable of values to initialize the new Collection with.
         :type values: T
 
-        :return: A new Collection that is instance of cls containing the passed values, inferring its item_type from
+        :return: A new Collection that is an instance of cls containing the passed values, inferring its item_type from
         _infer_type_contained_in_iterable method.
         :rtype: Collection[T]
 
@@ -233,7 +233,10 @@ class Collection[T](GenericBase[T]):
 
     def __eq__(self: Collection[T], other: Any) -> bool:
         """
-        Performs structural and type-based equality comparison between two Collection instances.
+        Checks if two Collections are equal comparing their values and item type.
+
+        If each Collection has a different internal container, they won't be equal unless those containers are designed
+        to be compatible, like set and frozenset, but unlike list and tuple.
 
         :return: True if self and other share the same subclass, item type and underlying values (compared with ==),
         False otherwise.
@@ -282,7 +285,7 @@ class Collection[T](GenericBase[T]):
         """
         Returns the contents of the Collection as a list.
 
-        :return: A list containing the values of the collection.
+        :return: A list containing the values of the Collection.
         :rtype: list[T]
         """
         return list(self.values)
@@ -291,7 +294,7 @@ class Collection[T](GenericBase[T]):
         """
         Returns the contents of the Collection as a tuple.
 
-        :return: A tuple containing the values of the collection.
+        :return: A tuple containing the values of the Collection.
         :rtype: tuple[T]
         """
         return tuple(self.values)
@@ -300,7 +303,7 @@ class Collection[T](GenericBase[T]):
         """
         Returns the contents of the Collection as a set.
 
-        :return: A set containing the values of the collection.
+        :return: A set containing the values of the Collection.
         :rtype: set[T]
         """
         return set(self.values)
@@ -309,7 +312,7 @@ class Collection[T](GenericBase[T]):
         """
         Returns the contents of the Collection as a frozenset.
 
-        :return: A frozenset containing the values of the collection.
+        :return: A frozenset containing the values of the Collection.
         :rtype: frozenset[T]
         """
         return frozenset(self.values)
@@ -324,8 +327,10 @@ class Collection[T](GenericBase[T]):
 
         :param key_mapper: Callable to obtain the keys from. Defaults to identity mapping.
         :type key_mapper: Callable[[T], K]
+
         :param value_mapper: Callable to obtain the values from. Defaults to identity mapping.
         :type value_mapper: Callable[[T], V]
+
         :return: A dictionary derived from the Collection by mapping each item to a (key, value) pair using the provided
         key_mapper and value_mapper callables.
         :rtype: dict[K, V]
@@ -341,6 +346,7 @@ class Collection[T](GenericBase[T]):
 
         :param value: Value to count within the Collection.
         :type value: T
+
         :return: The number of appearances of the value in the Collection. If the underlying container supports
         `.count`, it uses that method; otherwise, falls back to manual equality counting. Supports unhashable values.
         :rtype: int
@@ -365,10 +371,13 @@ class Collection[T](GenericBase[T]):
 
         :param f: Callable object to map the Collection with.
         :type f: Callable[[T], R]
+
         :param result_type: Type expected to be returned by the Callable.
         :type result_type: type[R] | None
-        :param _coerce: State parameter to try to force coercion to the expected result type if it's not None.
+
+        :param _coerce: State parameter that if True, tries to coerce results to the result_type if it's not None.
         :type _coerce: bool
+
         :return: A new Collection of the same subclass as self containing those values. If result_type is given,
         it is used as the item_type of the returned Collection, if not that is inferred from the mapped values.
         :rtype: Collection[R]
@@ -393,9 +402,13 @@ class Collection[T](GenericBase[T]):
 
         :param f: Callable object to map the Collection with.
         :type f: Callable[[T], Iterable[R]]
+
         :param result_type: Type of Iterable expected to be returned by the Callable.
         :type result_type: type[R] | None
+
         :param _coerce: State parameter to try to force coercion to the expected result type if it's not None.
+        :type _coerce: bool
+
         :return: A new Collection of the same subclass as self containing those values. If result_type is given,
         it is used as the type of the returned Collection, if not that is inferred.
         :rtype: Collection[R]
@@ -406,7 +419,10 @@ class Collection[T](GenericBase[T]):
             if not isinstance(result, Iterable) or isinstance(result, (str, bytes)):
                 raise TypeError("flatmap function must return a non-string iterable")
             flattened.extend(result)
-        return type(self)[result_type](flattened, _coerce=_coerce) if result_type is not None else type(self).of(flattened)
+        return (
+            type(self)[result_type](flattened, _coerce=_coerce) if result_type is not None
+            else type(self).of(flattened)
+        )
 
     def filter(self: Collection[T], predicate: Callable[[T], bool]) -> Collection[T]:
         """
@@ -421,10 +437,11 @@ class Collection[T](GenericBase[T]):
 
     def all_match(self: Collection[T], predicate: Callable[[T], bool]) -> bool:
         """
-        Returns True if all elements in the collection satisfy the given predicate.
+        Returns True if all elements in the Collection satisfy the given predicate.
 
         :param predicate: A function from T to the booleans.
         :type predicate: Callable[[T], bool]
+
         :return: True if all elements match the predicate, False otherwise.
         :rtype: bool
         """
@@ -432,10 +449,11 @@ class Collection[T](GenericBase[T]):
 
     def any_match(self: Collection[T], predicate: Callable[[T], bool]) -> bool:
         """
-        Returns True if any element in the collection satisfies the given predicate.
+        Returns True if any element in the Collection satisfies the given predicate.
 
         :param predicate: A function from T to the booleans.
         :type predicate: Callable[[T], bool]
+
         :return: True if at least one element matches the predicate, False otherwise.
         :rtype: bool
         """
@@ -443,10 +461,11 @@ class Collection[T](GenericBase[T]):
 
     def none_match(self: Collection[T], predicate: Callable[[T], bool]) -> bool:
         """
-        Returns True if no element in the collection satisfies the given predicate.
+        Returns True if no element in the Collection satisfies the given predicate.
 
         :param predicate: A function from T to the booleans.
         :type predicate: Callable[[T], bool]
+
         :return: True if no elements match the predicate, False otherwise.
         :rtype: bool
         """
@@ -454,12 +473,14 @@ class Collection[T](GenericBase[T]):
 
     def reduce(self: Collection[T], f: Callable[[T, T], T], unit: T | None = None) -> T:
         """
-        Reduces the collection to a single value using a binary operator function and an optional initial unit.
+        Reduces the Collection to a single value using a binary operator function and an optional initial unit.
 
         :param f: A function that combines two elements of type T into one.
         :type f: Callable[[T, T], T]
+
         :param unit: Optional initial value for the reduction. If provided, the reduction starts with this.
         :type unit: T | None
+
         :return: The result of the reduction, as done after being delegated to the reduce() function applied to the
         internal container.
         :rtype: T
@@ -470,7 +491,7 @@ class Collection[T](GenericBase[T]):
 
     def for_each(self: Collection[T], consumer: Callable[[T], None]) -> None:
         """
-        Performs the given consumer function on each element in the collection.
+        Performs the given consumer function on each element in the Collection.
 
         :param consumer: A function that takes an element of type T and returns None.
         :type consumer: Callable[[T], None]
@@ -480,10 +501,11 @@ class Collection[T](GenericBase[T]):
 
     def peek(self: Collection[T], consumer: Callable[[T], None]) -> Collection[T]:
         """
-        Performs the given consumer function on each element for side effects and returns the original collection.
+        Performs the given consumer function on each element for side effects and returns the original Collection.
 
         :param consumer: A function that takes an element of type T and returns None.
         :type consumer: Callable[[T], None]
+
         :return: The original collection (self).
         :rtype: Collection[T]
         """
@@ -493,20 +515,37 @@ class Collection[T](GenericBase[T]):
 
     def distinct[K](self: Collection[T], key: Callable[[T], K] = lambda x: x) -> Collection[T]:
         """
-        Returns a new collection with only distinct elements, determined by a key function.
+        Returns a new Collection with only distinct elements, determined by a key function.
 
-        :param key: A function mapping each element to a hashable key. Defaults to identity mapping.
+        :param key: A function to extract a comparison key from each element. Defaults to identity mapping.
         :type key: Callable[[T], K]
+
         :return: A Collection of the same dynamic subclass as self with duplicates removed based on the key.
         :rtype: Collection[T]
         """
-        seen = set()
         result = []
+        seen_hashable = set()
+        seen_unhashable = []
+        using_set = True
+
         for value in self.values:
             key_of_value = key(value)
-            if key_of_value not in seen:
-                seen.add(key_of_value)
-                result.append(value)
+            if using_set:
+                try:
+                    if key_of_value not in seen_hashable:
+                        seen_hashable.add(key_of_value)
+                        result.append(value)
+                except TypeError:
+                    using_set = False
+                    seen_unhashable = [*seen_hashable]
+                    if key_of_value not in seen_unhashable:
+                        seen_unhashable.append(key_of_value)
+                        result.append(value)
+            else:
+                if key_of_value not in seen_unhashable:
+                    seen_unhashable.append(key_of_value)
+                    result.append(value)
+
         return type(self)(result, _skip_validation=True)
 
     def max(self: Collection[T], *, default: T | None = None, key: Callable[[T], Any] = None) -> T | None:
@@ -515,8 +554,10 @@ class Collection[T](GenericBase[T]):
 
         :param default: A value to return if the collection is empty.
         :type default: T | None
+
         :param key: A function to extract a comparison key from each element.
-        :type key: Callable[[T], Any], optional
+        :type key: Callable[[T], Any]
+
         :return: The maximum element, or default if provided and self is empty.
         :rtype: T | None
         """
@@ -532,8 +573,10 @@ class Collection[T](GenericBase[T]):
 
         :param default: A value to return if the collection is empty.
         :type default: T | None
+
         :param key: A function to extract a comparison key from each element.
         :type key: Callable[[T], Any], optional
+
         :return: The minimum element, or default if provided and self is empty.
         :rtype: T | None
         """
@@ -551,8 +594,11 @@ class Collection[T](GenericBase[T]):
         Groups the items in the Collection on a dict by their value by the key function.
 
         :param key: Callable to group the items by.
-        :return: A dict mapping each found value of key onto a Collection of the same dynamic subclass as self
-        containing the items in the original Collection that were mapped to that value by the key function.
+        :type key: Callable[[T], K]
+
+        :return: A dict mapping each value of key onto a Collection of the same dynamic subclass as self containing the
+        items that were mapped to that value by the key function.
+        :rtype: dict[K, Collection[T]]
         """
         groups: dict[K, list[T]] = defaultdict(list)
         for item in self.values:
@@ -571,8 +617,10 @@ class Collection[T](GenericBase[T]):
 
         :param predicate: Function from T to the booleans to partition the Collection by.
         :type predicate: Callable[[T], bool]
+
         :return: A dict whose True key is mapped to a Collection of the same dynamic subclass as self containing all
         items in it that satisfied the predicate, likewise for False.
+        :rtype: dict[bool, Collection[T]]
         """
         return self.group_by(predicate)
 
@@ -591,7 +639,7 @@ class Collection[T](GenericBase[T]):
         :param supplier: Provides the initial container.
         :type supplier: Callable[[], A]
 
-        :param accumulator: Accepts (container, item) to process each item.
+        :param accumulator: Accepts (container, item) to process each item via secondary effects.
         :type accumulator: Callable[[A, T], None]
 
         :param finisher: Final transformation to obtain a result. Defaults to identity mapping.
@@ -638,7 +686,7 @@ class Collection[T](GenericBase[T]):
         self: Collection[T],
         supplier: Callable[[], A],
         state_supplier: Callable[[], S],
-        accumulator: Callable[[A, T, S], None],
+        accumulator: Callable[[A, S, T], None],
         finisher: Callable[[A, S], R] = lambda x, _: x
     ) -> R:
         """
@@ -654,8 +702,8 @@ class Collection[T](GenericBase[T]):
         :param state_supplier: Provides the initial state object.
         :type state_supplier: Callable[[], S]
 
-        :param accumulator: Accepts (accumulator, item, state) to process each item.
-        :type accumulator: Callable[[A, T, S], None]
+        :param accumulator: Accepts (accumulator, item, state) to process each item via secondary effects.
+        :type accumulator: Callable[[A, S, T], None]
 
         :param finisher: Final transformation combining accumulator and state to a result.
         :type finisher: Callable[[A, S], R]
@@ -663,17 +711,24 @@ class Collection[T](GenericBase[T]):
         :return: The final collected result.
         :rtype: R
         """
+        '''
         acc = supplier()
         state = state_supplier()
         for item in self.values:
-            accumulator(acc, item, state)
+            accumulator(acc, state, item)
         return finisher(acc, state)
+        '''
+        return self.collect(
+            supplier=lambda:(supplier(), state_supplier()),
+            accumulator=lambda acc_state, item : accumulator(*acc_state, item),
+            finisher=lambda acc_state : finisher(*acc_state)
+        )
 
     def stateful_collect_pure[A, S, R](
         self: Collection[T],
         supplier: Callable[[], A],
         state_supplier: Callable[[], S],
-        accumulator: Callable[[A, T, S], tuple[A, S]],
+        accumulator: Callable[[A, S, T], tuple[A, S]],
         finisher: Callable[[A, S], R] = lambda x, _: x
     ) -> R:
         """
@@ -690,7 +745,7 @@ class Collection[T](GenericBase[T]):
         :type state_supplier: Callable[[], S]
 
         :param accumulator: Accepts (accumulator, item, state) to process each item.
-        :type accumulator: Callable[[A, T, S], None]
+        :type accumulator: Callable[[A, S, T], tuple[A, S]]
 
         :param finisher: Final transformation combining accumulator and state to a result.
         :type finisher: Callable[[A, S], R]
@@ -698,12 +753,18 @@ class Collection[T](GenericBase[T]):
         :return: The final collected result.
         :rtype: R
         """
+        '''
         acc = supplier()
         state = state_supplier()
         for item in self.values:
             acc, state = accumulator(acc, item, state)
         return finisher(acc, state)
-
+        '''
+        return self.collect_pure(
+            supplier=lambda: (supplier(), state_supplier()),
+            accumulator=lambda acc_state, item: accumulator(*acc_state, item),
+            finisher=lambda acc_state: finisher(*acc_state)
+        )
 
 @forbid_instantiation
 class AbstractSequence[T](Collection[T]):
@@ -1013,6 +1074,61 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         """
         del self.values[index]
 
+    def __iadd__(
+        self: AbstractMutableSequence[T],
+        other: AbstractSequence[T] | list[T] | tuple[T, ...]
+    ) -> AbstractMutableSequence[T]:
+        """
+        Appends the elements from `other` to this sequence in-place.
+
+        This method modifies `self.values` directly by extending it with the validated elements from `other`.
+
+        :param other: The sequence or iterable whose elements will be appended.
+        :type other: AbstractSequence[T] | list[T] | tuple[T]
+
+        :return: Self after appending the contents of `other`.
+        :rtype: AbstractMutableSequence[T]
+
+        :raises TypeError: If `other` contains elements of an incompatible type.
+        """
+        from type_validation import _validate_collection_type_and_get_values
+        if not isinstance(other, (AbstractSequence, list, tuple)):
+            return NotImplemented
+        self.extend(other)
+        return self
+
+    def __imul__(self: AbstractMutableSequence[T], n: int) -> AbstractMutableSequence[T]:
+        """
+        Repeats the contents of this sequence `n` times in-place.
+
+        :param n: The number of times to repeat the sequence.
+        :type n: int
+
+        :return: Self after repetition.
+        :rtype: AbstractMutableSequence[T]
+
+        :raises TypeError: If `n` is not an integer.
+        """
+        if not isinstance(n, int):
+            return NotImplemented
+        self.values[:] = self.values * n
+        return self
+
+    def __isub__(self: AbstractMutableSequence[T], other: Iterable[T]) -> AbstractMutableSequence[T]:
+        """
+        Removes all elements in `other` from this sequence in-place.
+
+        Retains only elements that are not in `other`, preserving order.
+
+        :param other: An iterable of elements to remove.
+        :type other: Iterable[T]
+
+        :return: Self after removing all matching elements.
+        :rtype: AbstractMutableSequence[T]
+        """
+        self.values[:] = [item for item in self.values if item not in other]
+        return self
+
     def sort(
         self: AbstractMutableSequence[T],
         key: Callable[[T], Any] | None = None,
@@ -1029,7 +1145,13 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         """
         self.values.sort(key=key, reverse=reverse)
 
-    def insert(self, index: int, value: T, *, _coerce: bool = False) -> None:
+    def insert(
+        self: AbstractMutableSequence[T],
+        index: int,
+        value: T,
+        *,
+        _coerce: bool = False
+    ) -> None:
         """
         Inserts a value at the specified index delegating on the underlying container's insert method.
 
@@ -1086,12 +1208,13 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         :type _coerce: bool
         """
         from type_validation import _validate_or_coerce_value
+        value_to_remove = value
         if _coerce:
             try:
-                value = _validate_or_coerce_value(value, self.item_type)
+                value_to_remove = _validate_or_coerce_value(value, self.item_type)
             except (TypeError, ValueError):
                 pass
-        self.values.remove(value)
+        self.values.remove(value_to_remove)
 
 
 @forbid_instantiation
@@ -1414,53 +1537,60 @@ class AbstractMutableSet[T](AbstractSet[T]):
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = set
     _mutable: ClassVar[bool] = True
 
-    def __ior__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
+    def __ior__(self: AbstractMutableSet[T], other: AbstractSet[T] | set[T] | frozenset[T]) -> AbstractMutableSet[T]:
         """
-        In-place union update with another AbstractSet.
-
-        Delegates the operation to the underlying container's __ior__ method.
+        In-place union update with another AbstractSet with the operator |=.
 
         :param other: The set to union with.
-        :type other: AbstractSet[T]
+        :type other: AbstractSet[T] | set[T] | frozenset[T]
 
         :return: This updated AbstractMutableSet.
         :rtype: AbstractMutableSet[T]
         """
-        self.values |= other.values
+        from type_validation import _validate_or_coerce_iterable
+        self.update(other)
         return self
 
-    def __iand__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
+    def __iand__(self: AbstractMutableSet[T], other: AbstractSet[T] | set[T] | frozenset[T]) -> AbstractMutableSet[T]:
         """
-        In-place intersection update with another AbstractSet.
-
-        Delegates the operation to the underlying container's __iadd__ method.
+        In-place intersection update with another AbstractSet with the operator &=.
 
         :param other: The set to intersect with.
-        :type other: AbstractSet[T]
+        :type other: AbstractSet[T] | set[T] | frozenset[T]
 
         :return: This updated AbstractMutableSet.
         :rtype: AbstractMutableSet[T]
         """
-        self.values &= other.values
+        from type_validation import _validate_or_coerce_iterable
+        self.intersection_update(other)
         return self
 
-    def __isub__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
+    def __isub__(self: AbstractMutableSet[T], other: AbstractSet[T] | set[T] | frozenset[T]) -> AbstractMutableSet[T]:
         """
-        In-place difference update with another AbstractSet.
-
-        Delegates the operation to the underlying container's __isub__ method.
+        In-place difference update with another AbstractSet with the operator -=.
 
         :param other: The set whose elements should be removed from this set.
-        :type other: AbstractSet[T]
+        :type other: AbstractSet[T] | set[T] | frozenset[T]
 
         :return: This updated AbstractMutableSet.
         :rtype: AbstractMutableSet[T]
         """
-        self.values -= other.values
+        from type_validation import _validate_or_coerce_iterable
+        self.difference_update(other)
         return self
 
-    def __ixor__(self: AbstractMutableSet[T], other: AbstractSet[T]) -> AbstractMutableSet[T]:
-        self.values ^= other.values
+    def __ixor__(self: AbstractMutableSet[T], other: AbstractSet[T] | set[T] | frozenset[T]) -> AbstractMutableSet[T]:
+        """
+        In-place symmetric difference update with another AbstractSet with the operator ^=.
+
+        :param other: The set whose elements should be removed from this set.
+        :type other: AbstractSet[T] | set[T] | frozenset[T]
+
+        :return: This updated AbstractMutableSet.
+        :rtype: AbstractMutableSet[T]
+        """
+        from type_validation import _validate_or_coerce_iterable
+        self.symmetric_difference_update(other)
         return self
 
     def add(
@@ -1503,12 +1633,13 @@ class AbstractMutableSet[T](AbstractSet[T]):
         :raise KeyError: If the element is not present.
         """
         from type_validation import _validate_or_coerce_value
+        value_to_remove = value
         if _coerce:
             try:
-                value = _validate_or_coerce_value(value, self.item_type)
+                value_to_remove = _validate_or_coerce_value(value, self.item_type)
             except (TypeError, ValueError):
                 pass
-        self.values.remove(value)
+        self.values.remove(value_to_remove)
 
     def discard(
         self: AbstractMutableSet[T],
@@ -1528,12 +1659,13 @@ class AbstractMutableSet[T](AbstractSet[T]):
         :type _coerce: bool
         """
         from type_validation import _validate_or_coerce_value
+        value_to_remove = value
         if _coerce:
             try:
-                value = _validate_or_coerce_value(value, self.item_type)
+                value_to_remove = _validate_or_coerce_value(value, self.item_type)
             except (TypeError, ValueError):
                 pass
-        self.values.discard(value)
+        self.values.discard(value_to_remove)
 
     def clear(self: AbstractMutableSet[T]) -> None:
         """

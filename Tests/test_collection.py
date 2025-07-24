@@ -130,8 +130,8 @@ class TestCollection(unittest.TestCase):
 
     def test_stateful_collect(self):
         mul = MutableList[int](0, 0, 1, 1, 1, 2)
-
-        def update(acc: MutableList[int], element: int, state: set):
+        # Using stateful_collect to simulate .distinct()
+        def update(acc: MutableList[int], state: set, element: int):
             if element not in state:
                 state.add(element)
                 acc.append(element)

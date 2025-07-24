@@ -1,5 +1,5 @@
 from types import UnionType
-from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar
+from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, TypeVar
 from weakref import WeakValueDictionary
 
 Ts = TypeVarTuple("Ts")
