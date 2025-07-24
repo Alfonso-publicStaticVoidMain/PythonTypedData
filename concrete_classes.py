@@ -15,6 +15,12 @@ from abstract_classes import (
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
 class MutableList[T](AbstractMutableSequence[T]):
+    """
+    Concrete mutable implementation of AbstractMutableSequence, with a list as its underlying container.
+
+    It adds some basic methods to transform the list into other classes created in this file: ImmutableList,
+    MutableSet, ImmutableSet, MutableDict and ImmutableDict.
+    """
 
     item_type: type[T]
     values: list[T]
@@ -25,6 +31,18 @@ class MutableList[T](AbstractMutableSequence[T]):
         _coerce: bool = False,
         _skip_validation: bool = False
     ) -> None:
+        """
+        Delegates to Collection's init propagating or fixing the configuration parameters.
+
+        :param values: One or more values for the MutableList to contain.
+        :type values: Iterable[T] | Collection[T] | T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the values to the type inferred from the generic.
+        :type _coerce: bool
+
+        :param _skip_validation: State parameter that, if True, skips the validation of the values.
+        :type _skip_validation: bool
+        """
         Collection.__init__(self, *values, _forbidden_iterable_types=(AbstractSet, set, frozenset), _coerce=_coerce, _skip_validation=_skip_validation)
 
     def to_immutable_list(self: MutableList[T]) -> ImmutableList[T]:
@@ -53,6 +71,12 @@ class MutableList[T](AbstractMutableSequence[T]):
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
 class ImmutableList[T](AbstractSequence[T]):
+    """
+    Concrete immutable implementation of AbstractSequence, with a tuple as its underlying container.
+
+    It adds some basic methods to transform the list into other classes created in this file: MutableList,
+    MutableSet, ImmutableSet, MutableDict and ImmutableDict.
+    """
 
     item_type: type[T]
     values: tuple[T, ...]
@@ -94,6 +118,12 @@ class ImmutableList[T](AbstractSequence[T]):
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
 class MutableSet[T](AbstractMutableSet[T]):
+    """
+    Concrete mutable implementation of AbstractMutableSet, with a set as its underlying container.
+
+    It adds some basic methods to transform the set into other classes created in this file: ImmutableSet, MutableDict
+    and ImmutableDict.
+    """
 
     item_type: type[T]
     values: set[T]
@@ -126,6 +156,12 @@ class MutableSet[T](AbstractMutableSet[T]):
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
 class ImmutableSet[T](AbstractSet[T]):
+    """
+    Concrete immutable implementation of AbstractSet, with a frozenset as its underlying container.
+
+    It adds some basic methods to transform the set into other classes created in this file: MutableSet, MutableDict
+    and ImmutableDict.
+    """
 
     item_type: type[T]
     values: frozenset[T]
@@ -161,6 +197,12 @@ class ImmutableSet[T](AbstractSet[T]):
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
 class MutableDict[K, V](AbstractMutableDict[K, V]):
+    """
+    Concrete mutable implementation of AbstractMutableDict, with a dict as its underlying container.
+
+    It adds some basic methods to transform the dict, its keys or values into other classes created in this file:
+    MutableList, ImmutableList, MutableSet, ImmutableSet and ImmutableDict.
+    """
 
     key_type: type[K]
     value_type: type[V]
@@ -208,6 +250,12 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
 class ImmutableDict[K, V](AbstractDict[K, V]):
+    """
+    Concrete immutable implementation of AbstractDict, with an immutabledict as its underlying container.
+
+    It adds some basic methods to transform the dict, its keys or values into other classes created in this file:
+    MutableList, ImmutableList, MutableSet, ImmutableSet and MutableDict.
+    """
 
     key_type: type[K]
     value_type: type[V]
