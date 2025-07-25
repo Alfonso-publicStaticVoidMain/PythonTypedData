@@ -77,6 +77,21 @@ def _validate_iterable(obj: Any, item_type: type) -> bool:
 
 
 def _validate_mapping(obj: Any, key_value_types: tuple[type, type]) -> bool:
+    """
+    Validates that all keys and values of a mapping match their expected key and value type.
+
+    :param obj: Mapping object whose keys and values to validate.
+    :type obj: Any
+
+    :param key_value_types: Tuple of key type and value type expected of the Mapping's keys and values.
+    :type key_value_types: tuple[type, type]
+
+    :return: True if all keys and all values validate their given type, False otherwise or if the object isn't a
+    Mapping or AbstractDict.
+    :rtype: bool
+
+    :raises ValueError: If the key_value_types tuple parameter isn't of length 2.
+    """
     if not isinstance(obj, (Mapping, AbstractDict)):
         return False
     if len(key_value_types) != 2:
@@ -86,6 +101,19 @@ def _validate_mapping(obj: Any, key_value_types: tuple[type, type]) -> bool:
 
 
 def _validate_tuple(obj: Any, args: tuple) -> bool:
+    """
+    Validates that a tuple matches the given args.
+
+    :param obj: Tuple object to validate.
+    :type obj: Any
+
+    :param args: Tuple containing the types expected on the tuple.
+    :type args: tuple
+
+    :return: True if the tuple object validates the types contained on args, accounting for possible Ellipsis, False
+    otherwise or if the object isn't a tuple.
+    :rtype: bool
+    """
     if not isinstance(obj, tuple):
         return False
     if len(args) == 2 and args[1] is Ellipsis:
@@ -96,9 +124,22 @@ def _validate_tuple(obj: Any, args: tuple) -> bool:
 
 
 def _validate_maybe(obj: Any, args: Any) -> bool:
+    """
+    Validates that a Maybe object is set up to contain a value of type args.
+
+    :param obj: Maybe object to validate.
+    :type obj: Any
+
+    :param args: Type expected to be contained on the object,
+    :type args: Any
+
+    :return: True if obj is an instance of Maybe, its item_type is args and either its value is None or is of type args.
+    False otherwise.
+    :rtype: bool
+    """
     if not isinstance(obj, Maybe):
         return False
-    return obj.value is None or _validate_type(obj.value, args)
+    return obj.item_type == args and (obj.value is None or _validate_type(obj.value, args))
 
 
 def _validate_or_coerce_value[T](
@@ -348,13 +389,9 @@ def _infer_type(obj: Any) -> type:
 
 def _infer_iterable_type(iterable: Any) -> type:
     if isinstance(iterable, Collection):
-        inferred = type(iterable)._inferred_item_type()
-        if inferred is not None:
+        if hasattr(type(iterable), '_args'):
             return type(iterable)
-
-        item_type = getattr(iterable, 'item_type', None)
-        if item_type is not None:
-            return type(iterable)[item_type]
+        return type(iterable)[iterable.item_type]
 
     if not iterable:
         raise ValueError("Cannot infer type from empty iterable")
