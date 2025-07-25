@@ -1,11 +1,104 @@
 from __future__ import annotations
 
-import collections
 from types import UnionType
-from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Literal, Mapping
+from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Literal, Mapping, Sequence
 
 from abstract_classes import Collection, AbstractDict
 from maybe import Maybe
+
+
+def _validate_type(obj: Any, expected_type: type) -> bool:
+    """
+    Validates if an object is of an expected type, with matching generics.
+
+    :param obj: Object to validate the type of.
+    :type obj: Any
+
+    :param expected_type: Type to check if the object is an instance of.
+    :type expected_type: type
+
+    :return: True if the object is an instance of the expected type, matching its generics too. False otherwise.
+    :rtype: bool
+    """
+    if expected_type is Any:
+        return True
+
+    origin = get_origin(expected_type)
+    args = get_args(expected_type)
+
+    if origin is None and hasattr(expected_type, '_args'):
+        origin = expected_type._origin
+        args = expected_type._args
+
+    if origin in (Union, UnionType):
+        return any(_validate_type(obj, arg) for arg in args)
+
+    if origin is Annotated:
+        return _validate_type(obj, args[0])
+
+    if origin is Literal:
+        return obj in args
+
+    if origin is tuple:
+        return _validate_tuple(obj, args)
+
+    if origin in (list, set, frozenset, Sequence) or (isinstance(origin, type) and issubclass(origin, Collection)):
+        return _validate_iterable(obj, args[0])
+
+    if origin in (Mapping, dict) or (isinstance(origin, type) and issubclass(origin, AbstractDict)):
+        return _validate_mapping(obj, args)
+
+    if isinstance(origin, type) and issubclass(origin, Maybe):
+        return _validate_maybe(obj, args[0])
+
+    if origin is None:
+        return isinstance(obj, expected_type)
+
+    return False
+
+
+def _validate_iterable(obj: Any, item_type: type) -> bool:
+    """
+    Validates that all items in an iterable are of the expected type.
+
+    :param obj: Iterable object whose items to validate.
+    :type obj: Any
+
+    :param item_type: Type to validate the items against.
+    :type item_type: type
+
+    :return: True if all elements of the iterable validate the given type, False otherwise or if the object isn't an
+    Iterable.
+    :rtype: bool
+    """
+    if not isinstance(obj, Iterable) or isinstance(obj, str):
+        return False
+    return all(_validate_type(item, item_type) for item in obj)
+
+
+def _validate_mapping(obj: Any, key_value_types: tuple[type, type]) -> bool:
+    if not isinstance(obj, (Mapping, AbstractDict)):
+        return False
+    if len(key_value_types) != 2:
+        raise ValueError(f"_validate_mapping_type method called with a tuple argument {key_value_types} of length {len(key_value_types)} != 2.")
+    key_type, val_type = key_value_types
+    return all(_validate_type(key, key_type) and _validate_type(value, val_type) for key, value in obj.items())
+
+
+def _validate_tuple(obj: Any, args: tuple) -> bool:
+    if not isinstance(obj, tuple):
+        return False
+    if len(args) == 2 and args[1] is Ellipsis:
+        return all(_validate_type(v, args[0]) for v in obj)
+    if len(obj) != len(args):
+        return False
+    return all(_validate_type(v, t) for v, t in zip(obj, args))
+
+
+def _validate_maybe(obj: Any, args: Any) -> bool:
+    if not isinstance(obj, Maybe):
+        return False
+    return obj.value is None or _validate_type(obj.value, args)
 
 
 def _validate_or_coerce_value[T](
@@ -37,7 +130,7 @@ def _validate_or_coerce_value[T](
     :returns: The obj itself if it's of the expected type, or its coercion to that type if it's valid.
     :rtype: T
 
-    :raises TypeError: if obj doesn't match expected_type and cannot be safely coerced.
+    :raises TypeError: if obj doesn't match item_type and cannot be safely coerced.
     """
     if _validate_type(obj, expected_type):
         return obj
@@ -110,7 +203,7 @@ def _validate_collection_type_and_get_values[T](
     """
     Validates and optionally coerces the elements, also checking that the Iterable is of one of the given allowed types.
 
-    Checks that an Iterable or Collection object other holds values of type expected_type and that is of a given allowed
+    Checks that an Iterable or Collection object other holds values of type item_type and that is of a given allowed
     type from among this library's typed types or Python's built-ins. Returns a list containing the values the iterable
     held, after performing type coercion if enabled.
 
@@ -194,9 +287,7 @@ def _validate_duplicates_and_hash(iterable: Iterable) -> None:
         raise ValueError(f"Duplicate keys detected: {duplicates}")
 
 
-def _split_keys_values[K, V](
-    keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]
-) -> tuple[list[K], list[V], bool]:
+def _split_keys_values[K, V](keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]) -> tuple[list[K], list[V], bool]:
     """
     Splits the keys and values from a dict-like structure or an iterable of (key, value) tuples and returns them.
 
@@ -315,85 +406,28 @@ def _combine_types[T](type_set: set[type[T]]) -> type[T]:
         return result_type
 
 
-def _infer_type_contained_in_iterable[T](iterable: Iterable[Any]) -> type[T]:
+def _infer_type_contained_in_iterable[T](iterable: Iterable[T]) -> type[T]:
     """
-    Infers the type of items inside an iterable by inferring the type of each item.
-    Supports nested containers. Raises ValueError if the iterable is empty or contains incompatible types.
+    Infers the type of items inside an iterable by inferring the type of each item and combining them if needed.
+
+    Supports nested containers and recursively infers their generic types too.
+
+    :param iterable: Iterable object to infer its contained type.
+    :type iterable: Iterable[T]
+
+    :return: A type that all the items in the iterable belong to, with unions if need be.
+    :rtype: type[T]
+
+    :raises ValueError: If the iterable is None or if it's empty but isn't a Collection (which still has an item_type
+    attached even if they're empty).
     """
     if iterable is None:
         raise ValueError("Cannot infer type from None")
+
     if isinstance(iterable, Collection) and hasattr(type(iterable), '_args'):
         return type(iterable)._inferred_item_type()
+
     if not iterable:
         raise ValueError("Cannot infer type from an empty iterable")
 
     return _combine_types({_infer_type(val) for val in iterable})
-
-
-def _validate_type(obj: Any, expected_type: type) -> bool:
-    if expected_type is Any:
-        return True
-
-    origin = get_origin(expected_type)
-    args = get_args(expected_type)
-
-    if origin is None and hasattr(expected_type, '_args'):
-        origin = expected_type._origin
-        args = expected_type._args
-
-    if origin in (Union, UnionType):
-        return any(_validate_type(obj, arg) for arg in args)
-
-    if origin is Annotated:
-        return _validate_type(obj, args[0])
-
-    if origin is Literal:
-        return obj in args
-
-    if origin is tuple:
-        return _validate_tuple(obj, args)
-
-    if origin in (list, set, frozenset, collections.abc.Sequence) or (isinstance(origin, type) and issubclass(origin, Collection)):
-        return _validate_iterable(obj, origin, args[0])
-
-    if origin in (collections.abc.Mapping, dict) or (isinstance(origin, type) and issubclass(origin, AbstractDict)):
-        return _validate_mapping(obj, origin, args)
-
-    if isinstance(origin, type) and issubclass(origin, Maybe):
-        return _validate_maybe(obj, args[0])
-
-    if origin is None:
-        return isinstance(obj, expected_type)
-
-    return False
-
-
-def _validate_iterable(obj: Any, iterable_type: type, item_type: Any) -> bool:
-    if not isinstance(obj, iterable_type) or isinstance(obj, str):
-        return False
-    return all(_validate_type(item, item_type) for item in obj)
-
-
-def _validate_mapping(obj: Any, mapping_type: type, key_value_types: tuple[type, type]) -> bool:
-    if not isinstance(obj, mapping_type):
-        return False
-    if len(key_value_types) != 2:
-        raise ValueError(f"_validate_mapping_type method called with a tuple argument {key_value_types} of length {len(key_value_types)} != 2.")
-    key_type, val_type = key_value_types
-    return all(_validate_type(key, key_type) and _validate_type(value, val_type) for key, value in obj.items())
-
-
-def _validate_tuple(obj: Any, args: tuple) -> bool:
-    if not isinstance(obj, tuple):
-        return False
-    if len(args) == 2 and args[1] is Ellipsis:
-        return all(_validate_type(v, args[0]) for v in obj)
-    if len(obj) != len(args):
-        return False
-    return all(_validate_type(v, t) for v, t in zip(obj, args))
-
-
-def _validate_maybe(obj: Any, args: Any) -> bool:
-    if not isinstance(obj, Maybe):
-        return False
-    return obj.value is None or _validate_type(obj.value, args)
