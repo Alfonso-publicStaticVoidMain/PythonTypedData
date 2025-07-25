@@ -37,7 +37,7 @@ def _validate_or_coerce_value[T](
     :returns: The obj itself if it's of the expected type, or its coercion to that type if it's valid.
     :rtype: T
 
-    :raises: TypeError if obj doesn't match expected_type and cannot be safely coerced.
+    :raises TypeError: if obj doesn't match expected_type and cannot be safely coerced.
     """
     if _validate_type(obj, expected_type):
         return obj
@@ -81,12 +81,18 @@ def _validate_or_coerce_iterable[T](
     _coerce: bool = False
 ) -> list[T]:
     """
-    Validates that all elements of an Iterable are of a given type, and coerces all that aren't if the _coerce parameter
-    is set to True. Returns the coerced or validated iterable as a list.
-    :param expected_type: Type to _coerce the elements to.
+    Validates and optionally coerces the elements of an iterable against a given type, and returns them as a list.
+
+    :param expected_type: Type to validate against and optionally coerce the elements into.
+    :type expected_type: type[T]
+
     :param iterable: Iterable object to _coerce its elements into.
-    :return: A list containing all elements after performing coercion.
-    :raise: An Error will be raised if any coercion isn't possible.
+    :type iterable: Iterable[Any] | None
+
+    :return: A list containing all elements after performing validation and optionally coercion.
+    :rtype: list[T]
+
+    :raises TypeError: If any value isn't of the expected type and coercion isn't possible or wasn't enabled.
     """
     if iterable is None:
         return []
@@ -99,21 +105,35 @@ def _validate_collection_type_and_get_values[T](
     *,
     _valid_typed_types: tuple[type[Collection], ...] = (Collection,),
     _valid_built_in_types: tuple[type[Iterable], ...] = (Iterable,),
-    _coerce: bool = False) -> list[T]:
+    _coerce: bool = False
+) -> list[T]:
     """
-    Checks that an Iterable or Collection object other holds iterable of type expected_type and that is of a given allowed
-    type from among this library's typed types or Python's built-ins. Returns a list containing the values the iterable held,
-    after performing type coercion if enabled.
-    :param expected_type: Type to compare the type against.
+    Validates and optionally coerces the elements, also checking that the Iterable is of one of the given allowed types.
+
+    Checks that an Iterable or Collection object other holds values of type expected_type and that is of a given allowed
+    type from among this library's typed types or Python's built-ins. Returns a list containing the values the iterable
+    held, after performing type coercion if enabled.
+
     :param collection: Typed or not object to check its contained type.
-    :param _valid_typed_types: Types from my typed classes that should be accepted.
+    :type collection: Iterable[T] | Collection[T]
+
+    :param expected_type: Type to compare the type against.
+    :type expected_type: type[T]
+
+    :param _valid_typed_types: Types from this library that should be accepted.
+    :type _valid_typed_types: tuple[type[Collection], ...]
+
     :param _valid_built_in_types: Typed from Python's built ins that should be accepted.
-    :return: A list containing the iterable contained on the others object after validating its type and coercing.
+    :type _valid_built_in_types: tuple[type[Iterable], ...]
+
+    :return: A list with the values of the iterable after validation and coercion.
+    :rtype: list[T]
     """
     if isinstance(collection, _valid_typed_types):
         if not _coerce and not issubclass(collection.item_type, expected_type):
             raise ValueError(f"Type mismatch between expected type {expected_type.__name__} and actual: {collection.item_type.__name__}")
         other_values = _validate_or_coerce_iterable(collection.values, expected_type, _coerce=_coerce)
+
     elif isinstance(collection, _valid_built_in_types):
         other_values = _validate_or_coerce_iterable(collection, expected_type, _coerce=_coerce)
 
@@ -129,6 +149,21 @@ def _validate_or_coerce_iterable_of_iterables[T](
     *,
     _coerce: bool = False
 ) -> list[list[T]]:
+    """
+    Validates and optionally coerces each iterable inside an iterable and returns them as a list of lists.
+
+    :param iterables: An Iterable containing one or more Iterable objects to validate and coerce.
+    :type iterables: Iterable[Iterable[T]]
+
+    :param expected_type: Type to validate against and optionally coerce the values into.
+    :type expected_type: type[T]
+
+    :param _coerce: State parameter to force type coercion or not. Some numeric type coercions are always performed.
+    :type _coerce: bool
+
+    :return: A list of lists containing the validated and optionally coerced iterables.
+    :rtype: list[list[T]]
+    """
     other_iterables: list = []
     for iterable in iterables:
         other_iterables.append(_validate_collection_type_and_get_values(iterable, expected_type, _coerce=_coerce))
@@ -136,17 +171,25 @@ def _validate_or_coerce_iterable_of_iterables[T](
 
 
 def _validate_duplicates_and_hash(iterable: Iterable) -> None:
+    """
+    Validates that an iterable contains only hashable elements and no duplicates. Raises an Error otherwise.
+
+    :param iterable: Iterable object to validate.
+    :type iterable: Iterable
+
+    :raises TypeError: If the iterable contains a key that isn't hashable.
+    :raises ValueError: If the iterable contains duplicate elements, and displays those.
+    """
     seen = set()
     duplicates = set()
     for key in iterable:
-        try:
-            hash(key)
-        except TypeError:
-            raise TypeError(f"Key {key!r} is not hashable and cannot be used as a dictionary key.")
         if key in seen:
             duplicates.add(key)
         else:
-            seen.add(key)
+            try:
+                seen.add(key)
+            except TypeError:
+                raise TypeError(f"Key {key!r} is not hashable and cannot be used as a dictionary key.")
     if duplicates:
         raise ValueError(f"Duplicate keys detected: {duplicates}")
 
@@ -154,6 +197,21 @@ def _validate_duplicates_and_hash(iterable: Iterable) -> None:
 def _split_keys_values[K, V](
     keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]
 ) -> tuple[list[K], list[V], bool]:
+    """
+    Splits the keys and values from a dict-like structure or an iterable of (key, value) tuples and returns them.
+
+    :param keys_values: Data structure containing the keys and values.
+    :type keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]
+
+    :return: A tuple of the list of keys, the list of values, and a boolean that will be True if they came from an
+    iterable of tuples.
+    :rtype: tuple[list[K], list[V], bool]
+
+    :raises TypeError: If the keys and values were given as an iterable but it either doesn't contain tuples or any
+    of those tuples isn't of length 2.
+    :raises TypeError: If the keys_values parameter isn't of the allowed types.
+    :raises ValueError: If the number of keys and values differ.
+    """
     keys_from_iterable = False
     if isinstance(keys_values, (dict, Mapping, AbstractDict)):
         keys = keys_values.keys()
@@ -177,8 +235,13 @@ def _split_keys_values[K, V](
 
 def _infer_type(obj: Any) -> type:
     """
-    Infers the most specific typing annotation of a given obj,
-    recursively handling collections like list, set, dict, and tuple.
+    Infers the most specific typing annotation of a given object, recursively handling collections like list, dict, and tuple.
+
+    :param obj: Object to infer the type of.
+    :type obj: Any
+
+    :return: The type of the object, including its generics.
+    :rtype: type
     """
     if isinstance(obj, (list, set, frozenset)):
         return _infer_iterable_type(obj)

@@ -279,7 +279,7 @@ class Collection[T](GenericBase[T]):
         """
         from copy import deepcopy
         values = deepcopy(self.values) if deep else (self.values.copy() if hasattr(self.values, 'copy') else self.values)
-        return type(self)[self.item_type](values, _skip_validation=True)
+        return type(self)(values, _skip_validation=True)
 
     def to_list(self: Collection[T]) -> list[T]:
         """
@@ -325,10 +325,10 @@ class Collection[T](GenericBase[T]):
         """
         Returns a dictionary obtained by calling the key and value mappers on each item of the Collection.
 
-        :param key_mapper: Callable to obtain the keys from. Defaults to identity mapping.
+        :param key_mapper: Function to obtain the keys from. Defaults to identity mapping.
         :type key_mapper: Callable[[T], K]
 
-        :param value_mapper: Callable to obtain the values from. Defaults to identity mapping.
+        :param value_mapper: Function to obtain the values from. Defaults to identity mapping.
         :type value_mapper: Callable[[T], V]
 
         :return: A dictionary derived from the Collection by mapping each item to a (key, value) pair using the provided
@@ -372,7 +372,7 @@ class Collection[T](GenericBase[T]):
         :param f: Callable object to map the Collection with.
         :type f: Callable[[T], R]
 
-        :param result_type: Type expected to be returned by the Callable.
+        :param result_type: Type expected to be returned by the Callable. If None, it will be inferred.
         :type result_type: type[R] | None
 
         :param _coerce: State parameter that if True, tries to coerce results to the result_type if it's not None.
@@ -403,7 +403,7 @@ class Collection[T](GenericBase[T]):
         :param f: Callable object to map the Collection with.
         :type f: Callable[[T], Iterable[R]]
 
-        :param result_type: Type of Iterable expected to be returned by the Callable.
+        :param result_type: Type of Iterable expected to be returned by the Callable. If None, it will be inferred.
         :type result_type: type[R] | None
 
         :param _coerce: State parameter to try to force coercion to the expected result type if it's not None.
@@ -2209,41 +2209,41 @@ class AbstractDict[K, V](GenericBase[K, V]):
         self, and its value type is either inferred from the mapped values or taken from result_type if it's not None.
         :rtype: AbstractDict[K, R]
         """
-        from type_validation import _infer_type_contained_in_iterable
         new_data = {key : f(value) for key, value in self.data.items()}
         if result_type is not None:
             return type(self)[self.key_type, result_type](new_data, _coerce_values=_coerce_values)
         else:
+            from type_validation import _infer_type_contained_in_iterable
             inferred_return_type = _infer_type_contained_in_iterable(new_data.values())
             return type(self)[self.key_type, inferred_return_type](new_data, _skip_validation=True)
 
     def filter_keys(self: AbstractDict[K, V], predicate: Callable[[K], bool]) -> AbstractDict[K, V]:
         """
-        Returns a new AbstractDict containing only the key-value pairs whose keys satisfy a predicate.
+        Returns a new AbstractDict containing only the (key, value) pairs whose keys satisfy a predicate.
 
         :param predicate: A function to the booleans that returns True for keys to retain.
         :type predicate: Callable[[K], bool]
 
-        :return: A new AbstractDict of the same dynamic subclass as self containing the filtered key-value pairs.
+        :return: A new AbstractDict of the same dynamic subclass as self containing the filtered (key, value) pairs.
         :rtype: AbstractDict[K, V]
         """
         return type(self)({key : value for key, value in self.data.items() if predicate(key)})
 
     def filter_values(self: AbstractDict[K, V], predicate: Callable[[V], bool]) -> AbstractDict[K, V]:
         """
-        Returns a new AbstractDict containing only the key-value pairs whose values satisfy a predicate.
+        Returns a new AbstractDict containing only the (key, value) pairs whose values satisfy a predicate.
 
         :param predicate: A function to the booleans that returns True for values to retain.
         :type predicate: Callable[[V], bool]
 
-        :return: A new AbstractDict of the same dynamic subclass as self containing the filtered key-value pairs.
+        :return: A new AbstractDict of the same dynamic subclass as self containing the filtered (key, value) pairs.
         :rtype: AbstractDict[K, V]
         """
         return type(self)({key : value for key, value in self.data.items() if predicate(value)})
 
     def filter_items(self: AbstractDict[K, V], predicate: Callable[[K, V], bool]) -> AbstractDict[K, V]:
         """
-        Returns a new AbstractDict containing only the key-value pairs that satisfy a (key, value) predicate.
+        Returns a new AbstractDict containing only the (key, value) pairs that satisfy a (key, value) predicate.
 
         :param predicate: A function that returns True for pairs to retain.
         :type predicate: Callable[[K, V], bool]

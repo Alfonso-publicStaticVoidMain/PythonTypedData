@@ -34,6 +34,12 @@ class MutableList[T](AbstractMutableSequence[T]):
         """
         Delegates to Collection's init propagating or fixing the configuration parameters.
 
+        _coerce and _skip_validation are propagated, and _forbidden_iterable_types is set to contain AbstractSet, set
+        and frozenset, as initializing a list with the values of a set can't guarantee a consistent ordering of them.
+
+        The _finisher parameter of Collection's init is inferred from AbstractMutableSequence's ClassVar _finisher
+        attribute, which is by default set to list.
+
         :param values: One or more values for the MutableList to contain.
         :type values: Iterable[T] | Collection[T] | T
 
@@ -46,12 +52,33 @@ class MutableList[T](AbstractMutableSequence[T]):
         Collection.__init__(self, *values, _forbidden_iterable_types=(AbstractSet, set, frozenset), _coerce=_coerce, _skip_validation=_skip_validation)
 
     def to_immutable_list(self: MutableList[T]) -> ImmutableList[T]:
+        """
+        Returns this list as an ImmutableList.
+
+        :return: A new ImmutableList object with the same item_type as self and containing the same values on the same
+        order. Validation is skipped when creating this object.
+        :type: ImmutableList[T]
+        """
         return ImmutableList[self.item_type](self.values, _skip_validation=True)
 
     def to_mutable_set(self: MutableList[T]) -> MutableSet[T]:
+        """
+        Returns this list as a MutableSet.
+
+        :return: A new MutableSet object with the same item_type as self and containing the same values. Validation is
+        skipped when creating this object.
+        :type: MutableSet[T]
+        """
         return MutableSet[self.item_type](self.values, _skip_validation=True)
 
     def to_immutable_set(self: MutableList[T]) -> ImmutableSet[T]:
+        """
+        Returns this list as an ImmutableSet.
+
+        :return: A new ImmutableSet object with the same item_type as self and containing the same values. Validation is
+        skipped when creating this object.
+        :type: ImmutableSet[T]
+        """
         return ImmutableSet[self.item_type](self.values, _skip_validation=True)
 
     def to_mutable_dict[K, V](
@@ -59,13 +86,39 @@ class MutableList[T](AbstractMutableSequence[T]):
         key_mapper: Callable[[T], K] = lambda x : x,
         value_mapper: Callable[[T], V] = lambda x : x
     ) -> MutableDict[K, V]:
+        """
+        Returns a MutableDict obtained by calling the key and value mappers on each item of the Collection.
+
+        :param key_mapper: Function to obtain the keys from. Defaults to identity mapping.
+        :type key_mapper: Callable[[T], K]
+
+        :param value_mapper: Function to obtain the values from. Defaults to identity mapping.
+        :type value_mapper: Callable[[T], V]
+
+        :return: A new MutableDict object containing the (key, value) pairs obtained by applying the key and value
+        mappings to the elements of this MutableList, inferring the dict types from them.
+        :rtype: MutableDict[K, V]
+        """
         return MutableDict.of(self.to_dict(key_mapper, value_mapper))
 
     def to_immutable_dict[K, V](
         self: MutableList[T],
         key_mapper: Callable[[T], K] = lambda x : x,
         value_mapper: Callable[[T], V] = lambda x : x
-    ) -> MutableDict[K, V]:
+    ) -> ImmutableDict[K, V]:
+        """
+        Returns an ImmutableDict obtained by calling the key and value mappers on each item of the Collection.
+
+        :param key_mapper: Function to obtain the keys from. Defaults to identity mapping.
+        :type key_mapper: Callable[[T], K]
+
+        :param value_mapper: Function to obtain the values from. Defaults to identity mapping.
+        :type value_mapper: Callable[[T], V]
+
+        :return: A new ImmutableDict object containing the (key, value) pairs obtained by applying the key and value
+        mappings to the elements of this MutableList, inferring the dict types from them.
+        :rtype: ImmutableDict[K, V]
+        """
         return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))
 
 
@@ -87,18 +140,57 @@ class ImmutableList[T](AbstractSequence[T]):
         _coerce: bool = False,
         _skip_validation: bool = False
     ) -> None:
+        """
+        Delegates to Collection's init propagating or fixing the configuration parameters.
+
+        _coerce and _skip_validation are propagated, and _forbidden_iterable_types is set to contain AbstractSet, set
+        and frozenset, as initializing a list with the values of a set can't guarantee a consistent ordering of them.
+
+        The _finisher parameter of Collection's init is inferred from AbstractSequence's ClassVar _finisher attribute,
+        which is by default set to tuple.
+
+        :param values: One or more values for the MutableList to contain.
+        :type values: Iterable[T] | Collection[T] | T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the values to the type inferred from the generic.
+        :type _coerce: bool
+
+        :param _skip_validation: State parameter that, if True, skips the validation of the values.
+        :type _skip_validation: bool
+        """
         Collection.__init__(self, *values, _forbidden_iterable_types=(AbstractSet, set, frozenset), _coerce=_coerce, _skip_validation=_skip_validation)
 
     def __repr__(self: Collection[T]) -> str:
         return f"{class_name(type(self))}{list(self.values)}"
 
     def to_mutable_list(self: ImmutableList[T]) -> MutableList[T]:
+        """
+        Returns this list as a MutableList.
+
+        :return: A new MutableList object with the same item_type as self and containing the same values on the same
+        order. Validation is skipped when creating this object.
+        :type: MutableList[T]
+        """
         return MutableList[self.item_type](self.values, _skip_validation=True)
 
     def to_mutable_set(self: ImmutableList[T]) -> MutableSet[T]:
+        """
+        Returns this list as a MutableSet.
+
+        :return: A new MutableSet object with the same item_type as self and containing the same values. Validation is
+        skipped when creating this object.
+        :type: MutableSet[T]
+        """
         return MutableSet[self.item_type](self.values, _skip_validation=True)
 
     def to_immutable_set(self: ImmutableList[T]) -> ImmutableSet[T]:
+        """
+        Returns this list as an ImmutableSet.
+
+        :return: A new ImmutableSet object with the same item_type as self and containing the same values. Validation is
+        skipped when creating this object.
+        :type: ImmutableSet[T]
+        """
         return ImmutableSet[self.item_type](self.values, _skip_validation=True)
 
     def to_mutable_dict[K, V](
@@ -106,13 +198,39 @@ class ImmutableList[T](AbstractSequence[T]):
         key_mapper: Callable[[T], K] = lambda x : x,
         value_mapper: Callable[[T], V] = lambda x : x
     ) -> MutableDict[K, V]:
+        """
+        Returns a MutableDict obtained by calling the key and value mappers on each item of the Collection.
+
+        :param key_mapper: Function to obtain the keys from. Defaults to identity mapping.
+        :type key_mapper: Callable[[T], K]
+
+        :param value_mapper: Function to obtain the values from. Defaults to identity mapping.
+        :type value_mapper: Callable[[T], V]
+
+        :return: A new MutableDict object containing the (key, value) pairs obtained by applying the key and value
+        mappings to the elements of this MutableList, inferring the dict types from them.
+        :rtype: MutableDict[K, V]
+        """
         return MutableDict.of(self.to_dict(key_mapper, value_mapper))
 
     def to_immutable_dict[K, V](
         self: ImmutableList[T],
         key_mapper: Callable[[T], K] = lambda x : x,
         value_mapper: Callable[[T], V] = lambda x : x
-    ) -> MutableDict[K, V]:
+    ) -> ImmutableDict[K, V]:
+        """
+        Returns an ImmutableDict obtained by calling the key and value mappers on each item of the Collection.
+
+        :param key_mapper: Function to obtain the keys from. Defaults to identity mapping.
+        :type key_mapper: Callable[[T], K]
+
+        :param value_mapper: Function to obtain the values from. Defaults to identity mapping.
+        :type value_mapper: Callable[[T], V]
+
+        :return: A new ImmutableDict object containing the (key, value) pairs obtained by applying the key and value
+        mappings to the elements of this MutableList, inferring the dict types from them.
+        :rtype: ImmutableDict[K, V]
+        """
         return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))
 
 
@@ -134,9 +252,33 @@ class MutableSet[T](AbstractMutableSet[T]):
         _coerce: bool = False,
         _skip_validation: bool = False
     ) -> None:
+        """
+        Delegates to Collection's init propagating or fixing the configuration parameters.
+
+        _coerce and _skip_validation are propagated, and _forbidden_iterable_types is omitted, so it is empty by default.
+
+        The _finisher parameter of Collection's init is inferred from AbstractMutableSet's ClassVar _finisher attribute,
+        which is by default set to set.
+
+        :param values: One or more values for the MutableList to contain.
+        :type values: Iterable[T] | Collection[T] | T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the values to the type inferred from the generic.
+        :type _coerce: bool
+
+        :param _skip_validation: State parameter that, if True, skips the validation of the values.
+        :type _skip_validation: bool
+        """
         Collection.__init__(self, *values, _coerce=_coerce, _skip_validation=_skip_validation)
 
     def to_immutable_set(self: MutableSet[T]) -> ImmutableSet[T]:
+        """
+        Returns this set as an ImmutableSet.
+
+        :return: A new ImmutableSet object with the same item_type as self and containing the same values. Validation is
+        skipped when creating this object.
+        :type: ImmutableSet[T]
+        """
         return ImmutableSet[self.item_type](self.values, _skip_validation=True)
 
     def to_mutable_dict[K, V](
@@ -144,13 +286,39 @@ class MutableSet[T](AbstractMutableSet[T]):
         key_mapper: Callable[[T], K] = lambda x : x,
         value_mapper: Callable[[T], V] = lambda x : x
     ) -> MutableDict[K, V]:
+        """
+        Returns a MutableDict obtained by calling the key and value mappers on each item of the Collection.
+
+        :param key_mapper: Function to obtain the keys from. Defaults to identity mapping.
+        :type key_mapper: Callable[[T], K]
+
+        :param value_mapper: Function to obtain the values from. Defaults to identity mapping.
+        :type value_mapper: Callable[[T], V]
+
+        :return: A new MutableDict object containing the (key, value) pairs obtained by applying the key and value
+        mappings to the elements of this MutableList, inferring the dict types from them.
+        :rtype: MutableDict[K, V]
+        """
         return MutableDict.of(self.to_dict(key_mapper, value_mapper))
 
     def to_immutable_dict[K, V](
         self: MutableSet[T],
         key_mapper: Callable[[T], K] = lambda x : x,
         value_mapper: Callable[[T], V] = lambda x : x
-    ) -> MutableDict[K, V]:
+    ) -> ImmutableDict[K, V]:
+        """
+        Returns an ImmutableDict obtained by calling the key and value mappers on each item of the Collection.
+
+        :param key_mapper: Function to obtain the keys from. Defaults to identity mapping.
+        :type key_mapper: Callable[[T], K]
+
+        :param value_mapper: Function to obtain the values from. Defaults to identity mapping.
+        :type value_mapper: Callable[[T], V]
+
+        :return: A new ImmutableDict object containing the (key, value) pairs obtained by applying the key and value
+        mappings to the elements of this MutableList, inferring the dict types from them.
+        :rtype: ImmutableDict[K, V]
+        """
         return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))
 
 
@@ -172,12 +340,36 @@ class ImmutableSet[T](AbstractSet[T]):
         _coerce: bool = False,
         _skip_validation: bool = False
     ) -> None:
+        """
+        Delegates to Collection's init propagating or fixing the configuration parameters.
+
+        _coerce and _skip_validation are propagated, and _forbidden_iterable_types is omitted, so it is empty by default.
+
+        The _finisher parameter of Collection's init is inferred from AbstractSet's ClassVar _finisher attribute, which
+        is by default set to frozenset.
+
+        :param values: One or more values for the MutableList to contain.
+        :type values: Iterable[T] | Collection[T] | T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the values to the type inferred from the generic.
+        :type _coerce: bool
+
+        :param _skip_validation: State parameter that, if True, skips the validation of the values.
+        :type _skip_validation: bool
+        """
         Collection.__init__(self, *values, _coerce=_coerce, _skip_validation=_skip_validation)
 
     def __repr__(self: Collection[T]) -> str:
         return f"{type(self).__name__}{set(self.values)}"
 
     def to_mutable_set(self: ImmutableSet[T]) -> MutableSet[T]:
+        """
+        Returns this set as a MutableSet.
+
+        :return: A new MutableSet object with the same item_type as self and containing the same values. Validation is
+        skipped when creating this object.
+        :type: MutableSet[T]
+        """
         return MutableSet[self.item_type](self.values, _skip_validation=True)
 
     def to_mutable_dict[K, V](
@@ -185,13 +377,39 @@ class ImmutableSet[T](AbstractSet[T]):
         key_mapper: Callable[[T], K] = lambda x : x,
         value_mapper: Callable[[T], V] = lambda x : x
     ) -> MutableDict[K, V]:
+        """
+        Returns a MutableDict obtained by calling the key and value mappers on each item of the Collection.
+
+        :param key_mapper: Function to obtain the keys from. Defaults to identity mapping.
+        :type key_mapper: Callable[[T], K]
+
+        :param value_mapper: Function to obtain the values from. Defaults to identity mapping.
+        :type value_mapper: Callable[[T], V]
+
+        :return: A new MutableDict object containing the (key, value) pairs obtained by applying the key and value
+        mappings to the elements of this MutableList, inferring the dict types from them.
+        :rtype: MutableDict[K, V]
+        """
         return MutableDict.of(self.to_dict(key_mapper, value_mapper))
 
     def to_immutable_dict[K, V](
         self: ImmutableSet[T],
         key_mapper: Callable[[T], K] = lambda x : x,
         value_mapper: Callable[[T], V] = lambda x : x
-    ) -> MutableDict[K, V]:
+    ) -> ImmutableDict[K, V]:
+        """
+        Returns an ImmutableDict obtained by calling the key and value mappers on each item of the Collection.
+
+        :param key_mapper: Function to obtain the keys from. Defaults to identity mapping.
+        :type key_mapper: Callable[[T], K]
+
+        :param value_mapper: Function to obtain the values from. Defaults to identity mapping.
+        :type value_mapper: Callable[[T], V]
+
+        :return: A new ImmutableDict object containing the (key, value) pairs obtained by applying the key and value
+        mappings to the elements of this MutableList, inferring the dict types from them.
+        :rtype: ImmutableDict[K, V]
+        """
         return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))
 
 
@@ -221,30 +439,85 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         AbstractDict.__init__(self, keys_values, _coerce_keys=_coerce_keys, _coerce_values=_coerce_values, _keys=_keys, _values=_values, _skip_validation=_skip_validation)
 
     def to_immutable_dict(self: MutableDict[K, V]) -> ImmutableDict[K, V]:
+        """
+        Returns this dict as an ImmutableDict.
+
+        :return: A new ImmutableDict object with the same key and value types as self and containing the data.
+        Validation is skipped when creating this object.
+        :type: ImmutableDict[T]
+        """
         return ImmutableDict[self.key_type, self.value_type](self.data, _skip_validation=True)
 
-    def to_keys_mutable_list(self: MutableDict[K, V]) -> MutableList[K]:
+    def keys_as_mutable_list(self: MutableDict[K, V]) -> MutableList[K]:
+        """
+        Returns a MutableList containing all keys in the dictionary.
+
+        :return: A MutableList of keys.
+        :rtype: MutableList[K]
+        """
         return MutableList[self.key_type](self.keys())
 
-    def to_keys_immutable_list(self: MutableDict[K, V]) -> ImmutableList[K]:
+    def keys_as_immutable_list(self: MutableDict[K, V]) -> ImmutableList[K]:
+        """
+        Returns an ImmutableList containing all keys in the dictionary.
+
+        :return: A new ImmutableList object with the key type as its item type containing all the keys.
+        :rtype: ImmutableList[K]
+        """
         return ImmutableList[self.key_type](self.keys())
 
-    def to_keys_mutable_set(self: MutableDict[K, V]) -> MutableSet[K]:
+    def keys_as_mutable_set(self: MutableDict[K, V]) -> MutableSet[K]:
+        """
+        Returns a MutableSet containing all keys in the dictionary.
+
+        :return: A new MutableSet object with the key type as its item type containing all the keys.
+        :rtype: MutableSet[K]
+        """
         return MutableSet[self.key_type](self.keys())
 
-    def to_keys_immutable_set(self: MutableDict[K, V]) -> ImmutableSet[K]:
+    def keys_as_immutable_set(self: MutableDict[K, V]) -> ImmutableSet[K]:
+        """
+        Returns an ImmutableSet containing all keys in the dictionary.
+
+        :return: A new ImmutableSet object with the key type as its item type containing all the keys.
+        :rtype: ImmutableSet[K]
+        """
         return ImmutableSet[self.key_type](self.keys())
 
-    def to_values_mutable_list(self: MutableDict[K, V]) -> MutableList[V]:
+    def values_as_mutable_list(self: MutableDict[K, V]) -> MutableList[V]:
+        """
+        Returns a MutableList containing all values in the dictionary.
+
+        :return: A new MutableList object with the value type as its item type containing all the values.
+        :rtype: MutableList[V]
+        """
         return MutableList[self.value_type](self.values())
 
-    def to_values_immutable_list(self: MutableDict[K, V]) -> ImmutableList[V]:
+    def values_as_immutable_list(self: MutableDict[K, V]) -> ImmutableList[V]:
+        """
+        Returns an ImmutableList containing all values in the dictionary.
+
+        :return: A new ImmutableList object with the value type as its item type containing all the values.
+        :rtype: ImmutableList[V]
+        """
         return ImmutableList[self.value_type](self.values())
 
-    def to_values_mutable_set(self: MutableDict[K, V]) -> MutableSet[V]:
+    def values_as_mutable_set(self: MutableDict[K, V]) -> MutableSet[V]:
+        """
+        Returns a MutableSet containing all unique values in the dictionary.
+
+        :return: A new MutableSet object with the value type as its item type containing all the values.
+        :rtype: MutableSet[V]
+        """
         return MutableSet[self.value_type](self.values())
 
-    def to_values_immutable_set(self: MutableDict[K, V]) -> ImmutableSet[V]:
+    def values_as_immutable_set(self: MutableDict[K, V]) -> ImmutableSet[V]:
+        """
+        Returns an ImmutableSet containing all unique values in the dictionary.
+
+        :return: A new ImmutableSet object with the value type as its item type containing all the values.
+        :rtype: ImmutableSet[V]
+        """
         return ImmutableSet[self.value_type](self.values())
 
 
@@ -279,26 +552,74 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
     def to_mutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
         return MutableDict[self.key_type, self.value_type](self.data, _skip_validation=True)
 
-    def to_keys_mutable_list(self: ImmutableDict[K, V]) -> MutableList[K]:
+    def keys_as_mutable_list(self: ImmutableDict[K, V]) -> MutableList[K]:
+        """
+        Returns a MutableList containing all keys in the dictionary.
+
+        :return: A new MutableList object with the key type as its item type containing all the keys.
+        :rtype: MutableList[K]
+        """
         return MutableList[self.key_type](self.keys())
 
-    def to_keys_immutable_list(self: ImmutableDict[K, V]) -> ImmutableList[K]:
+    def keys_as_immutable_list(self: ImmutableDict[K, V]) -> ImmutableList[K]:
+        """
+        Returns an ImmutableList containing all keys in the dictionary.
+
+        :return: A new ImmutableList object with the key type as its item type containing all the keys.
+        :rtype: ImmutableList[K]
+        """
         return ImmutableList[self.key_type](self.keys())
 
-    def to_keys_mutable_set(self: ImmutableDict[K, V]) -> MutableSet[K]:
+    def keys_as_mutable_set(self: ImmutableDict[K, V]) -> MutableSet[K]:
+        """
+        Returns a MutableSet containing all keys in the dictionary.
+
+        :return: A new MutableSet object with the key type as its item type containing all the keys.
+        :rtype: MutableSet[K]
+        """
         return MutableSet[self.key_type](self.keys())
 
-    def to_keys_immutable_set(self: ImmutableDict[K, V]) -> ImmutableSet[K]:
+    def keys_as_immutable_set(self: ImmutableDict[K, V]) -> ImmutableSet[K]:
+        """
+        Returns an ImmutableSet containing all keys in the dictionary.
+
+        :return: A new ImmutableSet object with the key type as its item type containing all the keys.
+        :rtype: ImmutableSet[K]
+        """
         return ImmutableSet[self.key_type](self.keys())
 
-    def to_values_mutable_list(self: ImmutableDict[K, V]) -> MutableList[V]:
+    def values_as_mutable_list(self: ImmutableDict[K, V]) -> MutableList[V]:
+        """
+        Returns a MutableList containing all values in the dictionary.
+
+        :return: A new MutableList object with the value type as its item type containing all the values.
+        :rtype: MutableList[V]
+        """
         return MutableList[self.value_type](self.values())
 
-    def to_values_immutable_list(self: ImmutableDict[K, V]) -> ImmutableList[V]:
+    def values_as_immutable_list(self: ImmutableDict[K, V]) -> ImmutableList[V]:
+        """
+        Returns an ImmutableList containing all values in the dictionary.
+
+        :return: A new ImmutableList object with the value type as its item type containing all the values.
+        :rtype: ImmutableList[V]
+        """
         return ImmutableList[self.value_type](self.values())
 
-    def to_values_mutable_set(self: ImmutableDict[K, V]) -> MutableSet[V]:
+    def values_as_mutable_set(self: ImmutableDict[K, V]) -> MutableSet[V]:
+        """
+        Returns a MutableSet containing all unique values in the dictionary.
+
+        :return: A new MutableSet object with the value type as its item type containing all the values.
+        :rtype: MutableSet[V]
+        """
         return MutableSet[self.value_type](self.values())
 
-    def to_values_immutable_set(self: ImmutableDict[K, V]) -> ImmutableSet[V]:
+    def values_as_immutable_set(self: ImmutableDict[K, V]) -> ImmutableSet[V]:
+        """
+        Returns an ImmutableSet containing all unique values in the dictionary.
+
+        :return: A new ImmutableSet object with the value type as its item type containing all the values.
+        :rtype: ImmutableSet[V]
+        """
         return ImmutableSet[self.value_type](self.values())
