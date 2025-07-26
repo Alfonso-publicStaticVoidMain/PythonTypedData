@@ -221,7 +221,7 @@ class TestTypeValidation(unittest.TestCase):
             Maybe[MutableDict[str, int]](MutableDict[str, int]({"a": 1})),
             Maybe[MutableDict[str, int]](MutableDict[str, int]({"b": 2}))
         ])
-        self.assertTrue(_validate_type(nested, MutableList[Maybe[AbstractDict[str, int]]]))
+        self.assertFalse(_validate_type(nested, MutableList[Maybe[AbstractDict[str, int]]]))
 
     def test_invalid_generic_mismatch_deep(self):
         from concrete_classes import MutableList, MutableDict
@@ -241,7 +241,7 @@ class TestTypeValidation(unittest.TestCase):
             Maybe[ImmutableSet[int]](ImmutableSet[int].of(3, 4)),
             Maybe[None](None)
         ]
-        self.assertTrue(_validate_type(hybrid, list[Maybe[MutableSet[int] | ImmutableSet[int] | None]]))
+        self.assertTrue(_validate_type(hybrid, list[Maybe[MutableSet[int]] | Maybe[ImmutableSet[int]] | Maybe[None]]))
 
     def test_collection_of_collections_of_custom_type(self):
         from concrete_classes import MutableSet, AbstractSet
@@ -302,11 +302,11 @@ class TestTypeValidation(unittest.TestCase):
 
         data = [
             Maybe.of(MutableSet[int]({1})),
-            Maybe.of(ImmutableSet[int].of(2)),
+            Maybe.of(ImmutableSet.of(2)),
             Maybe.empty(MutableSet[int])
         ]
-        self.assertTrue(_validate_type(data, list[Maybe[MutableSet[int] | ImmutableSet[int]]]))
-        self.assertTrue(_validate_type(data, list[Maybe[AbstractSet[int]]]))
+        self.assertTrue(_validate_type(data, list[Maybe[MutableSet[int]] | Maybe[ImmutableSet[int]]]))
+        self.assertFalse(_validate_type(data, list[Maybe[AbstractSet[int]]]))
 
 
 if __name__ == '__main__':

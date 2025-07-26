@@ -35,6 +35,19 @@ class TestCollection(unittest.TestCase):
         s.add('a')
         self.assertTrue(s)
 
+    def test_contains(self):
+        mus = MutableSet[int](0, 1, 2)
+        self.assertTrue(0 in mus)
+        self.assertTrue([0, 1] in mus)
+        self.assertFalse([2, 3] in mus)
+
+        mul = MutableList[str]('a', 'b', 'c', 2)
+        self.assertTrue('a' in mul)
+        self.assertTrue('2' in mul)
+        self.assertFalse(2 in mul)
+        self.assertTrue({'a', 'b', '2'} in mul)
+        self.assertFalse({'d'} in mul)
+
     def test_copy(self):
         lst = MutableList[int](1, 2)
         new_lst = lst.copy()
@@ -117,8 +130,8 @@ class TestCollection(unittest.TestCase):
 
     def test_stateful_collect(self):
         mul = MutableList[int](0, 0, 1, 1, 1, 2)
-
-        def update(acc: MutableList[int], element: int, state: set):
+        # Using stateful_collect to simulate .distinct()
+        def update(acc: MutableList[int], state: set, element: int):
             if element not in state:
                 state.add(element)
                 acc.append(element)
@@ -157,7 +170,6 @@ class TestCollection(unittest.TestCase):
             False : MutableList[TestClass](cosa_0, cosa_1)
         })
 
-
     def test_map_thoroughly(self):
         mul = MutableList[int](1, 2, 3)
         mapped_to_int = mul.map(lambda x : x+1)
@@ -168,6 +180,15 @@ class TestCollection(unittest.TestCase):
 
         mapped_to_str = mul.map(lambda x : 'a' * x)
         self.assertEqual(mapped_to_str, MutableList[str]('a', 'aa', 'aaa'))
+
+    def test_to_dict(self):
+        mul = MutableList[int](0, 1, 2)
+        dic = mul.to_dict(key_mapper=str)
+        self.assertEqual(dic, {'0':0, '1':1, '2':2})
+
+        iml = ImmutableList[str]('1_a', '2_b')
+        dic = iml.to_dict(lambda s : int(s[0]), lambda s : s[-1])
+        self.assertEqual(dic, {1:'a', 2:'b'})
 
     def test_abstract_classes(self):
         lst = MutableList[AbstractSet[int]]()
@@ -185,6 +206,7 @@ class TestCollection(unittest.TestCase):
         clt_lst.append(c)
         clt_lst.append(d)
         self.assertEqual(clt_lst, MutableList[Collection[str]](a, b, c, d))
+
 
 if __name__ == '__main__':
     unittest.main()
