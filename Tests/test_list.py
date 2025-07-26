@@ -42,7 +42,7 @@ class TestList(unittest.TestCase):
         iml = ImmutableList.of([1, 2, '3'])
         self.assertEqual(iml.item_type, int | str)
 
-        empty_list = MutableList.empty(str)
+        empty_list = MutableList[str].empty()
         self.assertEqual(len(empty_list), 0)
         self.assertFalse(empty_list)
 

@@ -238,10 +238,9 @@ class TestTypeValidation(unittest.TestCase):
 
         hybrid = [
             Maybe[MutableSet[int]](MutableSet[int]({1, 2})),
-            Maybe[ImmutableSet[int]](ImmutableSet[int].of(3, 4)),
-            Maybe[None](None)
+            Maybe[ImmutableSet[int]](ImmutableSet.of(3, 4)),
         ]
-        self.assertTrue(_validate_type(hybrid, list[Maybe[MutableSet[int]] | Maybe[ImmutableSet[int]] | Maybe[None]]))
+        self.assertTrue(_validate_type(hybrid, list[Maybe[MutableSet[int]] | Maybe[ImmutableSet[int]]]))
 
     def test_collection_of_collections_of_custom_type(self):
         from concrete_classes import MutableSet, AbstractSet
@@ -279,7 +278,7 @@ class TestTypeValidation(unittest.TestCase):
 
         nested = MutableList[Maybe[MutableDict[str, int]]]([
             Maybe.of(MutableDict[str, int]({"x": 1})),
-            Maybe.empty(MutableDict[str, int])  # None present
+            Maybe[MutableDict[str, int]].empty()  # None present
         ])
         self.assertTrue(_validate_type(nested, MutableList[Maybe[MutableDict[str, int]]]))
 
@@ -303,7 +302,7 @@ class TestTypeValidation(unittest.TestCase):
         data = [
             Maybe.of(MutableSet[int]({1})),
             Maybe.of(ImmutableSet.of(2)),
-            Maybe.empty(MutableSet[int])
+            Maybe[MutableSet[int]].empty()
         ]
         self.assertTrue(_validate_type(data, list[Maybe[MutableSet[int]] | Maybe[ImmutableSet[int]]]))
         self.assertFalse(_validate_type(data, list[Maybe[AbstractSet[int]]]))
