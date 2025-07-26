@@ -149,14 +149,14 @@ def _validate_or_coerce_value[T](
     _coerce: bool = False
 ) -> T:
     """
-    Validates or coerces an obj to match a given type.
+    Validates or coerces an object to match a given type, then returns it.
 
     Always allows safe conversions:
         - int -> float
         - int, float -> complex
         - bool -> int, float
         - bool, int, float, complex -> str
-    Allows conversions from str only if _coerce=True:
+    And if _coerce=True:
         - str -> int, float, complex
 
     :param obj: Value to validate or _coerce.

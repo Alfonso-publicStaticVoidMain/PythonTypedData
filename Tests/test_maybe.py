@@ -29,6 +29,23 @@ class TestMaybe(unittest.TestCase):
             Maybe[int].empty().or_else('a')
         self.assertEqual(Maybe[str].empty().or_else_get(lambda:""), "")
 
+    def test_map(self):
+        mb1 = Maybe[int](1)
+        mb2 = mb1.map(lambda x : x + 1)
+        self.assertEqual(mb2, Maybe[int](2))
+
+        with self.assertRaises(ValueError):
+            Maybe[int].empty().map(lambda x : 2*x)
+
+        mb3 = mb1.map(lambda x : f'{x}{x}', int, _coerce=True)
+        self.assertEqual(mb3, Maybe[int](11))
+
+        mb4 = mb1.map(lambda x : x + 1, str)
+        self.assertEqual(mb4, Maybe[str]('2'))
+
+        mb5 = Maybe[int].empty().map_or_else(lambda x : x + 1, 0)
+        self.assertEqual(mb5, 0)
+
     def test_repr(self):
         mb = Maybe[list[int]]([0, 1, 2])
         self.assertIn('Maybe[list[int]]', repr(mb))

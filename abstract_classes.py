@@ -55,7 +55,7 @@ class Collection[T](GenericBase[T]):
     when the constructor is called (e.g., MutableList[int]).
 
     Attributes:
-        item_type (type[T]): The inferred type of elements stored in the collection, derived from the generic types.
+        item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
 
         values (Any): The internal container of stored values, usually of one of Python's built-in Iterables.
 
@@ -65,16 +65,20 @@ class Collection[T](GenericBase[T]):
 
     Note:
         Any method that returns a new Collection instance (e.g., filter, union, sorted, etc.) constructs the returned
-        value using type(self)(...). This ensures that:
-
-            - The returned object has the same concrete runtime subclass as self.
-            - Generic type parameters (T) are preserved without reapplying __class_getitem__, because they are
-              already bound via the dynamic subclassing mechanism in __class_getitem__.
-
+        value using type(self)(...). This is because:
+            - In order for the `self` object to have been created in the first place, its Collection subclass must have
+              called __class_getitem__ in order to acquire a generic type, otherwise Collection's __init__ would have
+              thrown an error.
+            - In that call to __class_getitem__, the generic type it was called upon was stored in the _args attribute
+              of the class it returned, which is precisely type(self), while the original Collection subclass was stored
+              in the _origin attribute.
+            - Then, calling type(self)'s constructor correctly passes to Collection's __init__ the same values of the
+              generic types that were used to construct `self`, as well as the same base subclass, ensuring then they have
+              the same structure.
+            - Furthermore, calling type(self)[another_item_type] correctly creates a new dynamic subclass with the same
+              base class as self but with the new generic type.
         This makes behavior consistent across all subclasses of Collection: type(self) guarantees the returned value
-        matches the exact type and structure of self, unless otherwise explicitly overridden. Also, calling
-        type(self)[another_item_type] correctly creates a new dynamic subclass with the same base class as self but
-        with the new generic type.
+        matches the exact type and structure of self, unless otherwise explicitly overridden.
     """
 
     item_type: type[T]
@@ -116,7 +120,7 @@ class Collection[T](GenericBase[T]):
         """
         from type_validation import _validate_or_coerce_iterable, _validate_type
 
-        # Fetches the generic type of the Collection from its _args attribute inherited from GenericBase.
+        # The generic type of the Collection is fetched from its _args attribute inherited from GenericBase.
         generic_item_type: type = type(self)._inferred_item_type()
 
         # If the generic item type is None or a TypeVar, raises a TypeError.
@@ -126,10 +130,13 @@ class Collection[T](GenericBase[T]):
         if isinstance(generic_item_type, TypeVar):
             raise TypeError(f"{type(self).__name__} was instantiated without a generic type, somehow {generic_item_type} was a TypeVar.")
 
-        # If the values are of length 1, the value they contain doesn't match the generic type expected but is an Iterable,
-        # the tuple is unpacked.
-        if len(values) == 1 and not _validate_type(values[0], generic_item_type) and isinstance(values[0], Iterable) and not isinstance(values[0], (str, bytes)):
-            values = values[0]
+        if (
+            len(values) == 1  # The values are of length 1.
+            and not _validate_type(values[0], generic_item_type)  # Their only value doesn't validate the expected type.
+            and isinstance(values[0], Iterable)  # Their only value is an Iterable.
+            and not isinstance(values[0], (str, bytes))  # But it's not a str or bytes.
+        ):
+            values = values[0]  # Then, the values are unpacked.
 
         # If values is of one of the forbidden iterable types, raises a TypeError.
         if isinstance(values, _forbidden_iterable_types):
@@ -165,8 +172,8 @@ class Collection[T](GenericBase[T]):
         """
         Creates a Collection object containing the given values, inferring their common type.
 
-        Acts as a type-safe factory method for dynamically constructing properly parameterized collections when the type
-        is not known statically.
+        Acts as a type-safe factory method for constructing properly parameterized collections when the type
+        is not known beforehand.
 
         :param values: One or more parameters, or an Iterable of values to initialize the new Collection with.
         :type values: T
@@ -183,23 +190,20 @@ class Collection[T](GenericBase[T]):
         return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
 
     @classmethod
-    def empty[R](cls: type[Collection], item_type: type[R]) -> Collection[R]:
+    def empty[R](cls: type[Collection[R]]) -> Collection[R]:
         """
-        Creates an empty Collection subclass of the current class, parameterized with the given item type.
+        Creates an empty Collection subclass of the current class, parameterized with its generic type.
 
         Useful for initialization of empty collections with known type context.
-
-        :param item_type: Type of the to-be elements of the empty Collection.
-        :type item_type: type[R]
 
         :return: An empty Collection that is an instance of cls with the given item_type.
         :rtype: Collection[R]
 
         :raises ValueError: If item_type is None.
         """
-        if item_type is None:
-            raise ValueError(f"Trying to call {cls.__name__}.empty with a None type.")
-        return cls[item_type]()
+        if cls._inferred_item_type() is None:
+            raise ValueError(f"Trying to call {cls.__name__}.empty without a generic type.")
+        return cls()
 
     def __len__(self: Collection[T]) -> int:
         """

@@ -14,6 +14,11 @@ class Maybe[T](GenericBase[T]):
     Inspired by Java's Optional, this class provides a way to explicitly handle the presence or absence of a value
     in a type-safe way. It is immutable, supports functional-style transformations, and some basic type validation and
     coercion systems.
+
+    Attributes:
+        item_type (type[T]): The type of the value stored in this Maybe. Inferred from the generic type.
+
+        value (T | None): Value of the Maybe's item_type, or None.
     """
 
     item_type: type[T]
@@ -77,9 +82,11 @@ class Maybe[T](GenericBase[T]):
         """
         Returns a Maybe object holding a None value, fetching the item_type from the class itself.
 
-        :return: A Maybe object holding a None object. Its generic type is inferred from the dynamic Maybe subclass this
+        :return: A Maybe object holding a None object. Its item_type is inferred from the dynamic Maybe subclass this
         method was called on, like Maybe[int].
         """
+        if cls._inferred_item_type() is None:
+            raise ValueError(f"Trying to call {cls.__name__}.empty without a generic type.")
         return cls()
 
     @classmethod
@@ -241,12 +248,14 @@ class Maybe[T](GenericBase[T]):
         :type _coerce: bool
 
         :return: A Maybe object containing the mapped value. Its type is given explicitly on result_type or inferred.
+
+        :raises ValueError: If self is empty or if result is None.
         """
         if self.value is None:
-            raise ValueError("There's no obj to apply the function to.")
+            raise ValueError("There's no value to apply the function to.")
         result = f(self.value)
         if result is None:
-            raise ValueError("Callable function returned a None obj.")
+            raise ValueError("Callable function returned a None object.")
         if result_type is not None:
             from type_validation import _validate_or_coerce_value
             return Maybe[result_type](result, _coerce=_coerce)
@@ -255,7 +264,9 @@ class Maybe[T](GenericBase[T]):
     def map_or_else[U](
         self: Maybe[T],
         f: Callable[[T], U],
-        fallback: U
+        fallback: U,
+        *,
+        _coerce: bool = False
     ) -> U:
         """
         Maps the value of this Maybe and returns the result directly, or a fallback if self is empty.
@@ -266,15 +277,19 @@ class Maybe[T](GenericBase[T]):
         :param fallback: Value to return if self is empty.
         :type fallback: U
 
+        :param _coerce: State parameter that, if True, attempts to coerce the result value to the expected result_type.
+        :type _coerce: bool
+
         :return: The direct mapped value or the fallback if self was empty.
         :rtype: U
         """
-        return f(self.value) if self.is_present() else fallback
+        return self.map(f, _coerce=_coerce).get() if self.is_present() else fallback
 
     def flatmap[U](
         self: Maybe[T],
         f: Callable[[T], Maybe[U]],
         result_type: type[U] | None = None,
+        *,
         _coerce: bool = False
     ) -> Maybe[U]:
         """
@@ -325,6 +340,16 @@ class Maybe[T](GenericBase[T]):
         :rtype: bool
         """
         return bool(self.value)
+
+    def __eq__(self: Maybe[T], other: object) -> bool:
+        return (
+            isinstance(other, Maybe)
+            and self.item_type == other.item_type
+            and self.value == other.value
+        )
+
+    def __hash__(self: Maybe[T]) -> int:
+        return hash((self.item_type, self.value))
 
     def __repr__(self: Maybe[T]) -> str:
         """
