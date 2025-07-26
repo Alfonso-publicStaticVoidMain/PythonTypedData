@@ -18,16 +18,16 @@ class TestMaybe(unittest.TestCase):
 
     def test_get_present_empty(self):
         with self.assertRaises(ValueError):
-            Maybe.empty(int).get()
+            Maybe[int].empty().get()
 
-        self.assertTrue(Maybe.empty(str).is_empty())
+        self.assertTrue(Maybe[str].empty().is_empty())
         self.assertTrue(Maybe.of(2).is_present())
 
     def test_or_else(self):
-        self.assertEqual(Maybe.empty(int).or_else(3), 3)
+        self.assertEqual(Maybe[int].empty().or_else(3), 3)
         with self.assertRaises(TypeError):
-            Maybe.empty(int).or_else('a')
-        self.assertEqual(Maybe.empty(str).or_else_get(lambda:""), "")
+            Maybe[int].empty().or_else('a')
+        self.assertEqual(Maybe[str].empty().or_else_get(lambda:""), "")
 
     def test_repr(self):
         mb = Maybe[list[int]]([0, 1, 2])

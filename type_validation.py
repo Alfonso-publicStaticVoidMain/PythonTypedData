@@ -43,10 +43,10 @@ def _validate_type(obj: Any, expected_type: type) -> bool:
         return _validate_tuple(obj, args)
 
     if origin in (list, set, frozenset, Sequence) or (isinstance(origin, type) and issubclass(origin, Collection)):
-        return _validate_iterable(obj, args[0])
+        return _validate_iterable(obj, origin, args[0])
 
     if origin in (Mapping, dict) or (isinstance(origin, type) and issubclass(origin, AbstractDict)):
-        return _validate_mapping(obj, args)
+        return _validate_mapping(obj, origin, args)
 
     if isinstance(origin, type) and issubclass(origin, Maybe):
         return _validate_maybe(obj, args[0])
@@ -57,7 +57,7 @@ def _validate_type(obj: Any, expected_type: type) -> bool:
     return False
 
 
-def _validate_iterable(obj: Any, item_type: type) -> bool:
+def _validate_iterable(obj: Any, iterable_type: type, item_type: type) -> bool:
     """
     Validates that all items in an iterable are of the expected type.
 
@@ -71,12 +71,12 @@ def _validate_iterable(obj: Any, item_type: type) -> bool:
     Iterable.
     :rtype: bool
     """
-    if not isinstance(obj, Iterable) or isinstance(obj, str):
+    if not isinstance(obj, iterable_type) or isinstance(obj, str):
         return False
     return all(_validate_type(item, item_type) for item in obj)
 
 
-def _validate_mapping(obj: Any, key_value_types: tuple[type, type]) -> bool:
+def _validate_mapping(obj: Any, mapping_type: type, key_value_types: tuple[type, type]) -> bool:
     """
     Validates that all keys and values of a mapping match their expected key and value type.
 
@@ -92,7 +92,7 @@ def _validate_mapping(obj: Any, key_value_types: tuple[type, type]) -> bool:
 
     :raises ValueError: If the key_value_types tuple parameter isn't of length 2.
     """
-    if not isinstance(obj, (Mapping, AbstractDict)):
+    if not isinstance(obj, mapping_type):
         return False
     if len(key_value_types) != 2:
         raise ValueError(f"_validate_mapping_type method called with a tuple argument {key_value_types} of length {len(key_value_types)} != 2.")
@@ -387,7 +387,16 @@ def _infer_type(obj: Any) -> type:
     return type(obj)
 
 
-def _infer_iterable_type(iterable: Any) -> type:
+def _infer_iterable_type(iterable: Iterable) -> type:
+    """
+    Infers the typing annotation of an iterable object, including its generics, which are handled recursively.
+
+    :param iterable: Iterable to infer the type of.
+    :type iterable: Iterable
+
+    :return: The type of the iterable.
+    :rtype: type
+    """
     if isinstance(iterable, Collection):
         if hasattr(type(iterable), '_args'):
             return type(iterable)
@@ -405,6 +414,15 @@ def _infer_iterable_type(iterable: Any) -> type:
 
 
 def _infer_mapping_type(mapping: Mapping) -> type:
+    """
+    Infers the typing annotation of a mapping object, including its generics, which are handled recursively.
+
+    :param mapping: Mapping to infer the type of.
+    :type mapping: Mapping
+
+    :return: The type of the mapping.
+    :rtype: type
+    """
     if isinstance(mapping, AbstractDict):
         inferred_key, inferred_value = type(mapping)._inferred_key_value_types()
         if inferred_key is not None and inferred_value is not None:
@@ -425,6 +443,15 @@ def _infer_mapping_type(mapping: Mapping) -> type:
 
 
 def _infer_tuple_type(tpl: tuple) -> type:
+    """
+    Infers the typing annotation of a tuple, including its generic types, which are handled recursively.
+
+    :param tpl: Tuple to infer the type of.
+    :type tpl: tuple
+
+    :return: The type of the tuple.
+    :rtype: type
+    """
     if not tpl:
         return tuple[()]
     element_types = tuple(_infer_type(element) for element in tpl)
@@ -432,8 +459,17 @@ def _infer_tuple_type(tpl: tuple) -> type:
 
 
 def _combine_types[T](type_set: set[type[T]]) -> type[T]:
+    """
+    Combines all types contained in a set of types into a single one using the union pipe operator |.
+
+    :param type_set: Set of types to combine.
+    :type type_set: set[type[T]]
+
+    :return: The union of all types found within the set.
+    :rtype: type[T]
+    """
     if not type_set:
-        raise ValueError("Cannot combine empty type set")
+        raise ValueError("Cannot combine an empty type set")
     elif len(type_set) == 1:
         return next(iter(type_set))
     else:

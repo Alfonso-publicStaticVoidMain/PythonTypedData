@@ -7,22 +7,40 @@ class DictionaryTest(unittest.TestCase):
 
     def test_init_access_and_eq(self):
         dic = MutableDict[str, int]({'a': 1, 'b': '2'}, _coerce_values=True)
+        # '2' is correctly coerced to 2
         self.assertEqual(dic.data, {'a': 1, 'b': 2})
+        # Access to the keys returns the expected values
         self.assertEqual(dic['a'], 1)
         self.assertEqual(dic['b'], 2)
+        self.assertNotEqual(dic['a'], '2')
 
         imd = ImmutableDict[str, int](dic)
+        # Copying on another AbstractDict maintains the same access to keys and subjacent data
         self.assertEqual(dic.data, imd.data)
         self.assertEqual(dic['a'], imd['a'])
+        # The original dict and its "copy" are still considered equal
         self.assertEqual(imd, dic)
 
+        # Converting back to a MutableDict preserves equality
         mud = MutableDict[str, int](imd)
         self.assertEqual(dic, mud)
 
     def test_type_inference(self):
         dic = ImmutableDict.of({1: 'a', 2: 'b'})
+        # Key type is inferred to int
         self.assertEqual(dic.key_type, int)
+        # Value type is inferred to str
         self.assertEqual(dic.value_type, str)
+
+        # Using of_keys_values creates an equal dict
+        dic2 = ImmutableDict.of_keys_values([1, 2], ['a', 'b'])
+        self.assertEqual(dic, dic2)
+
+        dic3 = MutableDict.of_keys_values([1, '2'], ['a', 0])
+        # Key type is inferred to int | str
+        self.assertEqual(dic3.key_type, int | str)
+        # Value type is inferred to int | str
+        self.assertEqual(dic3.value_type, int | str)
 
     def test_immutability(self):
         fd = ImmutableDict[str, int]({'x': 2})
@@ -63,13 +81,14 @@ class DictionaryTest(unittest.TestCase):
         self.assertNotEqual(d.get(0, 27), 27)
 
     def test_clear(self):
-        d = MutableDict[str, float]({'pi': 3.14, 'e': 2.71})
+        origin_data = {'pi': 3.14, 'e': 2.71}
+        d = MutableDict[str, float](origin_data)
         str_float_empty = MutableDict[str, float]()
         str_str_empty = MutableDict[str, str]()
         d.clear()
         self.assertEqual(d, str_float_empty)
         self.assertNotEqual(d, str_str_empty)
-        self.assertNotEqual(d.data, {'pi': 3.14, 'e': 2.71})
+        self.assertNotEqual(d.data, origin_data)
 
     def test_update(self):
         d = MutableDict[str, int]({'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5})
@@ -99,8 +118,9 @@ class DictionaryTest(unittest.TestCase):
 
     def test_subdict(self):
         d = ImmutableDict[str, int]({'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5})
-        sd = d['b' : 'd']
-        self.assertEqual(sd, ImmutableDict[str, int]({'b': 2, 'c': 3, 'd': 4}))
+        self.assertEqual(d['b': 'd'], ImmutableDict[str, int]({'b': 2, 'c': 3, 'd': 4}))
+        self.assertEqual(d['d':], ImmutableDict[str, int]({'d': 4, 'e': 5}))
+        self.assertEqual(d[:'c'], ImmutableDict[str, int]({'a': 1, 'b': 2, 'c': 3}))
 
         tpl_dic = ImmutableDict[tuple[int, str], float]({
             (1, 'a') : 0,
