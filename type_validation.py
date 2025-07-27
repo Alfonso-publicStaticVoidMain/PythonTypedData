@@ -232,6 +232,11 @@ def _validate_or_coerce_iterable[T](
         return []
     return [_validate_or_coerce_value(value, expected_type, _coerce=_coerce) for value in iterable]
 
+def _validate_or_coerce_tuple(
+        tpl: tuple,
+        # TODO
+):
+    pass
 
 def _validate_collection_type_and_get_values[T](
     collection: Iterable[T] | Collection[T],
