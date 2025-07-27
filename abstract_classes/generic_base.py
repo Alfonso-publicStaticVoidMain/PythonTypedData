@@ -1,9 +1,58 @@
+from __future__ import annotations
+
 from types import UnionType
 from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, TypeVar
 from weakref import WeakValueDictionary
 
+"""
+Inheritance tree:
+
+GenericBase[*Ts]
+│
+├── Collection[T]
+│    ├── AbstractSequence[T]
+│    │    ├── ImmutableList[T] (*)
+│    │    └── AbstractMutableSequence[T]
+│    │         └── MutableList[T] (*)
+│    └── AbstractSet[T]
+│         ├── ImmutableSet[T] (*)
+│         └── AbstractMutableSet[T]
+│              └── MutableSet[T] (*)
+│
+├── AbstractDict[K, V]
+│    ├── ImmutableDict[K, V] (*)
+│    └── AbstractMutableDict[K, V]
+│         └── MutableDict[K, V] (*)
+│
+└── AbstractTuple[*Ts]
+     ├── ImmutableTuple[*Ts] (*)
+     └── AbstractMutableTuple[*Ts]
+          └── MutableTuple[*Ts] (*)
+
+(*) := Concrete class implementations. Everything else should be impossible to directly instantiate.
+"""
+
 Ts = TypeVarTuple("Ts")
 
+
+def forbid_instantiation(cls):
+    """
+    Class decorator that forbids direct instantiation of the given class with or without generics.
+
+    :raises TypeError: If the decorated class is instantiated directly, but allows instantiation of its subclasses.
+    """
+
+    def __new__(subcls, *args, **kwargs):
+        if getattr(subcls, "_origin", None) is cls:
+            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated, even with generics.")
+        if subcls is cls:
+            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
+        return object.__new__(subcls)
+
+    cls.__new__ = staticmethod(__new__)
+    return cls
+
+@forbid_instantiation
 class GenericBase[*Ts]:
     """
     Top-most class in the inheritance tree, that encodes the behaviour of the classes storing their generic parameters

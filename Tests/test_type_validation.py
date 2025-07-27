@@ -1,12 +1,14 @@
 import unittest
 from typing import Literal, Union, TYPE_CHECKING
 
-from abstract_classes import AbstractSet
+from abstract_classes.abstract_classes import AbstractSet
 
 if TYPE_CHECKING:
-    from concrete_classes import MutableDict, MutableSet, ImmutableDict, ImmutableSet, MutableList, ImmutableList
-    from maybe import Maybe
-from type_validation import _validate_type
+    from concrete_classes.concrete_classes import MutableList, ImmutableList
+    from concrete_classes.dict import MutableDict, ImmutableDict
+    from concrete_classes.set import MutableSet, ImmutableSet
+    from concrete_classes.maybe import Maybe
+from type_validation.type_validation import _validate_type
 
 
 class TestTypeValidation(unittest.TestCase):
@@ -109,8 +111,8 @@ class TestTypeValidation(unittest.TestCase):
         self.assertFalse(_validate_type('green', Literal['red', 'blue']))
 
     def test_validate_custom_classes(self):
-        from concrete_classes import MutableDict, MutableSet, ImmutableDict, ImmutableSet, MutableList, ImmutableList
-        from maybe import Maybe
+        from concrete_classes.concrete_classes import MutableDict, MutableSet, ImmutableDict, ImmutableSet, MutableList, ImmutableList
+        from concrete_classes.maybe import Maybe
 
         # --- Direct matches
         ml = MutableList[int]([1, 2, 3])
@@ -181,7 +183,7 @@ class TestTypeValidation(unittest.TestCase):
         self.assertTrue(_validate_type(optional_test, dict[str, Maybe[int]]))
 
     def test_validate_against_abstract_classes(self):
-        from concrete_classes import (
+        from concrete_classes.concrete_classes import (
             AbstractSequence, AbstractSet, AbstractMutableSet, AbstractMutableSequence,
             AbstractDict, AbstractMutableDict, MutableList, MutableSet, MutableDict,
             ImmutableList, ImmutableSet, ImmutableDict
@@ -203,7 +205,7 @@ class TestTypeValidation(unittest.TestCase):
         self.assertFalse(_validate_type(ImmutableDict[str, int]({"a": 1}), AbstractMutableDict[str, int]))
 
     def test_validate_list_of_abstract(self):
-        from concrete_classes import AbstractSet, MutableSet, ImmutableSet
+        from concrete_classes.concrete_classes import AbstractSet, MutableSet, ImmutableSet
 
         sets = [
             MutableSet[int]({1, 2}),
@@ -214,8 +216,8 @@ class TestTypeValidation(unittest.TestCase):
         self.assertFalse(_validate_type(sets, list[AbstractSet[str]]))
 
     def test_validate_nested_with_maybe_and_abstracts(self):
-        from concrete_classes import MutableList, AbstractDict, MutableDict
-        from maybe import Maybe
+        from concrete_classes.concrete_classes import MutableList, AbstractDict, MutableDict
+        from concrete_classes.maybe import Maybe
 
         nested = MutableList[Maybe[MutableDict[str, int]]]([
             Maybe[MutableDict[str, int]](MutableDict[str, int]({"a": 1})),
@@ -224,7 +226,7 @@ class TestTypeValidation(unittest.TestCase):
         self.assertFalse(_validate_type(nested, MutableList[Maybe[AbstractDict[str, int]]]))
 
     def test_invalid_generic_mismatch_deep(self):
-        from concrete_classes import MutableList, MutableDict
+        from concrete_classes.concrete_classes import MutableList, MutableDict
 
         bad = MutableList[MutableDict[float, int]]([
             MutableDict[float, int]({1.1: 1}),
@@ -233,8 +235,8 @@ class TestTypeValidation(unittest.TestCase):
         self.assertFalse(_validate_type(bad, MutableList[MutableDict[str, int]]))
 
     def test_union_of_nested_customs_and_maybe(self):
-        from concrete_classes import MutableSet, ImmutableSet
-        from maybe import Maybe
+        from concrete_classes.concrete_classes import MutableSet, ImmutableSet
+        from concrete_classes.maybe import Maybe
 
         hybrid = [
             Maybe[MutableSet[int]](MutableSet[int]({1, 2})),
@@ -243,7 +245,7 @@ class TestTypeValidation(unittest.TestCase):
         self.assertTrue(_validate_type(hybrid, list[Maybe[MutableSet[int]] | Maybe[ImmutableSet[int]]]))
 
     def test_collection_of_collections_of_custom_type(self):
-        from concrete_classes import MutableSet, AbstractSet
+        from concrete_classes.concrete_classes import MutableSet, AbstractSet
 
         nested_sets = [
             [MutableSet[int]({1}), MutableSet[int]({2})],
@@ -252,7 +254,7 @@ class TestTypeValidation(unittest.TestCase):
         self.assertTrue(_validate_type(nested_sets, list[list[AbstractSet[int]]]))
 
     def test_deeply_nested_mixed_mutable_immutable(self):
-        from concrete_classes import MutableDict, ImmutableDict, AbstractDict
+        from concrete_classes.concrete_classes import MutableDict, ImmutableDict, AbstractDict
 
         obj = [
             {
@@ -267,8 +269,8 @@ class TestTypeValidation(unittest.TestCase):
         self.assertTrue(_validate_type(obj, list[dict[str, AbstractDict[int, str]]]))
 
     def test_validate_maybe_inside_structure(self):
-        from maybe import Maybe
-        from concrete_classes import MutableList, MutableDict
+        from concrete_classes.maybe import Maybe
+        from concrete_classes.concrete_classes import MutableList, MutableDict
 
         valid_dict = {
             "a": Maybe[int](1),
@@ -283,8 +285,8 @@ class TestTypeValidation(unittest.TestCase):
         self.assertTrue(_validate_type(nested, MutableList[Maybe[MutableDict[str, int]]]))
 
     def test_validate_invalid_maybe_structures(self):
-        from maybe import Maybe
-        from concrete_classes import MutableDict
+        from concrete_classes.maybe import Maybe
+        from concrete_classes.concrete_classes import MutableDict
 
         self.assertFalse(_validate_type(Maybe[str]("hello"), Maybe[int]))
         self.assertFalse(_validate_type(Maybe[int](1), int))  # missing Maybe wrapper
@@ -296,8 +298,8 @@ class TestTypeValidation(unittest.TestCase):
         self.assertFalse(_validate_type(invalid_dict, dict[str, Maybe[int]]))
 
     def test_validate_maybe_with_nested_unions(self):
-        from maybe import Maybe
-        from concrete_classes import MutableSet, ImmutableSet
+        from concrete_classes.maybe import Maybe
+        from concrete_classes.concrete_classes import MutableSet, ImmutableSet
 
         data = [
             Maybe.of(MutableSet[int]({1})),

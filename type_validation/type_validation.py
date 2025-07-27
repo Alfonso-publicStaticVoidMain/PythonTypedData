@@ -3,8 +3,8 @@ from __future__ import annotations
 from types import UnionType
 from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Literal, Mapping, Sequence
 
-from abstract_classes import Collection, AbstractDict
-from maybe import Maybe
+from abstract_classes import Collection, AbstractDict, AbstractSequence, AbstractTuple
+from concrete_classes.maybe import Maybe
 
 
 def _validate_type(obj: Any, expected_type: type) -> bool:
@@ -233,10 +233,18 @@ def _validate_or_coerce_iterable[T](
     return [_validate_or_coerce_value(value, expected_type, _coerce=_coerce) for value in iterable]
 
 def _validate_or_coerce_tuple(
-        tpl: tuple,
-        # TODO
+    tpl: tuple,
+    item_types: tuple[type, ...],
+    *,
+    _coerce: bool = False
 ):
-    pass
+    if not isinstance(tpl, (tuple, list, Sequence, AbstractSequence, AbstractTuple)):
+        raise ValueError(f"Object of type {type(tpl).__name__} isn't an ordered iterable.")
+    if len(item_types) == 2 and item_types[1] is Ellipsis:
+        return tuple(_validate_or_coerce_value(value, item_types[0], _coerce=_coerce) for value in tpl)
+    if len(tpl) != len(item_types):
+        raise ValueError(f"Types given for the tuple don't match the length of the values.")
+    return tuple(_validate_or_coerce_value(value, tp, _coerce=_coerce) for value, tp in zip(tpl, item_types))
 
 def _validate_collection_type_and_get_values[T](
     collection: Iterable[T] | Collection[T],
@@ -457,10 +465,12 @@ def _infer_tuple_type(tpl: tuple) -> type:
     :return: The type of the tuple.
     :rtype: type
     """
+    return tuple[_infer_type_contained_in_tuple(tpl)]
+
+def _infer_type_contained_in_tuple(tpl: tuple) -> tuple[type, ...]:
     if not tpl:
-        return tuple[()]
-    element_types = tuple(_infer_type(element) for element in tpl)
-    return tuple[element_types]
+        return ()
+    return tuple(_infer_type(element) for element in tpl)
 
 
 def _combine_types[T](type_set: set[type[T]]) -> type[T]:

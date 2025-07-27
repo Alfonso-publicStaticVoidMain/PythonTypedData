@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from GenericBase import GenericBase
+from abstract_classes.GenericBase import GenericBase
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -48,7 +48,7 @@ class Maybe[T](GenericBase[T]):
         :raises ValueError: If the constructor was called without giving a generic type to Maybe. This forbids Maybe(1),
         for instance. Use Maybe.of(1) to infer the type.
         """
-        from type_validation import _validate_or_coerce_value
+        from type_validation.type_validation import _validate_or_coerce_value
 
         generic_item_type = type(self)._inferred_item_type()
 
@@ -102,7 +102,7 @@ class Maybe[T](GenericBase[T]):
         """
         if value is None:
             raise ValueError("Can't use Maybe.of with a None obj.")
-        from type_validation import _infer_type
+        from type_validation.type_validation import _infer_type
         return Maybe[_infer_type(value)](value, _skip_validation=True)
 
     @classmethod
@@ -121,7 +121,7 @@ class Maybe[T](GenericBase[T]):
         """
         if item_type is None:
             raise ValueError("You must give a type when using Maybe.of_nullable")
-        from type_validation import _validate_or_coerce_value
+        from type_validation.type_validation import _validate_or_coerce_value
         return Maybe[item_type](_validate_or_coerce_value(value, item_type)) if value is not None else Maybe[item_type]()
 
     def is_present(self: Maybe[T]) -> bool:
@@ -176,7 +176,7 @@ class Maybe[T](GenericBase[T]):
         :raises TypeError: If the fallback given doesn't validate the Maybe item_type, or can't be coerced to it if
         that option is enabled. This happens even if the fallback isn't needed.
         """
-        from type_validation import _validate_or_coerce_value
+        from type_validation.type_validation import _validate_or_coerce_value
         fallback = _validate_or_coerce_value(fallback, self.item_type, _coerce=_coerce)
         return self.value if self.is_present() else fallback
 
@@ -257,7 +257,7 @@ class Maybe[T](GenericBase[T]):
         if result is None:
             raise ValueError("Callable function returned a None object.")
         if result_type is not None:
-            from type_validation import _validate_or_coerce_value
+            from type_validation.type_validation import _validate_or_coerce_value
             return Maybe[result_type](result, _coerce=_coerce)
         return Maybe.of(result)
 

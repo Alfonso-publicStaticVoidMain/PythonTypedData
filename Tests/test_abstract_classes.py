@@ -1,6 +1,6 @@
 import unittest
 
-from abstract_classes import Collection, AbstractDict, AbstractSequence, AbstractSet, AbstractMutableDict, AbstractMutableSequence, AbstractMutableSet
+from abstract_classes.abstract_classes import Collection, AbstractDict, AbstractSequence, AbstractSet, AbstractMutableDict, AbstractMutableSequence, AbstractMutableSet
 
 
 class TestAbstractClasses(unittest.TestCase):
