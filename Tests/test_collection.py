@@ -1,7 +1,9 @@
 import unittest
 
-from abstract_classes import AbstractSet, Collection
-from concrete_classes import MutableList, ImmutableList, MutableSet, ImmutableSet
+from abstract_classes.collection import Collection
+from abstract_classes.abstract_set import AbstractSet
+from concrete_classes.list import MutableList, ImmutableList
+from concrete_classes.set import MutableSet, ImmutableSet
 
 
 class TestCollection(unittest.TestCase):
@@ -123,7 +125,7 @@ class TestCollection(unittest.TestCase):
         mul = MutableList[int](1, 2, 3, 4, 5)
         dic = mul.collect(
             supplier=lambda:{},  # Initial supplier gives an empty dict to start
-            accumulator=lambda d, n: d.__setitem__(n, 2**n),  # Accumulator sets key n to 2**n
+            accumulator=lambda d, n: d.__setitem__(n, 2**n),  # Accumulator adds the pair n : 2**n
             finisher=lambda d: d | {0: 1}  # Finisher adds the key 0: 1
         )
         self.assertEqual(dic, {0: 1, 1: 2, 2: 4, 3: 8, 4: 16, 5: 32})
@@ -180,6 +182,9 @@ class TestCollection(unittest.TestCase):
 
         mapped_to_str = mul.map(lambda x : 'a' * x)
         self.assertEqual(mapped_to_str, MutableList[str]('a', 'aa', 'aaa'))
+
+        mapped_to_str_coerced = mul.map(lambda x : 1j + x, str)
+        self.assertEqual(mapped_to_str_coerced, MutableList[str]('(1+1j)', '(2+1j)', '(3+1j)'))
 
     def test_to_dict(self):
         mul = MutableList[int](0, 1, 2)

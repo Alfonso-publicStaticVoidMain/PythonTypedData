@@ -1,6 +1,6 @@
 import unittest
 
-from concrete_classes import MutableDict, ImmutableDict
+from concrete_classes.dict import MutableDict, ImmutableDict
 
 
 class DictionaryTest(unittest.TestCase):
