@@ -4,7 +4,7 @@ import typing
 from typing import ClassVar, Callable, Iterable, Any, Iterator
 
 from abstract_classes.abstract_set import AbstractSet
-from abstract_classes.collection import Collection
+from abstract_classes.collection import Collection, MutableCollection
 from abstract_classes.generic_base import forbid_instantiation
 
 
@@ -244,7 +244,7 @@ class AbstractSequence[T](Collection[T]):
 
 
 @forbid_instantiation
-class AbstractMutableSequence[T](AbstractSequence[T]):
+class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
     """
     Abstract base class for mutable and ordered sequences containing values of a type T.
 
@@ -433,27 +433,3 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         :rtype: T
         """
         return self.values.pop(index)
-
-    def remove(
-        self: AbstractSequence[T],
-        value: T,
-        *,
-        _coerce: bool = False
-    ) -> None:
-        """
-        Removes the first occurrence of a value from the sequence.
-
-        :param value: The value to remove.
-        :type value: T
-
-        :param _coerce: State parameter that, if True, attempts to coerce the value before removing it.
-        :type _coerce: bool
-        """
-        from type_validation.type_validation import _validate_or_coerce_value
-        value_to_remove = value
-        if _coerce:
-            try:
-                value_to_remove = _validate_or_coerce_value(value, self.item_type)
-            except (TypeError, ValueError):
-                pass
-        self.values.remove(value_to_remove)

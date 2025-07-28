@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import ClassVar, Callable, Iterable, Any
 
-from abstract_classes.collection import Collection
+from abstract_classes.collection import Collection, MutableCollection
 from abstract_classes.generic_base import forbid_instantiation
 
 
@@ -311,7 +311,7 @@ class AbstractSet[T](Collection[T]):
 
 
 @forbid_instantiation
-class AbstractMutableSet[T](AbstractSet[T]):
+class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     """
     Abstract base class for mutable, hashable Collections of type T.
 
@@ -398,34 +398,6 @@ class AbstractMutableSet[T](AbstractSet[T]):
         from type_validation.type_validation import _validate_or_coerce_value
         self.values.add(_validate_or_coerce_value(value, self.item_type, _coerce=_coerce))
 
-    def remove(
-        self: AbstractMutableSet[T],
-        value: T,
-        *,
-        _coerce: bool = False
-    ) -> None:
-        """
-        Remove a single element from the set, or raises a KeyError if not present.
-
-        Delegates the operation to the underlying container's remove method.
-
-        :param value: The element to remove.
-        :type value: T
-
-        :param _coerce: State parameter that, if True, attempts to coerce the value before removal.
-        :type _coerce: bool
-
-        :raise KeyError: If the element is not present.
-        """
-        from type_validation.type_validation import _validate_or_coerce_value
-        value_to_remove = value
-        if _coerce:
-            try:
-                value_to_remove = _validate_or_coerce_value(value, self.item_type)
-            except (TypeError, ValueError):
-                pass
-        self.values.remove(value_to_remove)
-
     def discard(
         self: AbstractMutableSet[T],
         value: T,
@@ -451,12 +423,6 @@ class AbstractMutableSet[T](AbstractSet[T]):
             except (TypeError, ValueError):
                 pass
         self.values.discard(value_to_remove)
-
-    def clear(self: AbstractMutableSet[T]) -> None:
-        """
-        Remove all elements from the set.
-        """
-        self.values.clear()
 
     def pop(self: AbstractMutableSet[T]) -> T:
         """

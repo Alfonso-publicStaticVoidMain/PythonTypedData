@@ -741,3 +741,48 @@ class Collection[T](GenericBase[T]):
             accumulator=lambda acc_state, item: accumulator(*acc_state, item),
             finisher=lambda acc_state: finisher(*acc_state)
         )
+
+@forbid_instantiation
+class MutableCollection[T](Collection[T]):
+
+    def remove(
+        self: MutableCollection[T],
+        value: T,
+        *,
+        _coerce: bool = False
+    ) -> None:
+        """
+        Removes the first occurrence of a value from the collection.
+
+        :param value: The value to remove.
+        :type value: T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the value before removing it.
+        :type _coerce: bool
+        """
+        from type_validation.type_validation import _validate_or_coerce_value
+        value_to_remove = value
+        if _coerce:
+            try:
+                value_to_remove = _validate_or_coerce_value(value, self.item_type)
+            except (TypeError, ValueError):
+                pass
+        self.values.remove(value_to_remove)
+
+    def clear(self: MutableCollection[T]) -> None:
+        """
+        Remove all elements from the collection.
+        """
+        self.values.clear()
+
+    def filter_inplace(self: MutableCollection[T], predicate: Callable[[T], bool]) -> None:
+        pass
+
+    def remove_all(self, predicate: Callable[[T], bool]) -> None:
+        pass
+
+    def retain_all(self, items: Iterable[T]) -> None:
+        pass
+
+    def replace_all(self, old: T, new: T) -> None:
+        pass
