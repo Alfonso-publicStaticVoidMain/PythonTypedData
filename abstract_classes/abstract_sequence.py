@@ -440,6 +440,12 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         return self.values.pop(index)
 
     def filter_inplace(self: AbstractMutableSequence[T], predicate: Callable[[T], bool]) -> None:
+        """
+        Filters this sequence, keeping only the values that satisfy the predicate, preserving their order.
+
+        :param predicate: Function to the booleans to filter the sequence by.
+        :type predicate: Callable[[T], bool]
+        """
         self.values[:] = [x for x in self.values if predicate(x)]
 
     def replace(
@@ -449,6 +455,18 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         *,
         _coerce: bool = False
     ) -> None:
+        """
+        Replaces all appearances of `old` to `new`, respecting their position within the sequence.
+
+        :param old: Value to replace
+        :type old: T
+
+        :param new: Value to replace it by.
+        :type new: T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the new value to the sequence's item type.
+        :type _coerce: bool
+        """
         from type_validation.type_validation import _validate_or_coerce_value
         new = _validate_or_coerce_value(new, self.item_type, _coerce=_coerce)
         self.values[:] = [new if x == old else x for x in self.values]
@@ -459,6 +477,15 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         *,
         _coerce: bool = False
     ) -> None:
+        """
+        Replaces each value in the given dict's keys for its value, respecting its position within the sequence.
+
+        :param replacements: Dict of pairs old : new to replace.
+        :type replacements: dict[T, T]
+
+        :param _coerce: State parameter that, if True, attempts to coerce the new values to self's item type.
+        :type _coerce: bool
+        """
         from type_validation.type_validation import _validate_or_coerce_value
         validated_replacements = {old : _validate_or_coerce_value(new, self.item_type, _coerce=_coerce) for old, new in replacements.items()}
         self.values[:] = [validated_replacements.get(x, x) for x in self.values]

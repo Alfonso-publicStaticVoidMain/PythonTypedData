@@ -501,6 +501,12 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
             self.values.symmetric_difference_update(validated_set)
 
     def filter_inplace(self, predicate: Callable[[T], bool]) -> None:
+        """
+        Filters this set, keeping only the values that satisfy the predicate.
+
+        :param predicate: Function to the booleans to filter the set by.
+        :type predicate: Callable[[T], bool]
+        """
         self.values.difference_update({x for x in self.values if not predicate(x)})
 
     def replace(
@@ -510,6 +516,18 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
         *,
         _coerce: bool = False
     ) -> None:
+        """
+        Replaces all appearances of `old` to `new`.
+
+        :param old: Value to replace
+        :type old: T
+
+        :param new: Value to replace it by.
+        :type new: T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the new value to the set's item type.
+        :type _coerce: bool
+        """
         if old in self.values:
             self.values.remove(old)
             from type_validation.type_validation import _validate_or_coerce_value
@@ -522,16 +540,17 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
         *,
         _coerce: bool = False
     ) -> None:
+        """
+        Replaces each value in the given dict's keys for its value.
+
+        :param replacements: Dict of pairs old : new to replace.
+        :type replacements: dict[T, T]
+
+        :param _coerce: State parameter that, if True, attempts to coerce the new values to self's item type.
+        :type _coerce: bool
+        """
         from type_validation.type_validation import _validate_or_coerce_value
         validated_replacements = {old : _validate_or_coerce_value(new, self.item_type, _coerce=_coerce) for old, new in replacements.items()}
         for old in validated_replacements:
             self.values.remove(old)
             self.values.add(validated_replacements[old])
-
-    def map_inplace(
-        self: AbstractMutableSet[T],
-        f: Callable[[T], T],
-        *,
-        _coerce: bool = False
-    ) -> None:
-        self.replace_many({x : f(x) for x in self.values})

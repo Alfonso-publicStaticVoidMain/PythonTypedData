@@ -150,8 +150,7 @@ class Collection[T](GenericBase[T]):
         :param values: One or more parameters, or an Iterable of values to initialize the new Collection with.
         :type values: T
 
-        :return: A new Collection that is an instance of cls containing the passed values, inferring its item_type from
-        _infer_type_contained_in_iterable method.
+        :return: A new Collection that is an instance of cls containing the passed values, inferring its item type.
         :rtype: Collection[T]
 
         :raises ValueError: If no values are provided.
@@ -199,8 +198,8 @@ class Collection[T](GenericBase[T]):
         """
         Returns True if the provided item (or iterable of items) is contained in the Collection's internal container.
 
-        :return: True if item is an object of the item_type of the Collection and is contained in its values, or if it's
-        an Iterable whose elements are all contained on self's values. False otherwise.
+        :return: True if item is of the collection's item type and is contained in its values, or if it's an Iterable
+         whose elements are all contained on self's values. False otherwise.
         :rtype: bool
         """
         if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
@@ -215,7 +214,7 @@ class Collection[T](GenericBase[T]):
         to be compatible, like set and frozenset, but unlike list and tuple.
 
         :return: True if self and other share the same subclass, item type and underlying values (compared with ==),
-        False otherwise.
+         False otherwise.
         :rtype: bool
         """
         return (
@@ -308,7 +307,7 @@ class Collection[T](GenericBase[T]):
         :type value_mapper: Callable[[T], V]
 
         :return: A dictionary derived from the Collection by mapping each item to a (key, value) pair using the provided
-        key_mapper and value_mapper callables.
+         key_mapper and value_mapper callables.
         :rtype: dict[K, V]
         """
         return {
@@ -331,7 +330,6 @@ class Collection[T](GenericBase[T]):
             return self.values.count(value)
         except (AttributeError, TypeError, ValueError):
             return sum(1 for v in self.values if v == value)
-
 
     # Functional Methods:
 
@@ -386,7 +384,7 @@ class Collection[T](GenericBase[T]):
         :type _coerce: bool
 
         :return: A new Collection of the same subclass as self containing those values. If result_type is given,
-        it is used as the type of the returned Collection, if not that is inferred.
+         it is used as the type of the returned Collection, if not that is inferred.
         :rtype: Collection[R]
         """
         flattened = []
@@ -489,7 +487,7 @@ class Collection[T](GenericBase[T]):
             consumer(item)
         return self
 
-    def distinct[K](self: Collection[T], key: Callable[[T], K] = lambda x: x) -> Collection[T]:
+    def distinct[K](self: Collection[T], key: Callable[[T], K] = lambda x : x) -> Collection[T]:
         """
         Returns a new Collection with only distinct elements, determined by a key function.
 
@@ -524,7 +522,12 @@ class Collection[T](GenericBase[T]):
 
         return type(self)(result, _skip_validation=True)
 
-    def max(self: Collection[T], *, default: T | None = None, key: Callable[[T], Any] = None) -> T | None:
+    def max(
+        self: Collection[T],
+        *,
+        default: T | None = None,
+        key: Callable[[T], Any] = None
+    ) -> T | None:
         """
         Returns the maximum element in the collection, optionally using a key function or default value.
 
@@ -543,7 +546,12 @@ class Collection[T](GenericBase[T]):
             return None
         return max(self.values, key=key)
 
-    def min(self: Collection[T], *, default: T | None = None, key: Callable[[T], Any] = None) -> T | None:
+    def min(
+        self: Collection[T],
+        *,
+        default: T | None = None,
+        key: Callable[[T], Any] = None
+    ) -> T | None:
         """
         Returns the minimum element in the collection, optionally using a key function or default.
 
@@ -633,7 +641,7 @@ class Collection[T](GenericBase[T]):
         self: Collection[T],
         supplier: Callable[[], A],
         accumulator: Callable[[A, T], A],
-        finisher: Callable[[A], R] = lambda x: x
+        finisher: Callable[[A], R] = lambda x : x
     ) -> R:
         """
         Generalized collector, replicating Java's Stream API .collect method. The accumulator is now a pure function.
@@ -663,7 +671,7 @@ class Collection[T](GenericBase[T]):
         supplier: Callable[[], A],
         state_supplier: Callable[[], S],
         accumulator: Callable[[A, S, T], None],
-        finisher: Callable[[A, S], R] = lambda x, _: x
+        finisher: Callable[[A, S], R] = lambda x, _ : x
     ) -> R:
         """
         A generalized collector with internal state, inspired by Java's Stream API.
@@ -671,6 +679,14 @@ class Collection[T](GenericBase[T]):
         The supplier gives the initial container for the result. The state_supplier the initial value for the state.
         For each item in self, the accumulator is called on the container, item and state to process the item and
         modify the state, or not, then the finisher is applied to the container and state before returning.
+
+        The implementation of this method is delegated to the non-stateful collect, but it'd be equivalent to::
+
+            acc = supplier()
+            state = state_supplier()
+            for item in self.values:
+                accumulator(acc, state, item)
+            return finisher(acc, state)
 
         :param supplier: Provides the initial container.
         :type supplier: Callable[[], A]
@@ -687,13 +703,6 @@ class Collection[T](GenericBase[T]):
         :return: The final collected result.
         :rtype: R
         """
-        '''
-        acc = supplier()
-        state = state_supplier()
-        for item in self.values:
-            accumulator(acc, state, item)
-        return finisher(acc, state)
-        '''
         return self.collect(
             supplier=lambda:(supplier(), state_supplier()),
             accumulator=lambda acc_state, item : accumulator(*acc_state, item),
@@ -705,7 +714,7 @@ class Collection[T](GenericBase[T]):
         supplier: Callable[[], A],
         state_supplier: Callable[[], S],
         accumulator: Callable[[A, S, T], tuple[A, S]],
-        finisher: Callable[[A, S], R] = lambda x, _: x
+        finisher: Callable[[A, S], R] = lambda x, _ : x
     ) -> R:
         """
         A generalized collector with internal state, inspired by Java's Stream API.
@@ -713,6 +722,14 @@ class Collection[T](GenericBase[T]):
         The supplier provides an initial value of type A. The state_supplier the initial value of type S for the state.
         For each item in self, the accumulator is called on the container, item and state to process the item and
         return the value and state, then the finisher is applied to the last value and state before returning.
+
+        The implementation of this method is delegated to the non-stateful collect, but it'd be equivalent to::
+
+            acc = supplier()
+            state = state_supplier()
+            for item in self.values:
+                acc, state = accumulator(acc, item, state)
+            return finisher(acc, state)
 
         :param supplier: Provides the initial container.
         :type supplier: Callable[[], A]
@@ -729,18 +746,12 @@ class Collection[T](GenericBase[T]):
         :return: The final collected result.
         :rtype: R
         """
-        '''
-        acc = supplier()
-        state = state_supplier()
-        for item in self.values:
-            acc, state = accumulator(acc, item, state)
-        return finisher(acc, state)
-        '''
         return self.collect_pure(
             supplier=lambda: (supplier(), state_supplier()),
             accumulator=lambda acc_state, item: accumulator(*acc_state, item),
             finisher=lambda acc_state: finisher(*acc_state)
         )
+
 
 @forbid_instantiation
 class MutableCollection[T](Collection[T]):
@@ -776,6 +787,12 @@ class MutableCollection[T](Collection[T]):
         self.values.clear()
 
     def filter_inplace(self, predicate: Callable[[T], bool]) -> None:
+        """
+        Skeletal implementation of a filter inplace of the collection, valid for both a list and set of values.
+
+        :param predicate: Function to the booleans to filter the collection by.
+        :type predicate: Callable[[T], bool]
+        """
         values_to_remove: list[T] = [v for v in self.values if not predicate(v)]
         for v in values_to_remove:
             try:
@@ -789,6 +806,15 @@ class MutableCollection[T](Collection[T]):
         *,
         _coerce: bool = False
     ) -> None:
+        """
+        Maps each value in the collection to their image by the function f.
+
+        The class must implement replace_many and in case it's a Sequence, it should respect its ordering.
+
+        :param f: Mapping to apply to the Collection.
+        :param _coerce: State parameter that, if True, attempts to coerce the new values to the collection's item type.
+        :type _coerce: bool
+        """
         replace_many = getattr(self, "replace_many", None)
         if callable(replace_many):
             replace_many({x : f(x) for x in self.values}, _coerce=_coerce)
@@ -796,7 +822,19 @@ class MutableCollection[T](Collection[T]):
             pass
 
     def remove_all(self, items: Iterable[T]) -> None:
+        """
+        Removes from the collection all values within an iterable.
+
+        :param items: Iterable of items to remove.
+        :type items: Iterable[T]
+        """
         self.filter_inplace(lambda x: x not in items)
 
     def retain_all(self, items: Iterable[T]) -> None:
+        """
+        Removes from the collection all values except the ones present in the given iterable.
+
+        :param items: Iterable of items to keep.
+        :type items: Iterable[T]
+        """
         self.filter_inplace(lambda x: x in items)

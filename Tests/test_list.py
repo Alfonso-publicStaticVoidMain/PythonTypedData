@@ -228,5 +228,20 @@ class TestList(unittest.TestCase):
         with self.assertRaises(TypeError):
             mul *= 'c'
 
+    def test_inplace_filter(self):
+        mul = MutableList[str]('a', 'b', 'abc')
+        mul.filter_inplace(lambda s : s.startswith('a'))
+        self.assertEqual(mul, MutableList[str]('a', 'abc'))
+
+        mul.replace('abc', 123)
+        self.assertEqual(mul, MutableList.of('a', '123'))
+        self.assertNotEqual(mul, MutableList.of('a', 123))
+
+        mul.map_inplace(lambda s : s[0])
+        self.assertEqual(mul, MutableList.of('a', '1'))
+
+        mul.replace_many({'a' : 'b', '1' : 2})
+        self.assertEqual(mul, MutableList.of('b', '2'))
+
 if __name__ == '__main__':
     unittest.main()
