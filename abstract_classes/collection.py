@@ -775,14 +775,28 @@ class MutableCollection[T](Collection[T]):
         """
         self.values.clear()
 
-    def filter_inplace(self: MutableCollection[T], predicate: Callable[[T], bool]) -> None:
-        pass
+    def filter_inplace(self, predicate: Callable[[T], bool]) -> None:
+        values_to_remove: list[T] = [v for v in self.values if not predicate(v)]
+        for v in values_to_remove:
+            try:
+                self.values.remove(v)
+            except (TypeError, ValueError, KeyError):
+                pass
 
-    def remove_all(self, predicate: Callable[[T], bool]) -> None:
-        pass
+    def map_inplace(
+        self: MutableCollection[T],
+        f: Callable[[T], T],
+        *,
+        _coerce: bool = False
+    ) -> None:
+        replace_many = getattr(self, "replace_many", None)
+        if callable(replace_many):
+            replace_many({x : f(x) for x in self.values}, _coerce=_coerce)
+        else:
+            pass
+
+    def remove_all(self, items: Iterable[T]) -> None:
+        self.filter_inplace(lambda x: x not in items)
 
     def retain_all(self, items: Iterable[T]) -> None:
-        pass
-
-    def replace_all(self, old: T, new: T) -> None:
-        pass
+        self.filter_inplace(lambda x: x in items)

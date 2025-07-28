@@ -409,7 +409,12 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         from type_validation.type_validation import _validate_or_coerce_value
         self.values.insert(index, _validate_or_coerce_value(value, self.item_type, _coerce=_coerce))
 
-    def extend(self, other: Iterable[T], *, _coerce: bool = False) -> None:
+    def extend(
+        self: AbstractMutableSequence[T],
+        other: Iterable[T],
+        *,
+        _coerce: bool = False
+    ) -> None:
         """
         Extends the sequence with elements from another iterable.
 
@@ -422,7 +427,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         from type_validation.type_validation import _validate_or_coerce_iterable
         self.values.extend(_validate_or_coerce_iterable(other, self.item_type, _coerce=_coerce))
 
-    def pop(self, index: int = -1) -> T:
+    def pop(self: AbstractMutableSequence[T], index: int = -1) -> T:
         """
         Removes and returns the item at the given position (default at the last position).
 
@@ -433,3 +438,27 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         :rtype: T
         """
         return self.values.pop(index)
+
+    def filter_inplace(self: AbstractMutableSequence[T], predicate: Callable[[T], bool]) -> None:
+        self.values[:] = [x for x in self.values if predicate(x)]
+
+    def replace(
+        self: AbstractMutableSequence[T],
+        old: T,
+        new: T,
+        *,
+        _coerce: bool = False
+    ) -> None:
+        from type_validation.type_validation import _validate_or_coerce_value
+        new = _validate_or_coerce_value(new, self.item_type, _coerce=_coerce)
+        self.values[:] = [new if x == old else x for x in self.values]
+
+    def replace_many(
+        self: AbstractMutableSequence[T],
+        replacements: dict[T, T] | typing.Mapping[T, T],
+        *,
+        _coerce: bool = False
+    ) -> None:
+        from type_validation.type_validation import _validate_or_coerce_value
+        validated_replacements = {old : _validate_or_coerce_value(new, self.item_type, _coerce=_coerce) for old, new in replacements.items()}
+        self.values[:] = [validated_replacements.get(x, x) for x in self.values]

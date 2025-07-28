@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import ClassVar, Callable, Iterable, Any
+from typing import ClassVar, Callable, Iterable, Any, Mapping
 
 from abstract_classes.collection import Collection, MutableCollection
 from abstract_classes.generic_base import forbid_instantiation
@@ -499,3 +499,39 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
         from type_validation.type_validation import _validate_or_coerce_iterable_of_iterables
         for validated_set in _validate_or_coerce_iterable_of_iterables(others, self.item_type, _coerce=_coerce):
             self.values.symmetric_difference_update(validated_set)
+
+    def filter_inplace(self, predicate: Callable[[T], bool]) -> None:
+        self.values.difference_update({x for x in self.values if not predicate(x)})
+
+    def replace(
+        self: AbstractMutableSet[T],
+        old: T,
+        new: T,
+        *,
+        _coerce: bool = False
+    ) -> None:
+        if old in self.values:
+            self.values.remove(old)
+            from type_validation.type_validation import _validate_or_coerce_value
+            new = _validate_or_coerce_value(new, self.item_type, _coerce=_coerce)
+            self.values.add(new)
+
+    def replace_many(
+        self: AbstractMutableSet[T],
+        replacements: dict[T, T] | Mapping[T, T],
+        *,
+        _coerce: bool = False
+    ) -> None:
+        from type_validation.type_validation import _validate_or_coerce_value
+        validated_replacements = {old : _validate_or_coerce_value(new, self.item_type, _coerce=_coerce) for old, new in replacements.items()}
+        for old in validated_replacements:
+            self.values.remove(old)
+            self.values.add(validated_replacements[old])
+
+    def map_inplace(
+        self: AbstractMutableSet[T],
+        f: Callable[[T], T],
+        *,
+        _coerce: bool = False
+    ) -> None:
+        self.replace_many({x : f(x) for x in self.values})

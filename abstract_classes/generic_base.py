@@ -11,14 +11,17 @@ GenericBase[*Ts]
 │
 ├── Collection[T]
 │    │
-│    ├── AbstractSequence[T]
-│    │    ├── ImmutableList[T] (*)
-│    │    └── AbstractMutableSequence[T]
-│    │         └── MutableList[T] (*)
 │    │
-│    └── AbstractSet[T]
-│         ├── ImmutableSet[T] (*)
-│         └── AbstractMutableSet[T]
+│    ├── MutableCollection[T] ───────────────┐
+│    │                                       │
+│    ├── AbstractSequence[T]                 │
+│    │    ├── ImmutableList[T] (*)           │
+│    │    └── AbstractMutableSequence[T] ────┤
+│    │         └── MutableList[T] (*)        │
+│    │                                       │
+│    └── AbstractSet[T]                      │
+│         ├── ImmutableSet[T] (*)            │
+│         └── AbstractMutableSet[T] ─────────┘
 │              └── MutableSet[T] (*)
 │
 ├── AbstractDict[K, V]

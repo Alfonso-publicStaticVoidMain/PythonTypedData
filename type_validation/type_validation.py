@@ -161,7 +161,7 @@ def _validate_or_coerce_value[T](
     And if _coerce=True:
         - str -> int, float, complex
 
-    :param obj: Value to validate or _coerce.
+    :param obj: Value to validate or coerce.
     :type obj: object
 
     :param expected_type: Type to validate the obj for, or _coerce iterable into.
