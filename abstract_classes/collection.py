@@ -58,7 +58,7 @@ class Collection[T](GenericBase[T]):
         self: Collection[T],
         *values: T,
         _coerce: bool = False,
-        _forbidden_iterable_types: tuple[type, ...] = (),
+        _forbidden_iterable_types: tuple[type, ...] | None = None,
         _finisher: Callable[[Iterable[T]], Any] = None,
         _skip_validation: bool = False
     ) -> None:
@@ -107,6 +107,8 @@ class Collection[T](GenericBase[T]):
             and not isinstance(values[0], (str, bytes))  # But it's not a str or bytes.
         ):
             values = values[0]  # Then, the values are unpacked.
+
+        _forbidden_iterable_types = _forbidden_iterable_types or getattr(type(self), '_forbidden_iterable_types', ())
 
         # If values is of one of the forbidden iterable types, raises a TypeError.
         if isinstance(values, _forbidden_iterable_types):

@@ -4,8 +4,7 @@ from typing import ClassVar, Callable, Any, Mapping, Iterable, TypeVar, Iterator
 
 from immutabledict import immutabledict
 
-from abstract_classes.GenericBase import GenericBase, class_name
-from abstract_classes.generic_base import forbid_instantiation
+from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation
 
 
 @forbid_instantiation
@@ -377,7 +376,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
         """
         return dict(self.data)
 
-    def to_immutable_dict(self: AbstractDict[K, V]) -> immutabledict[K, V]:
+    def to_immutabledict(self: AbstractDict[K, V]) -> immutabledict[K, V]:
         """
         Returns an immutabledict representation of the AbstractDict.
 

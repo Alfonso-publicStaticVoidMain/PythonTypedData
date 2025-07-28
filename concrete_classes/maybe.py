@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from abstract_classes.GenericBase import GenericBase
+from abstract_classes.generic_base import GenericBase
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -342,6 +342,15 @@ class Maybe[T](GenericBase[T]):
         return bool(self.value)
 
     def __eq__(self: Maybe[T], other: object) -> bool:
+        """
+        Checks equality between two Maybe objects, comparing their item_type and value.
+
+        :param other: Another Maybe object to compare.
+        :type other: object
+
+        :return: True if other is an instance of Maybe of the same item_type and holding the same value by the `==`
+        operator, False otherwise.
+        """
         return (
             isinstance(other, Maybe)
             and self.item_type == other.item_type
@@ -349,6 +358,9 @@ class Maybe[T](GenericBase[T]):
         )
 
     def __hash__(self: Maybe[T]) -> int:
+        """
+        Hashes the Maybe object by trying to hash the tuple of its item_type and value.
+        """
         return hash((self.item_type, self.value))
 
     def __repr__(self: Maybe[T]) -> str:
@@ -358,5 +370,5 @@ class Maybe[T](GenericBase[T]):
         :return: A str of the format Maybe[self.item_type].of(self.value), or Maybe[self.item_type].empty().
         :rtype: str
         """
-        from abstract_classes import class_name
+        from abstract_classes.generic_base import class_name
         return f"{class_name(type(self))}.of({self.value!r})" if self.is_present() else f"{class_name(type(self))}.empty()"

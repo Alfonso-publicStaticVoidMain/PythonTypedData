@@ -1,6 +1,9 @@
 import unittest
 
-from abstract_classes.abstract_classes import Collection, AbstractDict, AbstractSequence, AbstractSet, AbstractMutableDict, AbstractMutableSequence, AbstractMutableSet
+from abstract_classes.abstract_dict import AbstractDict, AbstractMutableDict
+from abstract_classes.abstract_sequence import AbstractSequence, AbstractMutableSequence
+from abstract_classes.abstract_set import AbstractSet, AbstractMutableSet
+from abstract_classes.collection import Collection
 
 
 class TestAbstractClasses(unittest.TestCase):

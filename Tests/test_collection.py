@@ -1,7 +1,8 @@
 import unittest
 
-from abstract_classes.abstract_classes import AbstractSet, Collection
-from concrete_classes.concrete_classes import MutableList, ImmutableList
+from abstract_classes.collection import Collection
+from abstract_classes.abstract_set import AbstractSet
+from concrete_classes.list import MutableList, ImmutableList
 from concrete_classes.set import MutableSet, ImmutableSet
 
 

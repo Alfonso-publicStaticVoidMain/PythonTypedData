@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Iterable
+from typing import Mapping, Iterable, TYPE_CHECKING
 
 from immutabledict import immutabledict
 
 from abstract_classes.abstract_dict import AbstractMutableDict, AbstractDict
-from concrete_classes.concrete_classes import MutableList, ImmutableList
-from concrete_classes.set import MutableSet, ImmutableSet
+if TYPE_CHECKING:
+    from concrete_classes.list import MutableList, ImmutableList
+    from concrete_classes.set import MutableSet, ImmutableSet
 
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
@@ -52,6 +53,7 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         :return: A MutableList of keys.
         :rtype: MutableList[K]
         """
+        from concrete_classes.list import MutableList
         return MutableList[self.key_type](self.keys())
 
     def keys_as_immutable_list(self: MutableDict[K, V]) -> ImmutableList[K]:
@@ -61,6 +63,7 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         :return: A new ImmutableList object with the key type as its item type containing all the keys.
         :rtype: ImmutableList[K]
         """
+        from concrete_classes.list import ImmutableList
         return ImmutableList[self.key_type](self.keys())
 
     def keys_as_mutable_set(self: MutableDict[K, V]) -> MutableSet[K]:
@@ -70,6 +73,7 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         :return: A new MutableSet object with the key type as its item type containing all the keys.
         :rtype: MutableSet[K]
         """
+        from concrete_classes.set import MutableSet
         return MutableSet[self.key_type](self.keys())
 
     def keys_as_immutable_set(self: MutableDict[K, V]) -> ImmutableSet[K]:
@@ -79,6 +83,7 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         :return: A new ImmutableSet object with the key type as its item type containing all the keys.
         :rtype: ImmutableSet[K]
         """
+        from concrete_classes.set import ImmutableSet
         return ImmutableSet[self.key_type](self.keys())
 
     def values_as_mutable_list(self: MutableDict[K, V]) -> MutableList[V]:
@@ -88,6 +93,7 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         :return: A new MutableList object with the value type as its item type containing all the values.
         :rtype: MutableList[V]
         """
+        from concrete_classes.list import MutableList
         return MutableList[self.value_type](self.values())
 
     def values_as_immutable_list(self: MutableDict[K, V]) -> ImmutableList[V]:
@@ -97,6 +103,7 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         :return: A new ImmutableList object with the value type as its item type containing all the values.
         :rtype: ImmutableList[V]
         """
+        from concrete_classes.list import ImmutableList
         return ImmutableList[self.value_type](self.values())
 
     def values_as_mutable_set(self: MutableDict[K, V]) -> MutableSet[V]:
@@ -106,6 +113,7 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         :return: A new MutableSet object with the value type as its item type containing all the values.
         :rtype: MutableSet[V]
         """
+        from concrete_classes.set import MutableSet
         return MutableSet[self.value_type](self.values())
 
     def values_as_immutable_set(self: MutableDict[K, V]) -> ImmutableSet[V]:
@@ -115,6 +123,7 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         :return: A new ImmutableSet object with the value type as its item type containing all the values.
         :rtype: ImmutableSet[V]
         """
+        from concrete_classes.set import ImmutableSet
         return ImmutableSet[self.value_type](self.values())
 
 
@@ -146,7 +155,7 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
     def to_mutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
         return MutableDict[self.key_type, self.value_type](self.data, _skip_validation=True)
 
-    def to_mutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
+    def to_immutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
         return MutableDict[self.key_type, self.value_type](self.data, _skip_validation=True)
 
     def keys_as_mutable_list(self: ImmutableDict[K, V]) -> MutableList[K]:
@@ -156,6 +165,7 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         :return: A new MutableList object with the key type as its item type containing all the keys.
         :rtype: MutableList[K]
         """
+        from concrete_classes.list import MutableList
         return MutableList[self.key_type](self.keys())
 
     def keys_as_immutable_list(self: ImmutableDict[K, V]) -> ImmutableList[K]:
@@ -165,6 +175,7 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         :return: A new ImmutableList object with the key type as its item type containing all the keys.
         :rtype: ImmutableList[K]
         """
+        from concrete_classes.list import ImmutableList
         return ImmutableList[self.key_type](self.keys())
 
     def keys_as_mutable_set(self: ImmutableDict[K, V]) -> MutableSet[K]:
@@ -174,6 +185,7 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         :return: A new MutableSet object with the key type as its item type containing all the keys.
         :rtype: MutableSet[K]
         """
+        from concrete_classes.set import MutableSet
         return MutableSet[self.key_type](self.keys())
 
     def keys_as_immutable_set(self: ImmutableDict[K, V]) -> ImmutableSet[K]:
@@ -183,6 +195,7 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         :return: A new ImmutableSet object with the key type as its item type containing all the keys.
         :rtype: ImmutableSet[K]
         """
+        from concrete_classes.set import ImmutableSet
         return ImmutableSet[self.key_type](self.keys())
 
     def values_as_mutable_list(self: ImmutableDict[K, V]) -> MutableList[V]:
@@ -192,6 +205,7 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         :return: A new MutableList object with the value type as its item type containing all the values.
         :rtype: MutableList[V]
         """
+        from concrete_classes.list import MutableList
         return MutableList[self.value_type](self.values())
 
     def values_as_immutable_list(self: ImmutableDict[K, V]) -> ImmutableList[V]:
@@ -201,6 +215,7 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         :return: A new ImmutableList object with the value type as its item type containing all the values.
         :rtype: ImmutableList[V]
         """
+        from concrete_classes.list import ImmutableList
         return ImmutableList[self.value_type](self.values())
 
     def values_as_mutable_set(self: ImmutableDict[K, V]) -> MutableSet[V]:
@@ -210,6 +225,7 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         :return: A new MutableSet object with the value type as its item type containing all the values.
         :rtype: MutableSet[V]
         """
+        from concrete_classes.set import MutableSet
         return MutableSet[self.value_type](self.values())
 
     def values_as_immutable_set(self: ImmutableDict[K, V]) -> ImmutableSet[V]:
@@ -219,4 +235,5 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         :return: A new ImmutableSet object with the value type as its item type containing all the values.
         :rtype: ImmutableSet[V]
         """
+        from concrete_classes.set import ImmutableSet
         return ImmutableSet[self.value_type](self.values())

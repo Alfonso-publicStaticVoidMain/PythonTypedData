@@ -1,6 +1,6 @@
 import unittest
 
-from concrete_classes.concrete_classes import MutableList
+from concrete_classes.list import MutableList
 from type_validation.type_validation import _infer_type
 
 

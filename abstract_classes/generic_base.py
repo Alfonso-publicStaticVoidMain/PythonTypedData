@@ -10,10 +10,12 @@ Inheritance tree:
 GenericBase[*Ts]
 │
 ├── Collection[T]
+│    │
 │    ├── AbstractSequence[T]
 │    │    ├── ImmutableList[T] (*)
 │    │    └── AbstractMutableSequence[T]
 │    │         └── MutableList[T] (*)
+│    │
 │    └── AbstractSet[T]
 │         ├── ImmutableSet[T] (*)
 │         └── AbstractMutableSet[T]
@@ -24,10 +26,8 @@ GenericBase[*Ts]
 │    └── AbstractMutableDict[K, V]
 │         └── MutableDict[K, V] (*)
 │
-└── AbstractTuple[*Ts]
-     ├── ImmutableTuple[*Ts] (*)
-     └── AbstractMutableTuple[*Ts]
-          └── MutableTuple[*Ts] (*)
+└── Maybe[T] (*)
+
 
 (*) := Concrete class implementations. Everything else should be impossible to directly instantiate.
 """
@@ -37,7 +37,7 @@ Ts = TypeVarTuple("Ts")
 
 def forbid_instantiation(cls):
     """
-    Class decorator that forbids direct instantiation of the given class with or without generics.
+    Class decorator that forbids direct instantiation of the decorated class with or without generics.
 
     :raises TypeError: If the decorated class is instantiated directly, but allows instantiation of its subclasses.
     """
@@ -51,52 +51,6 @@ def forbid_instantiation(cls):
 
     cls.__new__ = staticmethod(__new__)
     return cls
-
-@forbid_instantiation
-class GenericBase[*Ts]:
-    """
-    Top-most class in the inheritance tree, that encodes the behaviour of the classes storing their generic parameters
-    received at their instantiation and storing them as a tuple in an _args attribute, as well as an _origin attribute
-    pointing to the class the generics were applied upon.
-
-    The attribute _generic_type_registry keeps a registry of all the instances of a class with certain generics that
-    have already been created, so when a new one is called, it tries to retrieve it from the registry before committing
-    the memory to creating a new subclass.
-    """
-
-    _generic_type_registry: ClassVar[WeakValueDictionary[tuple[type, tuple[type, ...]], type]] = WeakValueDictionary()
-    _args: ClassVar[tuple[type, ...]]
-    _origin: ClassVar[type]
-
-    @classmethod
-    def __class_getitem__(cls, item: type | tuple[type, ...]):
-        """
-        Extends the class cls to store the generic arguments it was called upon (item) and use them on runtime.
-
-        :param item: type or tuple of types that represents the generic types applied to the class.
-        :type item: type | tuple[type, ...]
-
-        :return: A class inheriting from cls with the generic arguments stored on an _args attribute and the original
-        class on an _origin attribute.
-        :rtype: type[cls]
-        """
-        if not isinstance(item, tuple):
-            item = (item,)
-
-        cache_key = (cls, item)
-        if cache_key in cls._generic_type_registry:
-            return cls._generic_type_registry[cache_key]
-
-        subclass = type(
-            f"{cls.__name__}[{", ".join(class_name(arg) for arg in item)}]",
-            (cls,),
-            {}
-        )
-
-        subclass._args = item
-        subclass._origin = cls
-        GenericBase._generic_type_registry[cache_key] = subclass
-        return subclass
 
 
 def class_name(cls: type) -> str:
@@ -135,3 +89,59 @@ def class_name(cls: type) -> str:
 
     # Fallback for things like typing.Any
     return repr(cls)
+
+
+@forbid_instantiation
+class GenericBase[*Ts]:
+    """
+    Top-most class in the inheritance tree, that encodes the behaviour of the classes storing their generic parameters
+    received at their instantiation and storing them as a tuple in an _args attribute, as well as an _origin attribute
+    pointing to the class the generics were applied upon.
+
+    The attribute _generic_type_registry keeps a registry of all the instances of a class with certain generics that
+    have already been created, so when a new one is called, it tries to retrieve it from the registry before committing
+    the memory to creating a new subclass.
+
+    Attributes:
+        _generic_type_registry (ClassVar[WeakValueDictionary[tuple[type, tuple[type, ...]], type]]): A class attribute
+         level dict that stores the previous calls of the __class_getitem__ method to reduce memory overload and avoid
+         recreating new subclasses that have already been created, retrieving them from this dict instead.
+
+        _args (ClassVar[tuple[type, ...]]): A class attribute storing a tuple of types the class was called upon.
+
+        _origin (ClassVar[type]): A class attribute storing the base class that was called upon one or more generic types.
+    """
+
+    _generic_type_registry: ClassVar[WeakValueDictionary[tuple[type, tuple[type, ...]], type]] = WeakValueDictionary()
+    _args: ClassVar[tuple[type, ...]]
+    _origin: ClassVar[type]
+
+    @classmethod
+    def __class_getitem__(cls, item: type | tuple[type, ...]):
+        """
+        Extends the class cls to store the generic arguments it was called upon (item) and use them on runtime.
+
+        :param item: type or tuple of types that represents the generic types applied to the class.
+        :type item: type | tuple[type, ...]
+
+        :return: A class inheriting from cls with the generic arguments stored on an _args attribute and the original
+        class on an _origin attribute.
+        :rtype: type[cls]
+        """
+        if not isinstance(item, tuple):
+            item = (item,)
+
+        cache_key = (cls, item)
+        if cache_key in cls._generic_type_registry:
+            return cls._generic_type_registry[cache_key]
+
+        subclass = type(
+            f"{cls.__name__}[{", ".join(class_name(arg) for arg in item)}]",
+            (cls,),
+            {}
+        )
+
+        subclass._args = item
+        subclass._origin = cls
+        GenericBase._generic_type_registry[cache_key] = subclass
+        return subclass

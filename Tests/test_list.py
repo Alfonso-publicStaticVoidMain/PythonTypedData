@@ -1,6 +1,7 @@
 import unittest
 
-from concrete_classes.concrete_classes import MutableList, ImmutableList
+
+from concrete_classes.list import MutableList, ImmutableList
 from concrete_classes.set import ImmutableSet
 
 
@@ -12,7 +13,7 @@ class TestList(unittest.TestCase):
         self.assertEqual(lst, lst_2)
 
     def test_class_name(self):
-        from abstract_classes.GenericBase import class_name
+        from abstract_classes.generic_base import class_name
         lst = MutableList[int]([0, 1, 2])
         self.assertEqual(class_name(type(lst)), "MutableList[int]")
 

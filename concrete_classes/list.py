@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Callable
+from typing import Iterable, Callable, TYPE_CHECKING
 
 from abstract_classes.abstract_sequence import AbstractMutableSequence, AbstractSequence
 from abstract_classes.abstract_set import AbstractSet
 from abstract_classes.collection import Collection
 from abstract_classes.generic_base import class_name
 
-from concrete_classes.dict import MutableDict, ImmutableDict
-from concrete_classes.set import MutableSet, ImmutableSet
+if TYPE_CHECKING:
+    from concrete_classes.dict import MutableDict, ImmutableDict
+    from concrete_classes.set import MutableSet, ImmutableSet
 
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
@@ -48,7 +49,7 @@ class MutableList[T](AbstractMutableSequence[T]):
         :param _skip_validation: State parameter that, if True, skips the validation of the values.
         :type _skip_validation: bool
         """
-        Collection.__init__(self, *values, _forbidden_iterable_types=(AbstractSet, set, frozenset), _coerce=_coerce, _skip_validation=_skip_validation)
+        Collection.__init__(self, *values, _coerce=_coerce, _skip_validation=_skip_validation)
 
     def to_immutable_list(self: MutableList[T]) -> ImmutableList[T]:
         """
@@ -68,6 +69,7 @@ class MutableList[T](AbstractMutableSequence[T]):
         skipped when creating this object.
         :type: MutableSet[T]
         """
+        from concrete_classes.set import MutableSet
         return MutableSet[self.item_type](self.values, _skip_validation=True)
 
     def to_immutable_set(self: MutableList[T]) -> ImmutableSet[T]:
@@ -78,6 +80,7 @@ class MutableList[T](AbstractMutableSequence[T]):
         skipped when creating this object.
         :type: ImmutableSet[T]
         """
+        from concrete_classes.set import ImmutableSet
         return ImmutableSet[self.item_type](self.values, _skip_validation=True)
 
     def to_mutable_dict[K, V](
@@ -98,6 +101,7 @@ class MutableList[T](AbstractMutableSequence[T]):
         mappings to the elements of this MutableList, inferring the dict types from them.
         :rtype: MutableDict[K, V]
         """
+        from concrete_classes.dict import MutableDict
         return MutableDict.of(self.to_dict(key_mapper, value_mapper))
 
     def to_immutable_dict[K, V](
@@ -118,6 +122,7 @@ class MutableList[T](AbstractMutableSequence[T]):
         mappings to the elements of this MutableList, inferring the dict types from them.
         :rtype: ImmutableDict[K, V]
         """
+        from concrete_classes.dict import ImmutableDict
         return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))
 
 
@@ -157,7 +162,7 @@ class ImmutableList[T](AbstractSequence[T]):
         :param _skip_validation: State parameter that, if True, skips the validation of the values.
         :type _skip_validation: bool
         """
-        Collection.__init__(self, *values, _forbidden_iterable_types=(AbstractSet, set, frozenset), _coerce=_coerce, _skip_validation=_skip_validation)
+        Collection.__init__(self, *values, _coerce=_coerce, _skip_validation=_skip_validation)
 
     def __repr__(self: Collection[T]) -> str:
         return f"{class_name(type(self))}{list(self.values)}"
@@ -180,6 +185,7 @@ class ImmutableList[T](AbstractSequence[T]):
         skipped when creating this object.
         :type: MutableSet[T]
         """
+        from concrete_classes.set import MutableSet
         return MutableSet[self.item_type](self.values, _skip_validation=True)
 
     def to_immutable_set(self: ImmutableList[T]) -> ImmutableSet[T]:
@@ -190,6 +196,7 @@ class ImmutableList[T](AbstractSequence[T]):
         skipped when creating this object.
         :type: ImmutableSet[T]
         """
+        from concrete_classes.set import ImmutableSet
         return ImmutableSet[self.item_type](self.values, _skip_validation=True)
 
     def to_mutable_dict[K, V](
@@ -210,6 +217,7 @@ class ImmutableList[T](AbstractSequence[T]):
         mappings to the elements of this MutableList, inferring the dict types from them.
         :rtype: MutableDict[K, V]
         """
+        from concrete_classes.dict import MutableDict
         return MutableDict.of(self.to_dict(key_mapper, value_mapper))
 
     def to_immutable_dict[K, V](
@@ -230,4 +238,5 @@ class ImmutableList[T](AbstractSequence[T]):
         mappings to the elements of this MutableList, inferring the dict types from them.
         :rtype: ImmutableDict[K, V]
         """
+        from concrete_classes.dict import ImmutableDict
         return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))

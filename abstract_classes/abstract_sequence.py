@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import typing
 from typing import ClassVar, Callable, Iterable, Any, Iterator
 
+from abstract_classes.abstract_set import AbstractSet
 from abstract_classes.collection import Collection
 from abstract_classes.generic_base import forbid_instantiation
 
@@ -22,6 +24,7 @@ class AbstractSequence[T](Collection[T]):
     """
 
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
+    _forbidden_iterable_types: ClassVar[tuple[type, ...]] = (set, frozenset, AbstractSet, typing.AbstractSet)
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
         """
@@ -41,7 +44,7 @@ class AbstractSequence[T](Collection[T]):
         elif isinstance(index, int):
             return self.values[index]
         else:
-            raise TypeError("Invalid index type: must be int or slice")
+            raise TypeError("Invalid index type: must be an int or slice")
 
     def __eq__(self: AbstractSequence[T], other: Any) -> bool:
         """

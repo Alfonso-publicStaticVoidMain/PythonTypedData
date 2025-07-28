@@ -3,7 +3,9 @@ from __future__ import annotations
 from types import UnionType
 from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Literal, Mapping, Sequence
 
-from abstract_classes import Collection, AbstractDict, AbstractSequence, AbstractTuple
+from abstract_classes.abstract_dict import AbstractDict
+from abstract_classes.abstract_sequence import AbstractSequence
+from abstract_classes.collection import Collection
 from concrete_classes.maybe import Maybe
 
 
@@ -238,7 +240,7 @@ def _validate_or_coerce_tuple(
     *,
     _coerce: bool = False
 ):
-    if not isinstance(tpl, (tuple, list, Sequence, AbstractSequence, AbstractTuple)):
+    if not isinstance(tpl, (tuple, list, Sequence, AbstractSequence)):
         raise ValueError(f"Object of type {type(tpl).__name__} isn't an ordered iterable.")
     if len(item_types) == 2 and item_types[1] is Ellipsis:
         return tuple(_validate_or_coerce_value(value, item_types[0], _coerce=_coerce) for value in tpl)
