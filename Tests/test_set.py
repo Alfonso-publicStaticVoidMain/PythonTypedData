@@ -166,6 +166,21 @@ class TestSet(unittest.TestCase):
         st ^= {2, 0} # Symmetric Difference = {0}
         self.assertEqual(st, MutableSet[int](0))
 
+    def test_replace(self):
+        mus = MutableSet[int](0, 1, 2)
+        mus.replace(0, -5)
+        self.assertEqual(mus, MutableSet.of(1, 2, -5))
+
+        mus.replace(-5, 1)
+        self.assertEqual(mus, MutableSet.of(1, 2, -5))
+
+        mus.replace(-5, 1, _remove_if_new_is_present=True)
+        self.assertEqual(mus, MutableSet.of(2, 1))
+
+        # 3 shouldn't get replaced to 7
+        mus.replace_many({2 : 1, 1 : 3, 3 : 7})
+        self.assertEqual(mus, MutableSet.of(1, 3))
+
 
 if __name__ == '__main__':
     unittest.main()

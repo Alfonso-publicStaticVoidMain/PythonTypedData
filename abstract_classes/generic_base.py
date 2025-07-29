@@ -11,7 +11,6 @@ GenericBase[*Ts]
 │
 ├── Collection[T]
 │    │
-│    │
 │    ├── MutableCollection[T] ───────────────┐
 │    │                                       │
 │    ├── AbstractSequence[T]                 │
@@ -107,7 +106,7 @@ class GenericBase[*Ts]:
 
     Attributes:
         _generic_type_registry (ClassVar[WeakValueDictionary[tuple[type, tuple[type, ...]], type]]): A class attribute
-         level dict that stores the previous calls of the __class_getitem__ method to reduce memory overload and avoid
+         dict that stores the previous calls of the __class_getitem__ method to reduce memory overload and avoid
          recreating new subclasses that have already been created, retrieving them from this dict instead.
 
         _args (ClassVar[tuple[type, ...]]): A class attribute storing a tuple of types the class was called upon.
@@ -135,8 +134,8 @@ class GenericBase[*Ts]:
             item = (item,)
 
         cache_key = (cls, item)
-        if cache_key in cls._generic_type_registry:
-            return cls._generic_type_registry[cache_key]
+        if cache_key in GenericBase._generic_type_registry:
+            return GenericBase._generic_type_registry[cache_key]
 
         subclass = type(
             f"{cls.__name__}[{", ".join(class_name(arg) for arg in item)}]",

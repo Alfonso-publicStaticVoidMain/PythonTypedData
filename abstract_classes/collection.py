@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Iterable, Any, Callable, TypeVar, ClassVar, Iterator
+from typing import Iterable, Any, Callable, TypeVar, ClassVar, Iterator, Sequence
 from collections import defaultdict
 
 from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation
@@ -10,11 +10,11 @@ from abstract_classes.generic_base import GenericBase, class_name, forbid_instan
 @forbid_instantiation
 class Collection[T](GenericBase[T]):
     """
-    Abstract base class representing a collection of items of type T, wrapping an underlying container and its type.
+    Abstract base class representing a collection of items of type T, wrapping an underlying container and an item type.
 
-    Provides a base class for storing and operating on collections of items with a common type, without any further
-    structure, which will be added on certain extensions. It uses generics to enforce runtime type safety and supports
-    fluent and functional-style operations inspired by Java's Stream API.
+    Provides a base class for storing and operating on collections of items with a common type, without assuming any
+    further structure, which will be added on certain extensions like AbstractSequence and AbstractSet. It supports
+    functional-style operations inspired by Java's Stream API.
 
     The class enforces runtime generic type tracking using the metaclass extension GenericBase, from which it inherits
     its __class_getitem__ method, which stores the generic types the Collection subclasses are called upon on an _args
@@ -58,7 +58,7 @@ class Collection[T](GenericBase[T]):
         self: Collection[T],
         *values: T,
         _coerce: bool = False,
-        _forbidden_iterable_types: tuple[type, ...] | None = None,
+        _forbidden_iterable_types: tuple[type, ...] = (),
         _finisher: Callable[[Iterable[T]], Any] = None,
         _skip_validation: bool = False
     ) -> None:
@@ -66,9 +66,9 @@ class Collection[T](GenericBase[T]):
         Basic constructor for the Collection abstract class, to be invoked by all subclasses.
 
         The attribute item_type is inferred from the generic the class was called upon, which was stored on the
-        _args attribute of the class returned by __class_getitem__ and fetched by _inferred_item_type.
+        _args attribute of the class returned by __class_getitem__ and then fetched by _inferred_item_type.
 
-        :param values: Values, received as an iterable or one by one, to store in the Collection.
+        :param values: Values to store in the Collection, received as an iterable or one by one.
         :type values: T
 
         :param _coerce: State parameter to force type coercion or not. Some numeric type coercions are always performed.
@@ -78,11 +78,11 @@ class Collection[T](GenericBase[T]):
         :type _forbidden_iterable_types: tuple[type, ...]
 
         :param _finisher: Callable to be applied to the values before storing them on the values attribute of the object.
-        Defaults to None, and in that case is later assigned to the identity mapping.
+         Defaults to None, and in that case is later assigned to the identity mapping.
         :type _finisher: Callable[[Iterable[T]], Any]
 
         :param _skip_validation: State parameter to skip type validation of the values. Only use it in cases where it's
-        known that the values received will match the generic type.
+         known that the values received will match the generic type.
         :type _skip_validation: bool
 
         :raises TypeError: If the generic type wasn't provided or was a TypeVar.
@@ -116,22 +116,22 @@ class Collection[T](GenericBase[T]):
 
         object.__setattr__(self, 'item_type', generic_item_type)
 
-        final_values = values if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce)
-
         _finisher = _finisher or getattr(type(self), '_finisher', lambda x : x)
 
-        object.__setattr__(self, 'values', _finisher(final_values))
+        final_values = _finisher(values) if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce, _finisher=_finisher)
+
+        object.__setattr__(self, 'values', final_values)
 
     @classmethod
     def _inferred_item_type(cls: type[Collection[T]]) -> type[T] | None:
         """
         Returns the generic type argument T with which this Collection subclass was parameterized, or None.
 
-        This method is used internally for runtime type enforcement and generic introspection, and it fetches the generic
-        type from the _args attribute the class inherits from GenericBase which is set on its __class_getitem__ method.
+        This method is used internally for runtime type enforcement and generic introspection, as it fetches the generic
+        type from the first position of the _args tuple attribute the class inherits from GenericBase, which is set on
+        its __class_getitem__ method.
 
-        :return: The generic type T that this class was called upon, as stored on its attribute _args by the
-        __class_getitem__ method inherited from GenericBase. If unable to retrieve it, returns None.
+        :return: The generic type T that this class was called upon, or, if unable to retrieve it, None.
         :rtype: type[T] | None
         """
         try:
@@ -147,7 +147,7 @@ class Collection[T](GenericBase[T]):
         Acts as a type-safe factory method for constructing properly parameterized collections when the type
         is not known beforehand.
 
-        :param values: One or more parameters, or an Iterable of values to initialize the new Collection with.
+        :param values: Values to store in the Collection, received as an iterable or one by one.
         :type values: T
 
         :return: A new Collection that is an instance of cls containing the passed values, inferring its item type.
@@ -161,16 +161,17 @@ class Collection[T](GenericBase[T]):
         return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
 
     @classmethod
-    def empty[R](cls: type[Collection[R]]) -> Collection[R]:
+    def empty(cls: type[Collection[T]]) -> Collection[T]:
         """
         Creates an empty Collection subclass of the current class, parameterized with its generic type.
 
-        Useful for initialization of empty collections with known type context.
+        Useful for initialization of empty collections with known type context, like MutableList[int].empty(). Note
+        that typing MutableList.empty() will raise a ValueError.
 
-        :return: An empty Collection that is an instance of cls with the given item_type.
+        :return: An empty Collection that is an instance of this class, keeping its generic type too.
         :rtype: Collection[R]
 
-        :raises ValueError: If item_type is None.
+        :raises ValueError: If the class calling this method has no generic type on its _args attribute.
         """
         if cls._inferred_item_type() is None:
             raise ValueError(f"Trying to call {cls.__name__}.empty without a generic type.")
@@ -330,6 +331,16 @@ class Collection[T](GenericBase[T]):
             return self.values.count(value)
         except (AttributeError, TypeError, ValueError):
             return sum(1 for v in self.values if v == value)
+
+    def find_any(self: Collection[T]) -> T:
+        """
+        Gets a random element from the collection, not defaulting to last insertion or last position.
+
+        :return: A random element of the collection.
+        :rtype: T
+        """
+        from random import choice
+        return choice(tuple(self.values))
 
     # Functional Methods:
 
@@ -785,6 +796,17 @@ class MutableCollection[T](Collection[T]):
         Remove all elements from the collection.
         """
         self.values.clear()
+
+    def pop_random(self: MutableCollection[T]) -> T:
+        """
+        Removes a random element from the collection and returns it.
+
+        :return: A random element from the collection, which is removed from it.
+        :rtype: T
+        """
+        popped_item: T = self.find_any()
+        self.remove(popped_item)
+        return popped_item
 
     def filter_inplace(self, predicate: Callable[[T], bool]) -> None:
         """

@@ -162,7 +162,20 @@ class TestList(unittest.TestCase):
     def test_sorted_methods(self):
         lst = MutableList[str]("b", "a", "c")
         self.assertEqual(lst.sorted(), MutableList[str]("a", "b", "c"))
+        self.assertEqual(lst, MutableList[str]("b", "a", "c"))
         self.assertEqual(lst.sorted(reverse=True), MutableList[str]("c", "b", "a"))
+
+    def test_inplace_sort_reverse(self):
+        mul = MutableList[str]('a', 'x', 'b')
+        mul.sort()
+        self.assertEqual(mul, MutableList.of('a', 'b', 'x'))
+        mul.append('c')
+        mul.sort(reverse=True)
+        self.assertEqual(mul, MutableList.of('x', 'c', 'b', 'a'))
+        mul.append('y')
+        mul.reverse()
+        self.assertEqual(mul, MutableList.of('y', 'a', 'b', 'c', 'x'))
+
 
     def test_invalid_set_values(self):
         with self.assertRaises(TypeError):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import UnionType
-from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Literal, Mapping, Sequence
+from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Literal, Mapping, Sequence, Callable
 
 from abstract_classes.abstract_dict import AbstractDict
 from abstract_classes.abstract_sequence import AbstractSequence
@@ -214,8 +214,9 @@ def _validate_or_coerce_iterable[T](
     iterable: Iterable[Any] | None,
     expected_type: type[T],
     *,
-    _coerce: bool = False
-) -> list[T]:
+    _coerce: bool = False,
+    _finisher: Callable[[Iterable[T]], Iterable[T]] | Callable[[], Iterable[T]] = list
+) -> Iterable[T]:
     """
     Validates and optionally coerces the elements of an iterable against a given type, and returns them as a list.
 
@@ -231,8 +232,8 @@ def _validate_or_coerce_iterable[T](
     :raises TypeError: If any value isn't of the expected type and coercion isn't possible or wasn't enabled.
     """
     if iterable is None:
-        return []
-    return [_validate_or_coerce_value(value, expected_type, _coerce=_coerce) for value in iterable]
+        return _finisher()
+    return _finisher(_validate_or_coerce_value(value, expected_type, _coerce=_coerce) for value in iterable)
 
 def _validate_or_coerce_tuple(
     tpl: tuple,
@@ -296,8 +297,10 @@ def _validate_or_coerce_iterable_of_iterables[T](
     iterables: Iterable[Iterable[T]],
     expected_type: type[T],
     *,
-    _coerce: bool = False
-) -> list[list[T]]:
+    _coerce: bool = False,
+    _inner_finisher: Callable[[Iterable[T]], Iterable[T]] = set,
+    _outer_finisher: Callable[[Iterable[T]], Iterable[T]] = tuple
+) -> Iterable[Iterable[T]]:
     """
     Validates and optionally coerces each iterable inside an iterable and returns them as a list of lists.
 
@@ -310,13 +313,19 @@ def _validate_or_coerce_iterable_of_iterables[T](
     :param _coerce: State parameter to force type coercion or not. Some numeric type coercions are always performed.
     :type _coerce: bool
 
+    :param _inner_finisher: Callable to apply to each Iterable as they're added to the Iterable that'll be returned.
+    :type _inner_finisher: Callable[[Iterable[T]], Iterable[T]]
+
+    :param _outer_finisher: Callable to apply to the returned final Iterable of Iterables.
+    :type _outer_finisher: Callable[[Iterable[T]], Iterable[T]]
+
     :return: A list of lists containing the validated and optionally coerced iterables.
     :rtype: list[list[T]]
     """
     other_iterables: list = []
     for iterable in iterables:
-        other_iterables.append(_validate_collection_type_and_get_values(iterable, expected_type, _coerce=_coerce))
-    return other_iterables
+        other_iterables.append(_validate_or_coerce_iterable(iterable, expected_type, _coerce=_coerce, _finisher=_inner_finisher))
+    return _outer_finisher(other_iterables)
 
 
 def _validate_duplicates_and_hash(iterable: Iterable) -> None:

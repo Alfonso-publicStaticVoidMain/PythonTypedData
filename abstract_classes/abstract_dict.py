@@ -12,9 +12,8 @@ class AbstractDict[K, V](GenericBase[K, V]):
     """
     Abstract base class representing a dictionary with type enforced keys and values given by generic types.
 
-    Provides a base class for storing and operating on dictionaries with keys and values of a common type each. It uses
-    generics to enforce runtime type safety and supports fluent and functional-style operations inspired by Java's
-    Stream API.
+    Provides a base class for storing and operating on dictionaries with keys and values of a common type each. It
+    supports functional-style operations inspired by Java's Stream API.
 
     The class enforces runtime generic type tracking using a metaclass extension (GenericBase), allowing validation
     and coercion of elements during construction and transformations. It cannot be directly instantiated and must be
@@ -24,6 +23,8 @@ class AbstractDict[K, V](GenericBase[K, V]):
         key_type (type[K]): The type constraint for keys.
         value_type (type[V]): The type constraint for values.
         data (dict[K, V]): The underlying dictionary storage.
+        _finisher (ClassVar[Callable[[dict], Any]]): Overrides the _finisher parameter of AbstractDict's init
+         by its value, setting it to immutabledict.
 
     Note:
         Any method that returns a new AbstractDict instance (e.g., filter, map, etc.) constructs the returned
@@ -151,7 +152,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
         :type keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]
 
         :return: A new AbstractDict with inferred generic types and properly validated contents (hashable and not
-        duplicated keys).
+         duplicated keys).
         :rtype: AbstractDict[K, V]
         """
         if keys_values is None or not keys_values:
@@ -222,17 +223,15 @@ class AbstractDict[K, V](GenericBase[K, V]):
                 return type(self)({})
 
             try:
-                # Try comparing sample_key with start/stop if provided
+                # Try comparing sample key with start/stop if provided
                 if start is not None:
                     sample_key >= start
-                if stop is not None:
+                elif stop is not None:
                     sample_key <= stop
             except TypeError:
                 raise TypeError("Keys must support ordering for subdict slicing.")
 
-            return self.filter_keys(
-                lambda k: (start is None or start <= k) and (stop is None or k <= stop)
-            )
+            return self.filter_keys(lambda k : (start is None or start <= k) and (stop is None or k <= stop))
         else:
             # Regular key access
             return self.data[key]
@@ -314,7 +313,6 @@ class AbstractDict[K, V](GenericBase[K, V]):
         :return: A string representation of this AbstractDict.
         :rtype: str
         """
-
         return f"{class_name(type(self))}{dict(self.data)}"
 
     def __or__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
@@ -325,7 +323,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
         :type other: AbstractDict[K, V] | Mapping[K, V]
 
         :return: A new AbstractDict of the same dynamic subclass as self containing all key-value pairs from both, with
-        `other` overriding duplicate keys.
+         `other` overriding duplicate keys.
         :rtype: AbstractDict[K, V]
         """
         return type(self)(dict(self.data) | dict(other))
@@ -340,7 +338,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
         :return: A new AbstractDict of the same dynamic subclass as self with only keys present in both mappings.
         :rtype: AbstractDict[K, V]
         """
-        return type(self)({k: self.data[k] for k in self.data.keys() & other.keys()})
+        return type(self)({key : self.data[key] for key in self.data.keys() & other.keys()})
 
     def __sub__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
         """
@@ -352,7 +350,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
         :return: A new AbstractDict of the same dynamic subclass as self without the keys found in `other`.
         :rtype: AbstractDict[K, V]
         """
-        return type(self)({k: v for k, v in self.data.items() if k not in other})
+        return type(self)({key : value for key, value in self.data.items() if key not in other})
 
     def __xor__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
         """
@@ -517,10 +515,14 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
     Abstract base class for mutable dictionaries with type enforced keys and values.
 
     Inherits from AbstractDict, extending it with mutation operations such as item assignment, deletion, and updates.
+
     It is still an abstract class, so it must be subclassed to create concrete implementations.
 
-    It overrides _finisher to dict to ensure the mutability of the internal container, and also adds the attribute
-    _mutable set to True as class metadata, that for now is unused.
+    Attributes:
+        _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of AbstractDict's init
+         by its value, setting it to dict to ensure mutability of the underlying container.
+
+        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
     """
 
     _finisher: ClassVar[Callable[[dict], Mapping]] = dict
@@ -691,7 +693,14 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         """
         return self.data.popitem()
 
-    def setdefault(self: AbstractMutableDict[K, V], key: K, default: V | None = None) -> V:
+    def setdefault(
+        self: AbstractMutableDict[K, V],
+        key: K,
+        default: V | None = None,
+        *,
+        _coerce_keys: bool = False,
+        _coerce_values: bool = False
+    ) -> V:
         """
         Returns the value for a key, inserting a default value if the key is not present.
 
@@ -701,13 +710,19 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         :param default: The value to insert if the key is not present.
         :type default: V
 
+        :param _coerce_keys: State parameter that, if True, attempts to coerce the key to the expected key type.
+        :type _coerce_keys: bool
+
+        :param _coerce_values: State parameter that, if True, attempts to coerce the default to the expected value type.
+        :type _coerce_values: bool
+
         :return: The existing or newly inserted value.
         :rtype: V
         """
         from type_validation.type_validation import _validate_or_coerce_value
         if default is None:
-            return self.data.setdefault(_validate_or_coerce_value(key, self.key_type))
+            return self.data.setdefault(_validate_or_coerce_value(key, self.key_type, _coerce=_coerce_keys))
         return self.data.setdefault(
-            _validate_or_coerce_value(key, self.key_type),
-            _validate_or_coerce_value(default, self.value_type)
+            _validate_or_coerce_value(key, self.key_type, _coerce=_coerce_keys),
+            _validate_or_coerce_value(default, self.value_type, _coerce=_coerce_values)
         )

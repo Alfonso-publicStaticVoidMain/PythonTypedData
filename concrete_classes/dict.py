@@ -6,6 +6,7 @@ from typing import Mapping, Iterable, TYPE_CHECKING
 from immutabledict import immutabledict
 
 from abstract_classes.abstract_dict import AbstractMutableDict, AbstractDict
+
 if TYPE_CHECKING:
     from concrete_classes.list import MutableList, ImmutableList
     from concrete_classes.set import MutableSet, ImmutableSet
@@ -41,7 +42,7 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         Returns this dict as an ImmutableDict.
 
         :return: A new ImmutableDict object with the same key and value types as self and containing the data.
-        Validation is skipped when creating this object.
+         Validation is skipped when creating this object.
         :type: ImmutableDict[T]
         """
         return ImmutableDict[self.key_type, self.value_type](self.data, _skip_validation=True)
@@ -60,71 +61,78 @@ class MutableDict[K, V](AbstractMutableDict[K, V]):
         """
         Returns an ImmutableList containing all keys in the dictionary.
 
-        :return: A new ImmutableList object with the key type as its item type containing all the keys.
+        :return: A new ImmutableList object with the key type as its item type containing all the keys. Validation is
+         skipped when creating this object.
         :rtype: ImmutableList[K]
         """
         from concrete_classes.list import ImmutableList
-        return ImmutableList[self.key_type](self.keys())
+        return ImmutableList[self.key_type](self.keys(), _skip_validation=True)
 
     def keys_as_mutable_set(self: MutableDict[K, V]) -> MutableSet[K]:
         """
         Returns a MutableSet containing all keys in the dictionary.
 
-        :return: A new MutableSet object with the key type as its item type containing all the keys.
+        :return: A new MutableSet object with the key type as its item type containing all the keys. Validation is
+         skipped when creating this object.
         :rtype: MutableSet[K]
         """
         from concrete_classes.set import MutableSet
-        return MutableSet[self.key_type](self.keys())
+        return MutableSet[self.key_type](self.keys(), _skip_validation=True)
 
     def keys_as_immutable_set(self: MutableDict[K, V]) -> ImmutableSet[K]:
         """
         Returns an ImmutableSet containing all keys in the dictionary.
 
-        :return: A new ImmutableSet object with the key type as its item type containing all the keys.
+        :return: A new ImmutableSet object with the key type as its item type containing all the keys. Validation is
+         skipped when creating this object.
         :rtype: ImmutableSet[K]
         """
         from concrete_classes.set import ImmutableSet
-        return ImmutableSet[self.key_type](self.keys())
+        return ImmutableSet[self.key_type](self.keys(), _skip_validation=True)
 
     def values_as_mutable_list(self: MutableDict[K, V]) -> MutableList[V]:
         """
         Returns a MutableList containing all values in the dictionary.
 
-        :return: A new MutableList object with the value type as its item type containing all the values.
+        :return: A new MutableList object with the value type as its item type containing all the values. Validation is
+         skipped when creating this object.
         :rtype: MutableList[V]
         """
         from concrete_classes.list import MutableList
-        return MutableList[self.value_type](self.values())
+        return MutableList[self.value_type](self.values(), _skip_validation=True)
 
     def values_as_immutable_list(self: MutableDict[K, V]) -> ImmutableList[V]:
         """
         Returns an ImmutableList containing all values in the dictionary.
 
-        :return: A new ImmutableList object with the value type as its item type containing all the values.
+        :return: A new ImmutableList object with the value type as its item type containing all the values. Validation
+         is skipped when creating this object.
         :rtype: ImmutableList[V]
         """
         from concrete_classes.list import ImmutableList
-        return ImmutableList[self.value_type](self.values())
+        return ImmutableList[self.value_type](self.values(), _skip_validation=True)
 
     def values_as_mutable_set(self: MutableDict[K, V]) -> MutableSet[V]:
         """
         Returns a MutableSet containing all unique values in the dictionary.
 
-        :return: A new MutableSet object with the value type as its item type containing all the values.
+        :return: A new MutableSet object with the value type as its item type containing all the values. Validation is
+         skipped when creating this object.
         :rtype: MutableSet[V]
         """
         from concrete_classes.set import MutableSet
-        return MutableSet[self.value_type](self.values())
+        return MutableSet[self.value_type](self.values(), _skip_validation=True)
 
     def values_as_immutable_set(self: MutableDict[K, V]) -> ImmutableSet[V]:
         """
         Returns an ImmutableSet containing all unique values in the dictionary.
 
-        :return: A new ImmutableSet object with the value type as its item type containing all the values.
+        :return: A new ImmutableSet object with the value type as its item type containing all the values. Validation is
+         skipped when creating this object.
         :rtype: ImmutableSet[V]
         """
         from concrete_classes.set import ImmutableSet
-        return ImmutableSet[self.value_type](self.values())
+        return ImmutableSet[self.value_type](self.values(), _skip_validation=True)
 
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
@@ -153,16 +161,20 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         AbstractDict.__init__(self, keys_values, _coerce_keys=_coerce_keys, _coerce_values=_coerce_values, _keys=_keys, _values=_values, _skip_validation=_skip_validation)
 
     def to_mutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
-        return MutableDict[self.key_type, self.value_type](self.data, _skip_validation=True)
+        """
+        Returns this dict as a MutableDict.
 
-    def to_immutable_dict(self: ImmutableDict[K, V]) -> MutableDict[K, V]:
+        :return: A new MutableDict object with the same key and value types as self and containing the data.
+         Validation is skipped when creating this object.
+        :type: MutableDict[T]
+        """
         return MutableDict[self.key_type, self.value_type](self.data, _skip_validation=True)
 
     def keys_as_mutable_list(self: ImmutableDict[K, V]) -> MutableList[K]:
         """
         Returns a MutableList containing all keys in the dictionary.
 
-        :return: A new MutableList object with the key type as its item type containing all the keys.
+        :return: A MutableList of keys.
         :rtype: MutableList[K]
         """
         from concrete_classes.list import MutableList
@@ -172,68 +184,75 @@ class ImmutableDict[K, V](AbstractDict[K, V]):
         """
         Returns an ImmutableList containing all keys in the dictionary.
 
-        :return: A new ImmutableList object with the key type as its item type containing all the keys.
+        :return: A new ImmutableList object with the key type as its item type containing all the keys. Validation is
+         skipped when creating this object.
         :rtype: ImmutableList[K]
         """
         from concrete_classes.list import ImmutableList
-        return ImmutableList[self.key_type](self.keys())
+        return ImmutableList[self.key_type](self.keys(), _skip_validation=True)
 
     def keys_as_mutable_set(self: ImmutableDict[K, V]) -> MutableSet[K]:
         """
         Returns a MutableSet containing all keys in the dictionary.
 
-        :return: A new MutableSet object with the key type as its item type containing all the keys.
+        :return: A new MutableSet object with the key type as its item type containing all the keys. Validation is
+         skipped when creating this object.
         :rtype: MutableSet[K]
         """
         from concrete_classes.set import MutableSet
-        return MutableSet[self.key_type](self.keys())
+        return MutableSet[self.key_type](self.keys(), _skip_validation=True)
 
     def keys_as_immutable_set(self: ImmutableDict[K, V]) -> ImmutableSet[K]:
         """
         Returns an ImmutableSet containing all keys in the dictionary.
 
-        :return: A new ImmutableSet object with the key type as its item type containing all the keys.
+        :return: A new ImmutableSet object with the key type as its item type containing all the keys. Validation is
+         skipped when creating this object.
         :rtype: ImmutableSet[K]
         """
         from concrete_classes.set import ImmutableSet
-        return ImmutableSet[self.key_type](self.keys())
+        return ImmutableSet[self.key_type](self.keys(), _skip_validation=True)
 
     def values_as_mutable_list(self: ImmutableDict[K, V]) -> MutableList[V]:
         """
         Returns a MutableList containing all values in the dictionary.
 
-        :return: A new MutableList object with the value type as its item type containing all the values.
+        :return: A new MutableList object with the value type as its item type containing all the values. Validation is
+         skipped when creating this object.
         :rtype: MutableList[V]
         """
         from concrete_classes.list import MutableList
-        return MutableList[self.value_type](self.values())
+        return MutableList[self.value_type](self.values(), _skip_validation=True)
 
     def values_as_immutable_list(self: ImmutableDict[K, V]) -> ImmutableList[V]:
         """
         Returns an ImmutableList containing all values in the dictionary.
 
-        :return: A new ImmutableList object with the value type as its item type containing all the values.
+        :return: A new ImmutableList object with the value type as its item type containing all the values. Validation
+         is skipped when creating this object.
         :rtype: ImmutableList[V]
         """
         from concrete_classes.list import ImmutableList
-        return ImmutableList[self.value_type](self.values())
+        return ImmutableList[self.value_type](self.values(), _skip_validation=True)
 
     def values_as_mutable_set(self: ImmutableDict[K, V]) -> MutableSet[V]:
         """
         Returns a MutableSet containing all unique values in the dictionary.
 
-        :return: A new MutableSet object with the value type as its item type containing all the values.
+        :return: A new MutableSet object with the value type as its item type containing all the values. Validation is
+         skipped when creating this object.
         :rtype: MutableSet[V]
         """
         from concrete_classes.set import MutableSet
-        return MutableSet[self.value_type](self.values())
+        return MutableSet[self.value_type](self.values(), _skip_validation=True)
 
     def values_as_immutable_set(self: ImmutableDict[K, V]) -> ImmutableSet[V]:
         """
         Returns an ImmutableSet containing all unique values in the dictionary.
 
-        :return: A new ImmutableSet object with the value type as its item type containing all the values.
+        :return: A new ImmutableSet object with the value type as its item type containing all the values. Validation is
+         skipped when creating this object.
         :rtype: ImmutableSet[V]
         """
         from concrete_classes.set import ImmutableSet
-        return ImmutableSet[self.value_type](self.values())
+        return ImmutableSet[self.value_type](self.values(), _skip_validation=True)
