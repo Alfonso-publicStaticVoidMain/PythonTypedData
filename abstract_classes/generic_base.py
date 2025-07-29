@@ -72,7 +72,7 @@ def class_name(cls: type) -> str:
     # Case 0: Handle Union[...] using | notation
     origin = get_origin(cls)
     args = get_args(cls)
-    if origin is Union or origin is UnionType:
+    if origin in (Union, UnionType):
         return " | ".join(class_name(arg) for arg in args)
 
     # Case 1: A class extending GenericBase

@@ -609,7 +609,7 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
         from type_validation.type_validation import _validate_or_coerce_value
 
         validated_replacements = {
-            old: _validate_or_coerce_value(new, self.item_type, _coerce=_coerce)
+            old : _validate_or_coerce_value(new, self.item_type, _coerce=_coerce)
             for old, new in replacements.items()
         }
 
