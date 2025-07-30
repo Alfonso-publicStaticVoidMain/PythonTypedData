@@ -108,17 +108,17 @@ class Collection[T](GenericBase[T]):
         ):
             values = values[0]  # Then, the values are unpacked.
 
-        _forbidden_iterable_types = _forbidden_iterable_types or getattr(type(self), '_forbidden_iterable_types', ())
+        forbidden_iterable_types = _forbidden_iterable_types or type(self)._get_forbidden_iterable_types()
 
         # If values is of one of the forbidden iterable types, raises a TypeError.
-        if isinstance(values, _forbidden_iterable_types):
+        if isinstance(values, forbidden_iterable_types):
             raise TypeError(f"Invalid type {type(values).__name__} for class {type(self).__name__}.")
 
         object.__setattr__(self, 'item_type', generic_item_type)
 
-        _finisher = _finisher or getattr(type(self), '_finisher', lambda x : x)
+        finisher = _finisher or type(self)._get_finisher()
 
-        final_values = _finisher(values) if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce, _finisher=_finisher)
+        final_values = finisher(values) if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce, _finisher=finisher)
 
         object.__setattr__(self, 'values', final_values)
 
@@ -140,24 +140,84 @@ class Collection[T](GenericBase[T]):
             return None
 
     @classmethod
-    def _get_repr_finisher(
-        cls: Collection[T],
+    def _get_forbidden_iterable_types(
+        cls: type[Collection[T]],
+        default: type | tuple[type, ...] = ()
+    ) -> type | tuple[type, ...]:
+        """
+        Gets the iterable types that can't be passed to Collection's init to be contained in this class's objects.
+
+        :param default: Default value if the class doesn't have a _forbidden_iterable_types attribute.
+        :type default: type | tuple[type, ...]
+
+        :return: The _forbidden_iterable_types attribute of the class, or a default if it doesn't have one.
+        :rtype: type | tuple[type, ...]
+        """
+        return getattr(cls, '_forbidden_iterable_types', default)
+
+    @classmethod
+    def _get_finisher(
+        cls: type[Collection[T]],
         default: Callable[[Iterable], Iterable] = lambda x : x
     ) -> Callable[[Iterable], Iterable]:
+        """
+        Gets a callable that is applied to the values of this class's objects on init before setting the attribute.
+
+        :param default: Default value if the class doesn't have a _finisher attribute.
+        :type default: Callable[[Iterable], Iterable]
+
+        :return: The _finisher attribute of the class, or a default if it doesn't have one.
+        :rtype: Callable[[Iterable], Iterable]
+        """
+        return getattr(cls, '_finisher', default)
+
+    @classmethod
+    def _get_repr_finisher(
+        cls: type[Collection[T]],
+        default: Callable[[Iterable], Iterable] = lambda x : x
+    ) -> Callable[[Iterable], Iterable]:
+        """
+        Gets a callable that is applied to the values of this class's objects when representing them as a string.
+
+        :param default: Default value if the class doesn't have a _repr_finisher attribute.
+        :type default: Callable[[Iterable], Iterable]
+
+        :return: The _repr_finisher attribute of the class, or a default if it doesn't have one.
+        :rtype: Callable[[Iterable], Iterable]
+        """
         return getattr(cls, '_repr_finisher', default)
 
     @classmethod
     def _get_eq_finisher(
-        cls: Collection[T],
+        cls: type[Collection[T]],
         default: Callable[[Iterable], Iterable] = lambda x : x
     ) -> Callable[[Iterable], Iterable]:
+        """
+        Gets a callable that is applied to the values of this class's objects when comparing with another collection.
+
+        :param default: Default value if the class doesn't have a _eq_finisher attribute.
+        :type default: Callable[[Iterable], Iterable]
+
+        :return: The _eq_finisher attribute of the class, or a default if it doesn't have one.
+        :rtype: Callable[[Iterable], Iterable]
+        """
         return getattr(cls, '_eq_finisher', default)
 
     @classmethod
     def _get_comparable_types(
-        cls: Collection[T],
+        cls: type[Collection[T]],
         default: type[Collection] | tuple[type[Collection], ...] | None = None  # The real default value is Collection
     ) -> type[Collection] | tuple[type[Collection], ...]:
+        """
+        Gets the type or tuples of types this class can be expected to be possibly equal to.
+
+        :param default: Default value if the class doesn't have a _comparable_types attribute. When None, the method
+         returns Collection instead in that case.
+        :type default: type[Collection] | tuple[type[Collection], ...] | None
+
+        :return: The _comparable_types attribute of the class, or a default if it doesn't have one.
+        :rtype: type[Collection] | tuple[type[Collection], ...]
+        """
         return getattr(cls, '_comparable_types', default) or Collection
 
     @classmethod
@@ -239,12 +299,12 @@ class Collection[T](GenericBase[T]):
          False otherwise.
         :rtype: bool
         """
-        _eq_finisher = type(self)._get_eq_finisher()
-        _comparable_types: type[Collection] | tuple[type[Collection], ...] = type(self)._get_comparable_types()
+        eq_finisher = type(self)._get_eq_finisher()
+        comparable_types: type[Collection] | tuple[type[Collection], ...] = type(self)._get_comparable_types()
         return (
-            isinstance(other, _comparable_types)
+            isinstance(other, comparable_types)
             and self.item_type == other.item_type
-            and _eq_finisher(self.values) == _eq_finisher(other.values)
+            and eq_finisher(self.values) == eq_finisher(other.values)
         )
 
     def __repr__(self: Collection[T]) -> str:
@@ -254,8 +314,8 @@ class Collection[T](GenericBase[T]):
         :return: A string representation of the object.
         :rtype: str
         """
-        _repr_finisher = type(self)._get_repr_finisher()
-        return f"{class_name(type(self))}{_repr_finisher(self.values)}"
+        repr_finisher = type(self)._get_repr_finisher()
+        return f"{class_name(type(self))}{repr_finisher(self.values)}"
 
     def __bool__(self: Collection[T]) -> bool:
         """
