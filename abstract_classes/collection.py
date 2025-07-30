@@ -140,6 +140,27 @@ class Collection[T](GenericBase[T]):
             return None
 
     @classmethod
+    def _get_repr_finisher(
+        cls: Collection[T],
+        default: Callable[[Iterable], Iterable] = lambda x : x
+    ) -> Callable[[Iterable], Iterable]:
+        return getattr(cls, '_repr_finisher', default)
+
+    @classmethod
+    def _get_eq_finisher(
+        cls: Collection[T],
+        default: Callable[[Iterable], Iterable] = lambda x : x
+    ) -> Callable[[Iterable], Iterable]:
+        return getattr(cls, '_eq_finisher', default)
+
+    @classmethod
+    def _get_comparable_types(
+        cls: Collection[T],
+        default: type[Collection] | tuple[type[Collection], ...] | None = None  # The real default value is Collection
+    ) -> type[Collection] | tuple[type[Collection], ...]:
+        return getattr(cls, '_comparable_types', default) or Collection
+
+    @classmethod
     def of(cls: type[Collection], *values: T) -> Collection[T]:
         """
         Creates a Collection object containing the given values, inferring their common type.
@@ -218,10 +239,12 @@ class Collection[T](GenericBase[T]):
          False otherwise.
         :rtype: bool
         """
+        _eq_finisher = type(self)._get_eq_finisher()
+        _comparable_types: type[Collection] | tuple[type[Collection], ...] = type(self)._get_comparable_types()
         return (
-            isinstance(other, Collection)
+            isinstance(other, _comparable_types)
             and self.item_type == other.item_type
-            and self.values == other.values
+            and _eq_finisher(self.values) == _eq_finisher(other.values)
         )
 
     def __repr__(self: Collection[T]) -> str:
@@ -231,7 +254,8 @@ class Collection[T](GenericBase[T]):
         :return: A string representation of the object.
         :rtype: str
         """
-        return f"{class_name(type(self))}{self.values}"
+        _repr_finisher = type(self)._get_repr_finisher()
+        return f"{class_name(type(self))}{_repr_finisher(self.values)}"
 
     def __bool__(self: Collection[T]) -> bool:
         """

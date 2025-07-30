@@ -24,23 +24,8 @@ class AbstractSet[T](Collection[T]):
     """
 
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = frozenset
-
-    def __eq__(self: AbstractSet[T], other: Any) -> bool:
-        """
-        Checks whether two AbstractSet instances are equal in both type and contents.
-
-        :param other: The object to compare with.
-        :type other: Any
-
-        :return: True if both sets contain the same items and item type, False otherwise.
-        :rtype: bool
-        """
-
-        return (
-            isinstance(other, AbstractSet)
-            and self.item_type == other.item_type
-            and self.values == other.values
-        )
+    _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = set
+    _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = set
 
     def __lt__(self: AbstractSet[T], other: Any) -> bool:
         """

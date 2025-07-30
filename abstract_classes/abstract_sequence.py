@@ -22,14 +22,22 @@ class AbstractSequence[T](Collection[T]):
     container of the class.
 
     Attributes:
-        _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of Collection's init
-         by its value, setting it to tuple.
+        _finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting them as an
+         attribute on Collection's init.
+
+        _repr_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on the repr method to show
+         the values contained on the sequence.
+
+        _eq_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on both self and other's
+         values on the eq method to check for equality.
 
         _forbidden_iterable_types (ClassVar[tuple[type, ...]]): Overrides the _forbidden_iterable_types parameter of
          Collection's init, setting it to (set, frozenset, AbstractSet, typing.AbstractSet).
     """
 
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
+    _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = list
+    _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
     _forbidden_iterable_types: ClassVar[tuple[type, ...]] = (set, frozenset, AbstractSet, typing.AbstractSet)
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
@@ -51,25 +59,6 @@ class AbstractSequence[T](Collection[T]):
             return self.values[index]
         else:
             raise TypeError("Invalid index type: must be an int or slice")
-
-    def __eq__(self: AbstractSequence[T], other: Any) -> bool:
-        """
-        Checks equality with another sequence based on their item type and values.
-
-        Do note that equality will hold when comparing different implementations of AbstractSequence as long as the
-        item type is the same and the values are the same, even if holt by different containers.
-
-        :param other: Object to compare against.
-        :type other: Any
-
-        :return: True if `other` is an AbstractSequence with the same item type and the same values on the same order.
-        :rtype: bool
-        """
-        return (
-            isinstance(other, AbstractSequence)
-            and self.item_type == other.item_type
-            and list(self.values) == list(other.values)
-        )
 
     def __lt__(self: AbstractSequence[T], other: AbstractSequence[T] | list[T] | tuple[T, ...]) -> bool:
         """

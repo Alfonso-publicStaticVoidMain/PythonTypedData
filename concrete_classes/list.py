@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Callable, TYPE_CHECKING
+from typing import Iterable, Callable, TYPE_CHECKING, ClassVar
 
 from abstract_classes.abstract_sequence import AbstractMutableSequence, AbstractSequence
 from abstract_classes.abstract_set import AbstractSet
@@ -24,6 +24,8 @@ class MutableList[T](AbstractMutableSequence[T]):
 
     item_type: type[T]
     values: list[T]
+
+    _comparable_types: ClassVar[type[Collection] | tuple[type[Collection], ...]] = AbstractSequence
 
     def __init__(
         self: MutableList[T],
@@ -137,6 +139,8 @@ class ImmutableList[T](AbstractSequence[T]):
 
     item_type: type[T]
     values: tuple[T, ...]
+
+    _comparable_types: ClassVar[type[Collection] | tuple[type[Collection], ...]] = AbstractSequence
 
     def __init__(
         self: ImmutableList[T],

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Callable
+from typing import Iterable, Callable, ClassVar
 
 from abstract_classes.abstract_set import AbstractMutableSet, AbstractSet
 from abstract_classes.collection import Collection
@@ -19,6 +19,8 @@ class MutableSet[T](AbstractMutableSet[T]):
 
     item_type: type[T]
     values: set[T]
+
+    _comparable_types: ClassVar[type[Collection] | tuple[type[Collection], ...]] = AbstractSet
 
     def __init__(
         self: MutableSet[T],
@@ -107,6 +109,8 @@ class ImmutableSet[T](AbstractSet[T]):
 
     item_type: type[T]
     values: frozenset[T]
+
+    _comparable_types: ClassVar[type[Collection] | tuple[type[Collection], ...]] = AbstractSet
 
     def __init__(
         self: ImmutableSet[T],

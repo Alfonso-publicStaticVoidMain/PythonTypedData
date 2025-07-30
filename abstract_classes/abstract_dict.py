@@ -44,7 +44,9 @@ class AbstractDict[K, V](GenericBase[K, V]):
     value_type: type[V]
     data: dict[K, V]
 
-    _finisher: ClassVar[Callable[[dict], Any]] = immutabledict
+    _finisher: ClassVar[Callable[[dict], immutabledict]] = immutabledict
+    _repr_finisher: ClassVar[Callable[[Mapping], dict]] = dict
+    _eq_finisher: ClassVar[Callable[[Mapping], dict]] = dict
 
     def __init__(
         self: AbstractDict[K, V],
@@ -299,11 +301,12 @@ class AbstractDict[K, V](GenericBase[K, V]):
         :return: True if `other` is an AbstractDict with the same key and values types and contents, False otherwise.
         :rtype: bool
         """
+        _eq_finisher = getattr(type(self), '_eq_finisher', lambda x: x)
         return (
             isinstance(other, AbstractDict)
             and self.key_type == other.key_type
             and self.value_type == other.value_type
-            and self.data == other.data
+            and _eq_finisher(self.data) == _eq_finisher(other.data)
         )
 
     def __repr__(self: AbstractDict[K, V]) -> str:
@@ -313,7 +316,8 @@ class AbstractDict[K, V](GenericBase[K, V]):
         :return: A string representation of this AbstractDict.
         :rtype: str
         """
-        return f"{class_name(type(self))}{dict(self.data)}"
+        _repr_finisher = getattr(type(self), '_repr_finisher', lambda x: x)
+        return f"{class_name(type(self))}{_repr_finisher(self.data)}"
 
     def __or__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
         """
