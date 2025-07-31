@@ -18,7 +18,7 @@ class Maybe[T](GenericBase[T]):
     Attributes:
         item_type (type[T]): The type of the value stored in this Maybe. Inferred from the generic type.
 
-        value (T | None): Value of the Maybe's item_type, or None.
+        value (T | None): Value stored within the maybe, of type item_type, or None.
     """
 
     item_type: type[T]
@@ -39,14 +39,14 @@ class Maybe[T](GenericBase[T]):
         :param value: The wrapped value or None if empty.
         :type value: T | None
 
-        :param _coerce: State parameter that, if True, attempts to coerce the value to the expected item_type.
+        :param _coerce: State parameter that, if True, attempts to coerce the value to the expected item type.
         :type _coerce: bool
 
         :param _skip_validation: If True, disables runtime type validation of the value.
         :type _skip_validation: bool
 
         :raises ValueError: If the constructor was called without giving a generic type to Maybe. This forbids Maybe(1),
-        for instance. Use Maybe.of(1) to infer the type.
+         for instance. Use Maybe.of(1) to infer the type.
         """
         from type_validation.type_validation import _validate_or_coerce_value
 
@@ -84,6 +84,9 @@ class Maybe[T](GenericBase[T]):
 
         :return: A Maybe object holding a None object. Its item_type is inferred from the dynamic Maybe subclass this
         method was called on, like Maybe[int].
+
+        :raises ValueError: If the method was called upon a class with no generic type. This forbids Maybe.empty(), as
+         its item type can't be inferred, only allowing, for example, Maybe[str].empty().
         """
         if cls._inferred_item_type() is None:
             raise ValueError(f"Trying to call {cls.__name__}.empty without a generic type.")
@@ -92,7 +95,7 @@ class Maybe[T](GenericBase[T]):
     @classmethod
     def of(cls, value: T) -> Maybe[T]:
         """
-        Creates and returns a Maybe object containing the given value, and inferring its item_type from it.
+        Creates and returns a Maybe object containing the given value, and inferring its item type from it.
 
         :param value: Value for the Maybe object to contain. Mustn't be None.
         :type value: T
@@ -108,7 +111,7 @@ class Maybe[T](GenericBase[T]):
     @classmethod
     def of_nullable(cls, value: T | None, item_type: type[T]) -> Maybe[T]:
         """
-        Creates and returns a Maybe object of the given type containing the given value.
+        Creates and returns a Maybe object of the given type containing the given value, which may be None.
 
         :param value: Value for the Maybe object to contain. Can be None.
         :type value: T
@@ -118,6 +121,8 @@ class Maybe[T](GenericBase[T]):
 
         :return: A Maybe object of the given type containing the value.
         :rtype: Maybe[T]
+
+        :raises ValueError: If item_type is None, as then a Maybe object with no type nor value may be attempted.
         """
         if item_type is None:
             raise ValueError("You must give a type when using Maybe.of_nullable")
@@ -233,6 +238,7 @@ class Maybe[T](GenericBase[T]):
         self: Maybe[T],
         f: Callable[[T], U],
         result_type: type[U] | None = None,
+        *,
         _coerce: bool = False
     ) -> Maybe[U]:
         """

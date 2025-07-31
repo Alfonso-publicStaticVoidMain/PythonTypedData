@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Iterable, Any, Callable, TypeVar, ClassVar, Iterator
+from typing import Iterable, Any, Callable, TypeVar, ClassVar, Iterator, Sequence
 from collections import defaultdict
 
 from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation
@@ -10,11 +10,11 @@ from abstract_classes.generic_base import GenericBase, class_name, forbid_instan
 @forbid_instantiation
 class Collection[T](GenericBase[T]):
     """
-    Abstract base class representing a collection of items of type T, wrapping an underlying container and its type.
+    Abstract base class representing a collection of items of type T, wrapping an underlying container and an item type.
 
-    Provides a base class for storing and operating on collections of items with a common type, without any further
-    structure, which will be added on certain extensions. It uses generics to enforce runtime type safety and supports
-    fluent and functional-style operations inspired by Java's Stream API.
+    Provides a base class for storing and operating on collections of items with a common type, without assuming any
+    further structure, which will be added on certain extensions like AbstractSequence and AbstractSet. It supports
+    functional-style operations inspired by Java's Stream API.
 
     The class enforces runtime generic type tracking using the metaclass extension GenericBase, from which it inherits
     its __class_getitem__ method, which stores the generic types the Collection subclasses are called upon on an _args
@@ -58,7 +58,7 @@ class Collection[T](GenericBase[T]):
         self: Collection[T],
         *values: T,
         _coerce: bool = False,
-        _forbidden_iterable_types: tuple[type, ...] | None = None,
+        _forbidden_iterable_types: tuple[type, ...] = (),
         _finisher: Callable[[Iterable[T]], Any] = None,
         _skip_validation: bool = False
     ) -> None:
@@ -66,9 +66,9 @@ class Collection[T](GenericBase[T]):
         Basic constructor for the Collection abstract class, to be invoked by all subclasses.
 
         The attribute item_type is inferred from the generic the class was called upon, which was stored on the
-        _args attribute of the class returned by __class_getitem__ and fetched by _inferred_item_type.
+        _args attribute of the class returned by __class_getitem__ and then fetched by _inferred_item_type.
 
-        :param values: Values, received as an iterable or one by one, to store in the Collection.
+        :param values: Values to store in the Collection, received as an iterable or one by one.
         :type values: T
 
         :param _coerce: State parameter to force type coercion or not. Some numeric type coercions are always performed.
@@ -78,11 +78,11 @@ class Collection[T](GenericBase[T]):
         :type _forbidden_iterable_types: tuple[type, ...]
 
         :param _finisher: Callable to be applied to the values before storing them on the values attribute of the object.
-        Defaults to None, and in that case is later assigned to the identity mapping.
+         Defaults to None, and in that case is later assigned to the identity mapping.
         :type _finisher: Callable[[Iterable[T]], Any]
 
         :param _skip_validation: State parameter to skip type validation of the values. Only use it in cases where it's
-        known that the values received will match the generic type.
+         known that the values received will match the generic type.
         :type _skip_validation: bool
 
         :raises TypeError: If the generic type wasn't provided or was a TypeVar.
@@ -108,36 +108,117 @@ class Collection[T](GenericBase[T]):
         ):
             values = values[0]  # Then, the values are unpacked.
 
-        _forbidden_iterable_types = _forbidden_iterable_types or getattr(type(self), '_forbidden_iterable_types', ())
+        forbidden_iterable_types = _forbidden_iterable_types or type(self)._get_forbidden_iterable_types()
 
         # If values is of one of the forbidden iterable types, raises a TypeError.
-        if isinstance(values, _forbidden_iterable_types):
+        if isinstance(values, forbidden_iterable_types):
             raise TypeError(f"Invalid type {type(values).__name__} for class {type(self).__name__}.")
 
         object.__setattr__(self, 'item_type', generic_item_type)
 
-        final_values = values if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce)
+        finisher = _finisher or type(self)._get_finisher()
 
-        _finisher = _finisher or getattr(type(self), '_finisher', lambda x : x)
+        final_values = finisher(values) if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce, _finisher=finisher)
 
-        object.__setattr__(self, 'values', _finisher(final_values))
+        object.__setattr__(self, 'values', final_values)
 
     @classmethod
     def _inferred_item_type(cls: type[Collection[T]]) -> type[T] | None:
         """
         Returns the generic type argument T with which this Collection subclass was parameterized, or None.
 
-        This method is used internally for runtime type enforcement and generic introspection, and it fetches the generic
-        type from the _args attribute the class inherits from GenericBase which is set on its __class_getitem__ method.
+        This method is used internally for runtime type enforcement and generic introspection, as it fetches the generic
+        type from the first position of the _args tuple attribute the class inherits from GenericBase, which is set on
+        its __class_getitem__ method.
 
-        :return: The generic type T that this class was called upon, as stored on its attribute _args by the
-        __class_getitem__ method inherited from GenericBase. If unable to retrieve it, returns None.
+        :return: The generic type T that this class was called upon, or, if unable to retrieve it, None.
         :rtype: type[T] | None
         """
         try:
             return cls._args[0]
         except (AttributeError, IndexError, TypeError, KeyError):
             return None
+
+    @classmethod
+    def _get_forbidden_iterable_types(
+        cls: type[Collection[T]],
+        default: type | tuple[type, ...] = ()
+    ) -> type | tuple[type, ...]:
+        """
+        Gets the iterable types that can't be passed to Collection's init to be contained in this class's objects.
+
+        :param default: Default value if the class doesn't have a _forbidden_iterable_types attribute.
+        :type default: type | tuple[type, ...]
+
+        :return: The _forbidden_iterable_types attribute of the class, or a default if it doesn't have one.
+        :rtype: type | tuple[type, ...]
+        """
+        return getattr(cls, '_forbidden_iterable_types', default)
+
+    @classmethod
+    def _get_finisher(
+        cls: type[Collection[T]],
+        default: Callable[[Iterable], Iterable] = lambda x : x
+    ) -> Callable[[Iterable], Iterable]:
+        """
+        Gets a callable that is applied to the values of this class's objects on init before setting the attribute.
+
+        :param default: Default value if the class doesn't have a _finisher attribute.
+        :type default: Callable[[Iterable], Iterable]
+
+        :return: The _finisher attribute of the class, or a default if it doesn't have one.
+        :rtype: Callable[[Iterable], Iterable]
+        """
+        return getattr(cls, '_finisher', default)
+
+    @classmethod
+    def _get_repr_finisher(
+        cls: type[Collection[T]],
+        default: Callable[[Iterable], Iterable] = lambda x : x
+    ) -> Callable[[Iterable], Iterable]:
+        """
+        Gets a callable that is applied to the values of this class's objects when representing them as a string.
+
+        :param default: Default value if the class doesn't have a _repr_finisher attribute.
+        :type default: Callable[[Iterable], Iterable]
+
+        :return: The _repr_finisher attribute of the class, or a default if it doesn't have one.
+        :rtype: Callable[[Iterable], Iterable]
+        """
+        return getattr(cls, '_repr_finisher', default)
+
+    @classmethod
+    def _get_eq_finisher(
+        cls: type[Collection[T]],
+        default: Callable[[Iterable], Iterable] = lambda x : x
+    ) -> Callable[[Iterable], Iterable]:
+        """
+        Gets a callable that is applied to the values of this class's objects when comparing with another collection.
+
+        :param default: Default value if the class doesn't have a _eq_finisher attribute.
+        :type default: Callable[[Iterable], Iterable]
+
+        :return: The _eq_finisher attribute of the class, or a default if it doesn't have one.
+        :rtype: Callable[[Iterable], Iterable]
+        """
+        return getattr(cls, '_eq_finisher', default)
+
+    @classmethod
+    def _get_comparable_types(
+        cls: type[Collection[T]],
+        default: type[Collection] | tuple[type[Collection], ...] | None = None  # The real default value is Collection
+    ) -> type[Collection] | tuple[type[Collection], ...]:
+        """
+        Gets the type or tuples of types this class can be expected to be possibly equal to.
+
+        :param default: Default value if the class doesn't have a _comparable_types attribute. When None, the method
+         returns Collection instead in that case.
+        :type default: type[Collection] | tuple[type[Collection], ...] | None
+
+        :return: The _comparable_types attribute of the class, or a default if it doesn't have one.
+        :rtype: type[Collection] | tuple[type[Collection], ...]
+        """
+        return getattr(cls, '_comparable_types', default) or Collection
 
     @classmethod
     def of(cls: type[Collection], *values: T) -> Collection[T]:
@@ -147,11 +228,10 @@ class Collection[T](GenericBase[T]):
         Acts as a type-safe factory method for constructing properly parameterized collections when the type
         is not known beforehand.
 
-        :param values: One or more parameters, or an Iterable of values to initialize the new Collection with.
+        :param values: Values to store in the Collection, received as an iterable or one by one.
         :type values: T
 
-        :return: A new Collection that is an instance of cls containing the passed values, inferring its item_type from
-        _infer_type_contained_in_iterable method.
+        :return: A new Collection that is an instance of cls containing the passed values, inferring its item type.
         :rtype: Collection[T]
 
         :raises ValueError: If no values are provided.
@@ -162,16 +242,17 @@ class Collection[T](GenericBase[T]):
         return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
 
     @classmethod
-    def empty[R](cls: type[Collection[R]]) -> Collection[R]:
+    def empty(cls: type[Collection[T]]) -> Collection[T]:
         """
         Creates an empty Collection subclass of the current class, parameterized with its generic type.
 
-        Useful for initialization of empty collections with known type context.
+        Useful for initialization of empty collections with known type context, like MutableList[int].empty(). Note
+        that typing MutableList.empty() will raise a ValueError.
 
-        :return: An empty Collection that is an instance of cls with the given item_type.
+        :return: An empty Collection that is an instance of this class, keeping its generic type too.
         :rtype: Collection[R]
 
-        :raises ValueError: If item_type is None.
+        :raises ValueError: If the class calling this method has no generic type on its _args attribute.
         """
         if cls._inferred_item_type() is None:
             raise ValueError(f"Trying to call {cls.__name__}.empty without a generic type.")
@@ -199,8 +280,8 @@ class Collection[T](GenericBase[T]):
         """
         Returns True if the provided item (or iterable of items) is contained in the Collection's internal container.
 
-        :return: True if item is an object of the item_type of the Collection and is contained in its values, or if it's
-        an Iterable whose elements are all contained on self's values. False otherwise.
+        :return: True if item is of the collection's item type and is contained in its values, or if it's an Iterable
+         whose elements are all contained on self's values. False otherwise.
         :rtype: bool
         """
         if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
@@ -215,13 +296,15 @@ class Collection[T](GenericBase[T]):
         to be compatible, like set and frozenset, but unlike list and tuple.
 
         :return: True if self and other share the same subclass, item type and underlying values (compared with ==),
-        False otherwise.
+         False otherwise.
         :rtype: bool
         """
+        eq_finisher = type(self)._get_eq_finisher()
+        comparable_types: type[Collection] | tuple[type[Collection], ...] = type(self)._get_comparable_types()
         return (
-            isinstance(other, Collection)
+            isinstance(other, comparable_types)
             and self.item_type == other.item_type
-            and self.values == other.values
+            and eq_finisher(self.values) == eq_finisher(other.values)
         )
 
     def __repr__(self: Collection[T]) -> str:
@@ -231,7 +314,8 @@ class Collection[T](GenericBase[T]):
         :return: A string representation of the object.
         :rtype: str
         """
-        return f"{class_name(type(self))}{self.values}"
+        repr_finisher = type(self)._get_repr_finisher()
+        return f"{class_name(type(self))}{repr_finisher(self.values)}"
 
     def __bool__(self: Collection[T]) -> bool:
         """
@@ -308,7 +392,7 @@ class Collection[T](GenericBase[T]):
         :type value_mapper: Callable[[T], V]
 
         :return: A dictionary derived from the Collection by mapping each item to a (key, value) pair using the provided
-        key_mapper and value_mapper callables.
+         key_mapper and value_mapper callables.
         :rtype: dict[K, V]
         """
         return {
@@ -332,6 +416,15 @@ class Collection[T](GenericBase[T]):
         except (AttributeError, TypeError, ValueError):
             return sum(1 for v in self.values if v == value)
 
+    def find_any(self: Collection[T]) -> T:
+        """
+        Gets a random element from the collection, not defaulting to last insertion or last position.
+
+        :return: A random element of the collection.
+        :rtype: T
+        """
+        from random import choice
+        return choice(tuple(self.values))
 
     # Functional Methods:
 
@@ -386,7 +479,7 @@ class Collection[T](GenericBase[T]):
         :type _coerce: bool
 
         :return: A new Collection of the same subclass as self containing those values. If result_type is given,
-        it is used as the type of the returned Collection, if not that is inferred.
+         it is used as the type of the returned Collection, if not that is inferred.
         :rtype: Collection[R]
         """
         flattened = []
@@ -489,7 +582,7 @@ class Collection[T](GenericBase[T]):
             consumer(item)
         return self
 
-    def distinct[K](self: Collection[T], key: Callable[[T], K] = lambda x: x) -> Collection[T]:
+    def distinct[K](self: Collection[T], key: Callable[[T], K] = lambda x : x) -> Collection[T]:
         """
         Returns a new Collection with only distinct elements, determined by a key function.
 
@@ -524,7 +617,12 @@ class Collection[T](GenericBase[T]):
 
         return type(self)(result, _skip_validation=True)
 
-    def max(self: Collection[T], *, default: T | None = None, key: Callable[[T], Any] = None) -> T | None:
+    def max(
+        self: Collection[T],
+        *,
+        default: T | None = None,
+        key: Callable[[T], Any] = None
+    ) -> T | None:
         """
         Returns the maximum element in the collection, optionally using a key function or default value.
 
@@ -543,7 +641,12 @@ class Collection[T](GenericBase[T]):
             return None
         return max(self.values, key=key)
 
-    def min(self: Collection[T], *, default: T | None = None, key: Callable[[T], Any] = None) -> T | None:
+    def min(
+        self: Collection[T],
+        *,
+        default: T | None = None,
+        key: Callable[[T], Any] = None
+    ) -> T | None:
         """
         Returns the minimum element in the collection, optionally using a key function or default.
 
@@ -633,7 +736,7 @@ class Collection[T](GenericBase[T]):
         self: Collection[T],
         supplier: Callable[[], A],
         accumulator: Callable[[A, T], A],
-        finisher: Callable[[A], R] = lambda x: x
+        finisher: Callable[[A], R] = lambda x : x
     ) -> R:
         """
         Generalized collector, replicating Java's Stream API .collect method. The accumulator is now a pure function.
@@ -663,7 +766,7 @@ class Collection[T](GenericBase[T]):
         supplier: Callable[[], A],
         state_supplier: Callable[[], S],
         accumulator: Callable[[A, S, T], None],
-        finisher: Callable[[A, S], R] = lambda x, _: x
+        finisher: Callable[[A, S], R] = lambda x, _ : x
     ) -> R:
         """
         A generalized collector with internal state, inspired by Java's Stream API.
@@ -671,6 +774,14 @@ class Collection[T](GenericBase[T]):
         The supplier gives the initial container for the result. The state_supplier the initial value for the state.
         For each item in self, the accumulator is called on the container, item and state to process the item and
         modify the state, or not, then the finisher is applied to the container and state before returning.
+
+        The implementation of this method is delegated to the non-stateful collect, but it'd be equivalent to::
+
+            acc = supplier()
+            state = state_supplier()
+            for item in self.values:
+                accumulator(acc, state, item)
+            return finisher(acc, state)
 
         :param supplier: Provides the initial container.
         :type supplier: Callable[[], A]
@@ -687,13 +798,6 @@ class Collection[T](GenericBase[T]):
         :return: The final collected result.
         :rtype: R
         """
-        '''
-        acc = supplier()
-        state = state_supplier()
-        for item in self.values:
-            accumulator(acc, state, item)
-        return finisher(acc, state)
-        '''
         return self.collect(
             supplier=lambda:(supplier(), state_supplier()),
             accumulator=lambda acc_state, item : accumulator(*acc_state, item),
@@ -705,7 +809,7 @@ class Collection[T](GenericBase[T]):
         supplier: Callable[[], A],
         state_supplier: Callable[[], S],
         accumulator: Callable[[A, S, T], tuple[A, S]],
-        finisher: Callable[[A, S], R] = lambda x, _: x
+        finisher: Callable[[A, S], R] = lambda x, _ : x
     ) -> R:
         """
         A generalized collector with internal state, inspired by Java's Stream API.
@@ -713,6 +817,14 @@ class Collection[T](GenericBase[T]):
         The supplier provides an initial value of type A. The state_supplier the initial value of type S for the state.
         For each item in self, the accumulator is called on the container, item and state to process the item and
         return the value and state, then the finisher is applied to the last value and state before returning.
+
+        The implementation of this method is delegated to the non-stateful collect, but it'd be equivalent to::
+
+            acc = supplier()
+            state = state_supplier()
+            for item in self.values:
+                acc, state = accumulator(acc, item, state)
+            return finisher(acc, state)
 
         :param supplier: Provides the initial container.
         :type supplier: Callable[[], A]
@@ -729,15 +841,106 @@ class Collection[T](GenericBase[T]):
         :return: The final collected result.
         :rtype: R
         """
-        '''
-        acc = supplier()
-        state = state_supplier()
-        for item in self.values:
-            acc, state = accumulator(acc, item, state)
-        return finisher(acc, state)
-        '''
         return self.collect_pure(
             supplier=lambda: (supplier(), state_supplier()),
             accumulator=lambda acc_state, item: accumulator(*acc_state, item),
             finisher=lambda acc_state: finisher(*acc_state)
         )
+
+
+@forbid_instantiation
+class MutableCollection[T](Collection[T]):
+
+    def remove(
+        self: MutableCollection[T],
+        value: T,
+        *,
+        _coerce: bool = False
+    ) -> None:
+        """
+        Removes the first occurrence of a value from the collection.
+
+        :param value: The value to remove.
+        :type value: T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the value before removing it.
+        :type _coerce: bool
+        """
+        from type_validation.type_validation import _validate_or_coerce_value
+        value_to_remove = value
+        if _coerce:
+            try:
+                value_to_remove = _validate_or_coerce_value(value, self.item_type)
+            except (TypeError, ValueError):
+                pass
+        self.values.remove(value_to_remove)
+
+    def clear(self: MutableCollection[T]) -> None:
+        """
+        Remove all elements from the collection.
+        """
+        self.values.clear()
+
+    def pop_random(self: MutableCollection[T]) -> T:
+        """
+        Removes a random element from the collection and returns it.
+
+        :return: A random element from the collection, which is removed from it.
+        :rtype: T
+        """
+        popped_item: T = self.find_any()
+        self.remove(popped_item)
+        return popped_item
+
+    def filter_inplace(self, predicate: Callable[[T], bool]) -> None:
+        """
+        Skeletal implementation of a filter inplace of the collection, valid for both a list and set of values.
+
+        :param predicate: Function to the booleans to filter the collection by.
+        :type predicate: Callable[[T], bool]
+        """
+        values_to_remove: list[T] = [v for v in self.values if not predicate(v)]
+        for v in values_to_remove:
+            try:
+                self.values.remove(v)
+            except (TypeError, ValueError, KeyError):
+                pass
+
+    def map_inplace(
+        self: MutableCollection[T],
+        f: Callable[[T], T],
+        *,
+        _coerce: bool = False
+    ) -> None:
+        """
+        Maps each value in the collection to their image by the function f.
+
+        The class must implement replace_many and in case it's a Sequence, it should respect its ordering.
+
+        :param f: Mapping to apply to the Collection.
+        :param _coerce: State parameter that, if True, attempts to coerce the new values to the collection's item type.
+        :type _coerce: bool
+        """
+        replace_many = getattr(self, "replace_many", None)
+        if callable(replace_many):
+            replace_many({x : f(x) for x in self.values}, _coerce=_coerce)
+        else:
+            pass
+
+    def remove_all(self: MutableCollection[T], items: Iterable[T]) -> None:
+        """
+        Removes from the collection all values within an iterable.
+
+        :param items: Iterable of items to remove.
+        :type items: Iterable[T]
+        """
+        self.filter_inplace(lambda x : x not in items)
+
+    def retain_all(self: MutableCollection[T], items: Iterable[T]) -> None:
+        """
+        Removes from the collection all values except the ones present in the given iterable.
+
+        :param items: Iterable of items to keep.
+        :type items: Iterable[T]
+        """
+        self.filter_inplace(lambda x : x in items)

@@ -4,8 +4,8 @@ import typing
 from typing import ClassVar, Callable, Iterable, Any, Iterator
 
 from abstract_classes.abstract_set import AbstractSet
-from abstract_classes.collection import Collection
-from abstract_classes.generic_base import forbid_instantiation
+from abstract_classes.collection import Collection, MutableCollection
+from abstract_classes.generic_base import forbid_instantiation, _convert_to
 
 
 @forbid_instantiation
@@ -14,16 +14,30 @@ class AbstractSequence[T](Collection[T]):
     Abstract base class for sequence-like Collections of a type T, with ordering and indexing capabilities.
 
     Provides standard sequence operations such as indexing, slicing, comparison, addition of other sequences,
-    multiplication by integers, and sorting. It is still an abstract class, so it must be subclassed to create concrete
-    implementations.
+    multiplication by integers, and sorting.
+
+    It is still an abstract class, so it must be subclassed to create concrete implementations.
 
     This class will be further extended by AbstractMutableSequence to add the methods that modify the internal data
     container of the class.
 
-    This class sets the ClassVar attribute _finisher to tuple to ensure the immutability of the internal container.
+    Attributes:
+        _finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting them as an
+         attribute on Collection's init.
+
+        _repr_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on the repr method to show
+         the values contained on the sequence.
+
+        _eq_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on both self and other's
+         values on the eq method to check for equality.
+
+        _forbidden_iterable_types (ClassVar[tuple[type, ...]]): Overrides the _forbidden_iterable_types parameter of
+         Collection's init, setting it to (set, frozenset, AbstractSet, typing.AbstractSet).
     """
 
-    _finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
+    _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
+    _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
+    _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
     _forbidden_iterable_types: ClassVar[tuple[type, ...]] = (set, frozenset, AbstractSet, typing.AbstractSet)
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
@@ -34,7 +48,7 @@ class AbstractSequence[T](Collection[T]):
         :type index: int | slice
 
         :return: The item at the given index or a new AbstractSequence of the same dynamic subclass as self containing
-        the sliced values.
+         the sliced values.
         :rtype: T | AbstractSequence[T]
 
         :raises TypeError: If index is not an int or slice.
@@ -46,27 +60,11 @@ class AbstractSequence[T](Collection[T]):
         else:
             raise TypeError("Invalid index type: must be an int or slice")
 
-    def __eq__(self: AbstractSequence[T], other: Any) -> bool:
-        """
-        Checks equality with another sequence based on their item type and values.
-
-        :param other: Object to compare against.
-        :type other: Any
-
-        :return: True if both have the same item type and the same values on the same order.
-        :rtype: bool
-        """
-        return (
-            isinstance(other, AbstractSequence)
-            and self.item_type == other.item_type
-            and list(self.values) == list(other.values)
-        )
-
     def __lt__(self: AbstractSequence[T], other: AbstractSequence[T] | list[T] | tuple[T, ...]) -> bool:
         """
         Checks if this sequence is lexicographically less than another.
 
-        :param other: Another sequence to compare with.
+        :param other: Another AbstractSequence, list or tuple to compare with.
         :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
 
         :return: True if self is less than `other`.
@@ -80,7 +78,7 @@ class AbstractSequence[T](Collection[T]):
         """
         Checks if this sequence is lexicographically greater than another.
 
-        :param other: Another sequence to compare with.
+        :param other: Another AbstractSequence, list or tuple to compare with.
         :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
 
         :return: True if self is greater than `other`.
@@ -94,7 +92,7 @@ class AbstractSequence[T](Collection[T]):
         """
         Checks if this sequence is less than or equal to another.
 
-        :param other: Another sequence to compare with.
+        :param other: Another AbstractSequence, list or tuple to compare with.
         :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
 
         :return: True if self is less than or equal to `other`.
@@ -108,7 +106,7 @@ class AbstractSequence[T](Collection[T]):
         """
         Checks if this sequence is greater than or equal to another.
 
-        :param other: Another sequence to compare with.
+        :param other: Another AbstractSequence, list or tuple to compare with.
         :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
 
         :return: True if self is greater than or equal to `other`.
@@ -123,13 +121,13 @@ class AbstractSequence[T](Collection[T]):
         other: AbstractSequence[T] | list[T] | tuple[T, ...]
     ) -> AbstractSequence[T]:
         """
-        Concatenates this sequence with another sequence, list or tuple of compatible types.
+        Returns a new AbstractSequence concatenating the values of another AbstractSequence, list or tuple.
 
         :param other: The sequence or iterable to concatenate.
         :type other: AbstractSequence[T] | list[T] | tuple[T]
 
         :return: A new AbstractSequence of the same dynamic subclass as self containing the elements from `other` added
-        right after the ones from self, as done by the __add__ method of the underlying value container.
+         right after the ones from self, as done by the __add__ method of the underlying container.
         :rtype: AbstractSequence[T]
 
         :raises TypeError: If `other` has incompatible types.
@@ -144,12 +142,12 @@ class AbstractSequence[T](Collection[T]):
         n: int
     ) -> AbstractSequence[T]:
         """
-        Repeats this sequence `n` times.
+        Returns a new AbstractSequence with the values of this sequence concatenated n times.
 
         :param n: Number of times to repeat the sequence.
         :type n: int
 
-        :return: A new AbstractSequence of the same dynamic subclass as self with its elements repeated `n` times.
+        :return: A new AbstractSequence of the same dynamic subclass as self with its values concatenated n times.
         :rtype: AbstractSequence[T]
 
         :raises TypeError: If n is not an integer.
@@ -160,7 +158,7 @@ class AbstractSequence[T](Collection[T]):
 
     def __sub__(self: AbstractSequence[T], other: Iterable[T]) -> AbstractSequence[T]:
         """
-        Returns a new sequence with the elements of `other` removed.
+        Returns a new AbstractSequence with the elements of `other` removed.
 
         :param other: A collection of elements to exclude.
         :type other: Iterable
@@ -172,19 +170,19 @@ class AbstractSequence[T](Collection[T]):
 
     def __reversed__(self: AbstractSequence[T]) -> Iterator[T]:
         """
-        Returns a reversed iterator over the sequence.
+        Returns a reversed iterator over the sequence, delegated to the __reversed__ method of the underlying container.
 
-        :return: A reversed iterator, delegated to the __reversed__ method of the underlying container.
+        :return: A reversed iterator over the values of the sequence.
         :rtype: Iterator[T]
         """
         return reversed(self.values)
 
     def reversed(self) -> AbstractSequence[T]:
         """
-        Returns a new sequence with elements in reverse order.
+        Returns a new AbstractSequence with its elements in reverse order.
 
         :return: A new reversed AbstractSequence of the same dynamic subclass as self containing its elements in
-        reversed order.
+         reversed order.
         :rtype: AbstractSequence[T]
         """
         return type(self)(reversed(self.values), _skip_validation=True)
@@ -205,7 +203,7 @@ class AbstractSequence[T](Collection[T]):
 
     def get_index(self: AbstractSequence[T], value: T, fallback: int = -1) -> int:
         """
-        Returns the index of the first occurrence of a value, or a fallback if it isn't found.
+        Returns the index of the first occurrence of a value, or a fallback defaulted to -1 if it isn't found.
 
         :param value: The value to search for.
         :type value: T
@@ -213,7 +211,7 @@ class AbstractSequence[T](Collection[T]):
         :param fallback: Number to return if the value isn't found. Defaulted to -1.
         :type fallback: int
 
-        :return: Index of the first appearance of the value.
+        :return: Index of the first appearance of the value, or fallback if it isn't found.
         :rtype: int
         """
         try:
@@ -228,9 +226,9 @@ class AbstractSequence[T](Collection[T]):
         reverse: bool = False
     ) -> AbstractSequence[T]:
         """
-        Returns a new sequence with its elements sorted by an optional key.
+        Returns a new AbstractSequence with its elements sorted by an optional key.
 
-        :param key: Optional function to extract comparison key from elements.
+        :param key: Optional function to extract the comparison key from.
         :type key: Callable[[T], Any] | None
 
         :param reverse: Whether to sort in descending order.
@@ -244,18 +242,23 @@ class AbstractSequence[T](Collection[T]):
 
 
 @forbid_instantiation
-class AbstractMutableSequence[T](AbstractSequence[T]):
+class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
     """
     Abstract base class for mutable and ordered sequences containing values of a type T.
 
     This class extends AbstractSequence by adding mutation capabilities such as appending, inserting, removing, and
-    sorting. It is still an abstract class, so it must be subclassed to create concrete implementations.
+    sorting.
 
-    It overrides _finisher to list to ensure the mutability of the internal container, and also adds the attribute
-    _mutable set to True as class metadata, that for now is unused.
+    It is still an abstract class, so it must be subclassed to create concrete implementations.
+
+    Attributes:
+        _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of Collection's init
+         by its value, setting it to list to ensure mutability of the underlying container.
+
+        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
     """
 
-    _finisher: ClassVar[Callable[[Iterable], Iterable]] = list
+    _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
     _mutable: ClassVar[bool] = True
 
     def append(
@@ -265,7 +268,7 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         _coerce: bool = False
     ) -> None:
         """
-        Appends a value to the end of the sequence, delegating on the underlying container's __append__ method.
+        Appends a value to the end of the sequence, delegating on the underlying container's append method.
 
         :param value: The value to append.
         :type value: T
@@ -341,12 +344,12 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
 
     def __imul__(self: AbstractMutableSequence[T], n: int) -> AbstractMutableSequence[T]:
         """
-        Repeats the contents of this sequence `n` times in-place.
+        Concatenates the contents of this sequence n times in-place.
 
         :param n: The number of times to repeat the sequence.
         :type n: int
 
-        :return: Self after repetition.
+        :return: Self after concatenation.
         :rtype: AbstractMutableSequence[T]
 
         :raises TypeError: If `n` is not an integer.
@@ -387,6 +390,12 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         """
         self.values.sort(key=key, reverse=reverse)
 
+    def reverse(self: AbstractMutableSequence[T]) -> None:
+        """
+        Reverses the order of this sequence in-place.
+        """
+        self.values.reverse()
+
     def insert(
         self: AbstractMutableSequence[T],
         index: int,
@@ -409,9 +418,14 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         from type_validation.type_validation import _validate_or_coerce_value
         self.values.insert(index, _validate_or_coerce_value(value, self.item_type, _coerce=_coerce))
 
-    def extend(self, other: Iterable[T], *, _coerce: bool = False) -> None:
+    def extend(
+        self: AbstractMutableSequence[T],
+        other: Iterable[T],
+        *,
+        _coerce: bool = False
+    ) -> None:
         """
-        Extends the sequence with elements from another iterable.
+        Extends the sequence appending the elements from another iterable.
 
         :param other: The iterable whose elements to add.
         :type other: Iterable[T]
@@ -422,7 +436,7 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         from type_validation.type_validation import _validate_or_coerce_iterable
         self.values.extend(_validate_or_coerce_iterable(other, self.item_type, _coerce=_coerce))
 
-    def pop(self, index: int = -1) -> T:
+    def pop(self: AbstractMutableSequence[T], index: int = -1) -> T:
         """
         Removes and returns the item at the given position (default at the last position).
 
@@ -434,26 +448,56 @@ class AbstractMutableSequence[T](AbstractSequence[T]):
         """
         return self.values.pop(index)
 
-    def remove(
-        self: AbstractSequence[T],
-        value: T,
+    def filter_inplace(self: AbstractMutableSequence[T], predicate: Callable[[T], bool]) -> None:
+        """
+        Filters this sequence, keeping only the values that satisfy the predicate, preserving their order.
+
+        Overrides the method from the parent class MutableCollection, which is implemented in a skeletal and inefficient
+        way to work with both lists and sets as underlying containers.
+
+        :param predicate: Function to the booleans to filter the sequence by.
+        :type predicate: Callable[[T], bool]
+        """
+        self.values[:] = [item for item in self.values if predicate(item)]
+
+    def replace(
+        self: AbstractMutableSequence[T],
+        old: T,
+        new: T,
         *,
         _coerce: bool = False
     ) -> None:
         """
-        Removes the first occurrence of a value from the sequence.
+        Replaces all appearances of `old` to `new`, respecting their position within the sequence.
 
-        :param value: The value to remove.
-        :type value: T
+        :param old: Value to replace
+        :type old: T
 
-        :param _coerce: State parameter that, if True, attempts to coerce the value before removing it.
+        :param new: Value to replace it by.
+        :type new: T
+
+        :param _coerce: State parameter that, if True, attempts to coerce the new value to the sequence's item type.
         :type _coerce: bool
         """
         from type_validation.type_validation import _validate_or_coerce_value
-        value_to_remove = value
-        if _coerce:
-            try:
-                value_to_remove = _validate_or_coerce_value(value, self.item_type)
-            except (TypeError, ValueError):
-                pass
-        self.values.remove(value_to_remove)
+        new = _validate_or_coerce_value(new, self.item_type, _coerce=_coerce)
+        self.values[:] = [new if item == old else item for item in self.values]
+
+    def replace_many(
+        self: AbstractMutableSequence[T],
+        replacements: dict[T, T] | typing.Mapping[T, T],
+        *,
+        _coerce: bool = False
+    ) -> None:
+        """
+        Replaces each value in the given dict's keys for its value, respecting its position within the sequence.
+
+        :param replacements: Dict of pairs old : new to replace.
+        :type replacements: dict[T, T]
+
+        :param _coerce: State parameter that, if True, attempts to coerce the new values to self's item type.
+        :type _coerce: bool
+        """
+        from type_validation.type_validation import _validate_or_coerce_value
+        validated_replacements = {old : _validate_or_coerce_value(new, self.item_type, _coerce=_coerce) for old, new in replacements.items()}
+        self.values[:] = [validated_replacements.get(item, item) for item in self.values]

@@ -162,7 +162,20 @@ class TestList(unittest.TestCase):
     def test_sorted_methods(self):
         lst = MutableList[str]("b", "a", "c")
         self.assertEqual(lst.sorted(), MutableList[str]("a", "b", "c"))
+        self.assertEqual(lst, MutableList[str]("b", "a", "c"))
         self.assertEqual(lst.sorted(reverse=True), MutableList[str]("c", "b", "a"))
+
+    def test_inplace_sort_reverse(self):
+        mul = MutableList[str]('a', 'x', 'b')
+        mul.sort()
+        self.assertEqual(mul, MutableList.of('a', 'b', 'x'))
+        mul.append('c')
+        mul.sort(reverse=True)
+        self.assertEqual(mul, MutableList.of('x', 'c', 'b', 'a'))
+        mul.append('y')
+        mul.reverse()
+        self.assertEqual(mul, MutableList.of('y', 'a', 'b', 'c', 'x'))
+
 
     def test_invalid_set_values(self):
         with self.assertRaises(TypeError):
@@ -227,6 +240,21 @@ class TestList(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             mul *= 'c'
+
+    def test_inplace_filter(self):
+        mul = MutableList[str]('a', 'b', 'abc')
+        mul.filter_inplace(lambda s : s.startswith('a'))
+        self.assertEqual(mul, MutableList[str]('a', 'abc'))
+
+        mul.replace('abc', 123)
+        self.assertEqual(mul, MutableList.of('a', '123'))
+        self.assertNotEqual(mul, MutableList.of('a', 123))
+
+        mul.map_inplace(lambda s : s[0])
+        self.assertEqual(mul, MutableList.of('a', '1'))
+
+        mul.replace_many({'a' : 'b', '1' : 2})
+        self.assertEqual(mul, MutableList.of('b', '2'))
 
 if __name__ == '__main__':
     unittest.main()

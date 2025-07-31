@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import UnionType
-from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, TypeVar
+from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, Callable
 from weakref import WeakValueDictionary
 
 """
@@ -11,14 +11,17 @@ GenericBase[*Ts]
 │
 ├── Collection[T]
 │    │
-│    ├── AbstractSequence[T]
-│    │    ├── ImmutableList[T] (*)
-│    │    └── AbstractMutableSequence[T]
-│    │         └── MutableList[T] (*)
-│    │
-│    └── AbstractSet[T]
-│         ├── ImmutableSet[T] (*)
-│         └── AbstractMutableSet[T]
+│    ├── MutableCollection[T] 
+│    │    └──────────────────────────────────┐
+│    │                                       │
+│    ├── AbstractSequence[T]                 │
+│    │    ├── ImmutableList[T] (*)           │
+│    │    └── AbstractMutableSequence[T] ────┤
+│    │         └── MutableList[T] (*)        │
+│    │                                       │
+│    └── AbstractSet[T]                      │
+│         ├── ImmutableSet[T] (*)            │
+│         └── AbstractMutableSet[T] ─────────┘
 │              └── MutableSet[T] (*)
 │
 ├── AbstractDict[K, V]
@@ -70,7 +73,7 @@ def class_name(cls: type) -> str:
     # Case 0: Handle Union[...] using | notation
     origin = get_origin(cls)
     args = get_args(cls)
-    if origin is Union or origin is UnionType:
+    if origin in (Union, UnionType):
         return " | ".join(class_name(arg) for arg in args)
 
     # Case 1: A class extending GenericBase
@@ -91,6 +94,20 @@ def class_name(cls: type) -> str:
     return repr(cls)
 
 
+def _convert_to(tp: type) -> Callable[[Any], Any]:
+    """
+    Generates a function that converts its one parameter to the type tp, only if it wasn't already of that type.
+
+    :param tp: Type to convert into. Must also be a 1-parameter callable.
+    :type tp: type
+
+    :return: A 1-parameter callable that, for its parameter x, if it is of type tp, returns it unmodified. Otherwise,
+     returns tp applied to x.
+    :rtype: Callable[[Any], Any
+    """
+    return lambda x : x if isinstance(x, tp) else tp(x)
+
+
 @forbid_instantiation
 class GenericBase[*Ts]:
     """
@@ -104,7 +121,7 @@ class GenericBase[*Ts]:
 
     Attributes:
         _generic_type_registry (ClassVar[WeakValueDictionary[tuple[type, tuple[type, ...]], type]]): A class attribute
-         level dict that stores the previous calls of the __class_getitem__ method to reduce memory overload and avoid
+         dict that stores the previous calls of the __class_getitem__ method to reduce memory overload and avoid
          recreating new subclasses that have already been created, retrieving them from this dict instead.
 
         _args (ClassVar[tuple[type, ...]]): A class attribute storing a tuple of types the class was called upon.
@@ -132,8 +149,8 @@ class GenericBase[*Ts]:
             item = (item,)
 
         cache_key = (cls, item)
-        if cache_key in cls._generic_type_registry:
-            return cls._generic_type_registry[cache_key]
+        if cache_key in GenericBase._generic_type_registry:
+            return GenericBase._generic_type_registry[cache_key]
 
         subclass = type(
             f"{cls.__name__}[{", ".join(class_name(arg) for arg in item)}]",
