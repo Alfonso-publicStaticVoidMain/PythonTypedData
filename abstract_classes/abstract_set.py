@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import ClassVar, Callable, Iterable, Any, Mapping
 
 from abstract_classes.collection import Collection, MutableCollection
-from abstract_classes.generic_base import forbid_instantiation
+from abstract_classes.generic_base import forbid_instantiation, _convert_to
 
 
 @forbid_instantiation
@@ -23,9 +23,9 @@ class AbstractSet[T](Collection[T]):
          by its value, setting it to frozenset.
     """
 
-    _finisher: ClassVar[Callable[[Iterable], Iterable]] = frozenset
-    _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = set
-    _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = set
+    _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(frozenset)
+    _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
+    _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
 
     def __lt__(self: AbstractSet[T], other: Any) -> bool:
         """
@@ -348,7 +348,7 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
         _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
     """
 
-    _finisher: ClassVar[Callable[[Iterable], Iterable]] = set
+    _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _mutable: ClassVar[bool] = True
 
     def __ior__(self: AbstractMutableSet[T], other: AbstractSet[T] | set[T] | frozenset[T]) -> AbstractMutableSet[T]:

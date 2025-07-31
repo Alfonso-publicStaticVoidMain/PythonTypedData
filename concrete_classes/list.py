@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Iterable, Callable, TYPE_CHECKING, ClassVar
 
 from abstract_classes.abstract_sequence import AbstractMutableSequence, AbstractSequence
-from abstract_classes.abstract_set import AbstractSet
 from abstract_classes.collection import Collection
 from abstract_classes.generic_base import class_name
 

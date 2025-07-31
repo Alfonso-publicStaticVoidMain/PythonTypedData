@@ -927,20 +927,20 @@ class MutableCollection[T](Collection[T]):
         else:
             pass
 
-    def remove_all(self, items: Iterable[T]) -> None:
+    def remove_all(self: MutableCollection[T], items: Iterable[T]) -> None:
         """
         Removes from the collection all values within an iterable.
 
         :param items: Iterable of items to remove.
         :type items: Iterable[T]
         """
-        self.filter_inplace(lambda x: x not in items)
+        self.filter_inplace(lambda x : x not in items)
 
-    def retain_all(self, items: Iterable[T]) -> None:
+    def retain_all(self: MutableCollection[T], items: Iterable[T]) -> None:
         """
         Removes from the collection all values except the ones present in the given iterable.
 
         :param items: Iterable of items to keep.
         :type items: Iterable[T]
         """
-        self.filter_inplace(lambda x: x in items)
+        self.filter_inplace(lambda x : x in items)

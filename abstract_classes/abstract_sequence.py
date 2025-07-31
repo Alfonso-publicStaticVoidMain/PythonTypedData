@@ -5,7 +5,7 @@ from typing import ClassVar, Callable, Iterable, Any, Iterator
 
 from abstract_classes.abstract_set import AbstractSet
 from abstract_classes.collection import Collection, MutableCollection
-from abstract_classes.generic_base import forbid_instantiation
+from abstract_classes.generic_base import forbid_instantiation, _convert_to
 
 
 @forbid_instantiation
@@ -35,9 +35,9 @@ class AbstractSequence[T](Collection[T]):
          Collection's init, setting it to (set, frozenset, AbstractSet, typing.AbstractSet).
     """
 
-    _finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
-    _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = list
-    _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
+    _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
+    _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
+    _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
     _forbidden_iterable_types: ClassVar[tuple[type, ...]] = (set, frozenset, AbstractSet, typing.AbstractSet)
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
@@ -258,7 +258,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
     """
 
-    _finisher: ClassVar[Callable[[Iterable], Iterable]] = list
+    _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
     _mutable: ClassVar[bool] = True
 
     def append(

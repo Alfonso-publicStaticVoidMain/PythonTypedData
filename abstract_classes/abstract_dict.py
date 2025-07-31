@@ -4,7 +4,7 @@ from typing import ClassVar, Callable, Any, Mapping, Iterable, TypeVar, Iterator
 
 from immutabledict import immutabledict
 
-from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation
+from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation, _convert_to
 
 
 @forbid_instantiation
@@ -44,9 +44,9 @@ class AbstractDict[K, V](GenericBase[K, V]):
     value_type: type[V]
     data: dict[K, V]
 
-    _finisher: ClassVar[Callable[[dict], immutabledict]] = immutabledict
-    _repr_finisher: ClassVar[Callable[[Mapping], dict]] = dict
-    _eq_finisher: ClassVar[Callable[[Mapping], dict]] = dict
+    _finisher: ClassVar[Callable[[dict], immutabledict]] = _convert_to(immutabledict)
+    _repr_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
+    _eq_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
 
     def __init__(
         self: AbstractDict[K, V],
@@ -106,6 +106,10 @@ class AbstractDict[K, V](GenericBase[K, V]):
             object.__setattr__(self, "data", finisher({}))
             return
 
+        keys: Iterable[K]
+        values: Iterable[V]
+        keys_from_iterable: bool
+
         if _keys is not None and _values is not None:
             keys = _keys
             values = _values
@@ -118,7 +122,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
         actual_keys = keys if _skip_validation else _validate_or_coerce_iterable(keys, self.key_type, _coerce=_coerce_keys)
         actual_values = values if _skip_validation else _validate_or_coerce_iterable(values, self.value_type, _coerce=_coerce_values)
 
-        if keys_from_iterable:
+        if keys_from_iterable and not _skip_validation:
             _validate_duplicates_and_hash(actual_keys)
 
         object.__setattr__(self, "data", finisher(dict(zip(actual_keys, actual_values))))
@@ -144,8 +148,8 @@ class AbstractDict[K, V](GenericBase[K, V]):
 
     @classmethod
     def _get_finisher(
-            cls: type[AbstractDict[K, V]],
-            default: Callable[[Iterable], Iterable] = lambda x: x
+        cls: type[AbstractDict[K, V]],
+        default: Callable[[Iterable], Iterable] = lambda x : x
     ) -> Callable[[Iterable], Iterable]:
         """
         Gets a callable that is applied to the data of this class's objects on init before setting the attribute.
@@ -160,8 +164,8 @@ class AbstractDict[K, V](GenericBase[K, V]):
 
     @classmethod
     def _get_repr_finisher(
-            cls: type[AbstractDict[K, V]],
-            default: Callable[[Iterable], Iterable] = lambda x: x
+        cls: type[AbstractDict[K, V]],
+        default: Callable[[Iterable], Iterable] = lambda x : x
     ) -> Callable[[Iterable], Iterable]:
         """
         Gets a callable that is applied to the data of this class's objects when representing them as a string.
@@ -176,8 +180,8 @@ class AbstractDict[K, V](GenericBase[K, V]):
 
     @classmethod
     def _get_eq_finisher(
-            cls: type[AbstractDict[K, V]],
-            default: Callable[[Iterable], Iterable] = lambda x: x
+        cls: type[AbstractDict[K, V]],
+        default: Callable[[Iterable], Iterable] = lambda x : x
     ) -> Callable[[Iterable], Iterable]:
         """
         Gets a callable that is applied to the data of this class's objects when comparing with another collection.
@@ -192,9 +196,8 @@ class AbstractDict[K, V](GenericBase[K, V]):
 
     @classmethod
     def _get_comparable_types(
-            cls: type[AbstractDict[K, V]],
-            default: type[AbstractDict] | tuple[type[AbstractDict], ...] | None = None
-            # The real default value is Collection
+        cls: type[AbstractDict[K, V]],
+        default: type[AbstractDict] | tuple[type[AbstractDict], ...] | None = None  # The real default value is AbstractDict
     ) -> type[AbstractDict] | tuple[type[AbstractDict], ...]:
         """
         Gets the type or tuples of types this class can be expected to be possibly equal to.
@@ -229,7 +232,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
         keys, values, _ = _split_keys_values(keys_values)
         key_type = _infer_type_contained_in_iterable(keys)
         value_type = _infer_type_contained_in_iterable(values)
-        return cls[key_type, value_type](_keys=keys, _values=values)
+        return cls[key_type, value_type](_keys=keys, _values=values, _skip_validation=True)
 
     @classmethod
     def of_keys_values(
@@ -260,7 +263,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
         from type_validation.type_validation import _infer_type_contained_in_iterable
         key_type = _infer_type_contained_in_iterable(keys)
         value_type = _infer_type_contained_in_iterable(values)
-        return cls[key_type, value_type](_keys=keys, _values=values)
+        return cls[key_type, value_type](_keys=keys, _values=values, _skip_validation=True)
 
     def __getitem__(self: AbstractDict[K, V], key: K | slice) -> V | AbstractDict[K, V]:
         """
@@ -596,7 +599,7 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
     """
 
-    _finisher: ClassVar[Callable[[dict], Mapping]] = dict
+    _finisher: ClassVar[Callable[[dict], Mapping]] = _convert_to(dict)
     _mutable: bool = True
 
     def __setitem__(self: AbstractMutableDict[K, V], key: K, value: V) -> None:

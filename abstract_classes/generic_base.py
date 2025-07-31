@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import UnionType
-from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, TypeVar
+from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, Callable
 from weakref import WeakValueDictionary
 
 """
@@ -11,7 +11,8 @@ GenericBase[*Ts]
 │
 ├── Collection[T]
 │    │
-│    ├── MutableCollection[T] ───────────────┐
+│    ├── MutableCollection[T] 
+│    │    └──────────────────────────────────┐
 │    │                                       │
 │    ├── AbstractSequence[T]                 │
 │    │    ├── ImmutableList[T] (*)           │
@@ -91,6 +92,20 @@ def class_name(cls: type) -> str:
 
     # Fallback for things like typing.Any
     return repr(cls)
+
+
+def _convert_to(tp: type) -> Callable[[Any], Any]:
+    """
+    Generates a function that converts its one parameter to the type tp, only if it wasn't already of that type.
+
+    :param tp: Type to convert into. Must also be a 1-parameter callable.
+    :type tp: type
+
+    :return: A 1-parameter callable that, for its parameter x, if it is of type tp, returns it unmodified. Otherwise,
+     returns tp applied to x.
+    :rtype: Callable[[Any], Any
+    """
+    return lambda x : x if isinstance(x, tp) else tp(x)
 
 
 @forbid_instantiation
