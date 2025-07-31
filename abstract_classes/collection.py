@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Iterable, Any, Callable, TypeVar, ClassVar, Iterator, Sequence
+from typing import Iterable, Any, Callable, TypeVar, ClassVar, Iterator
 from collections import defaultdict
 
 from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation
+from abstract_classes.metadata import Metadata
 
 
 @forbid_instantiation
-class Collection[T](GenericBase[T]):
+class Collection[T](GenericBase[T], Metadata):
     """
     Abstract base class representing a collection of items of type T, wrapping an underlying container and an item type.
 
@@ -25,7 +26,7 @@ class Collection[T](GenericBase[T]):
     when the constructor is called (e.g., MutableList[int]).
 
     Attributes:
-        item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
+        item_type (T): The type of elements stored in the collection, derived from the generic type.
 
         values (Any): The internal container of stored values, usually of one of Python's built-in Iterables.
 
@@ -56,7 +57,7 @@ class Collection[T](GenericBase[T]):
 
     def __init__(
         self: Collection[T],
-        *values: T,
+        *values: T | Iterable[T],
         _coerce: bool = False,
         _forbidden_iterable_types: tuple[type, ...] = (),
         _finisher: Callable[[Iterable[T]], Any] = None,
@@ -140,88 +141,7 @@ class Collection[T](GenericBase[T]):
             return None
 
     @classmethod
-    def _get_forbidden_iterable_types(
-        cls: type[Collection[T]],
-        default: type | tuple[type, ...] = ()
-    ) -> type | tuple[type, ...]:
-        """
-        Gets the iterable types that can't be passed to Collection's init to be contained in this class's objects.
-
-        :param default: Default value if the class doesn't have a _forbidden_iterable_types attribute.
-        :type default: type | tuple[type, ...]
-
-        :return: The _forbidden_iterable_types attribute of the class, or a default if it doesn't have one.
-        :rtype: type | tuple[type, ...]
-        """
-        return getattr(cls, '_forbidden_iterable_types', default)
-
-    @classmethod
-    def _get_finisher(
-        cls: type[Collection[T]],
-        default: Callable[[Iterable], Iterable] = lambda x : x
-    ) -> Callable[[Iterable], Iterable]:
-        """
-        Gets a callable that is applied to the values of this class's objects on init before setting the attribute.
-
-        :param default: Default value if the class doesn't have a _finisher attribute.
-        :type default: Callable[[Iterable], Iterable]
-
-        :return: The _finisher attribute of the class, or a default if it doesn't have one.
-        :rtype: Callable[[Iterable], Iterable]
-        """
-        return getattr(cls, '_finisher', default)
-
-    @classmethod
-    def _get_repr_finisher(
-        cls: type[Collection[T]],
-        default: Callable[[Iterable], Iterable] = lambda x : x
-    ) -> Callable[[Iterable], Iterable]:
-        """
-        Gets a callable that is applied to the values of this class's objects when representing them as a string.
-
-        :param default: Default value if the class doesn't have a _repr_finisher attribute.
-        :type default: Callable[[Iterable], Iterable]
-
-        :return: The _repr_finisher attribute of the class, or a default if it doesn't have one.
-        :rtype: Callable[[Iterable], Iterable]
-        """
-        return getattr(cls, '_repr_finisher', default)
-
-    @classmethod
-    def _get_eq_finisher(
-        cls: type[Collection[T]],
-        default: Callable[[Iterable], Iterable] = lambda x : x
-    ) -> Callable[[Iterable], Iterable]:
-        """
-        Gets a callable that is applied to the values of this class's objects when comparing with another collection.
-
-        :param default: Default value if the class doesn't have a _eq_finisher attribute.
-        :type default: Callable[[Iterable], Iterable]
-
-        :return: The _eq_finisher attribute of the class, or a default if it doesn't have one.
-        :rtype: Callable[[Iterable], Iterable]
-        """
-        return getattr(cls, '_eq_finisher', default)
-
-    @classmethod
-    def _get_comparable_types(
-        cls: type[Collection[T]],
-        default: type[Collection] | tuple[type[Collection], ...] | None = None  # The real default value is Collection
-    ) -> type[Collection] | tuple[type[Collection], ...]:
-        """
-        Gets the type or tuples of types this class can be expected to be possibly equal to.
-
-        :param default: Default value if the class doesn't have a _comparable_types attribute. When None, the method
-         returns Collection instead in that case.
-        :type default: type[Collection] | tuple[type[Collection], ...] | None
-
-        :return: The _comparable_types attribute of the class, or a default if it doesn't have one.
-        :rtype: type[Collection] | tuple[type[Collection], ...]
-        """
-        return getattr(cls, '_comparable_types', default) or Collection
-
-    @classmethod
-    def of(cls: type[Collection], *values: T) -> Collection[T]:
+    def of[R: Collection](cls: R, *values: Any) -> R:
         """
         Creates a Collection object containing the given values, inferring their common type.
 
@@ -300,7 +220,7 @@ class Collection[T](GenericBase[T]):
         :rtype: bool
         """
         eq_finisher = type(self)._get_eq_finisher()
-        comparable_types: type[Collection] | tuple[type[Collection], ...] = type(self)._get_comparable_types()
+        comparable_types: type[Collection] | tuple[type[Collection], ...] = type(self)._get_comparable_types(Collection)
         return (
             isinstance(other, comparable_types)
             and self.item_type == other.item_type
@@ -326,7 +246,7 @@ class Collection[T](GenericBase[T]):
         """
         return bool(self.values)
 
-    def copy(self: Collection[T], deep: bool = False) -> Collection[T]:
+    def copy[R: Collection](self: R, deep: bool = False) -> R:
         """
         Returns a shallow or deep copy of the Collection.
 
@@ -334,8 +254,10 @@ class Collection[T](GenericBase[T]):
         values or uses `deepcopy` if requested. Skips re-validation for performance.
 
         :param deep: Boolean state parameter to control if the copy is shallow or deep.
+        :type deep: bool
+
         :return: A shallow or deep copy of the object.
-        :rtype: Collection[T]
+        :rtype: R
         """
         from copy import deepcopy
         values = deepcopy(self.values) if deep else (self.values.copy() if hasattr(self.values, 'copy') else self.values)
@@ -350,12 +272,12 @@ class Collection[T](GenericBase[T]):
         """
         return list(self.values)
 
-    def to_tuple(self: Collection[T]) -> tuple[T]:
+    def to_tuple(self: Collection[T]) -> tuple[T, ...]:
         """
         Returns the contents of the Collection as a tuple.
 
         :return: A tuple containing the values of the Collection.
-        :rtype: tuple[T]
+        :rtype: tuple[T, ...]
         """
         return tuple(self.values)
 
@@ -428,21 +350,21 @@ class Collection[T](GenericBase[T]):
 
     # Functional Methods:
 
-    def map[R](
-        self: Collection[T],
-        f: Callable[[T], R],
-        result_type: type[R] | None = None,
+    def map[S: Collection](
+        self: S,
+        f: Callable[[T], Any],
+        result_type: type | None = None,
         *,
         _coerce: bool = False
-    ) -> Collection[R]:
+    ) -> S:
         """
         Maps each value of the Collection to its image by the function `f` and returns a new Collection of them.
 
         :param f: Callable object to map the Collection with.
-        :type f: Callable[[T], R]
+        :type f: Callable[[T], Any]
 
         :param result_type: Type expected to be returned by the Callable. If None, it will be inferred.
-        :type result_type: type[R] | None
+        :type result_type: type | None
 
         :param _coerce: State parameter that if True, tries to coerce results to the result_type if it's not None.
         :type _coerce: bool
@@ -457,23 +379,23 @@ class Collection[T](GenericBase[T]):
             else type(self).of(mapped_values)
         )
 
-    def flatmap[R](
-        self: Collection[T],
-        f: Callable[[T], Iterable[R]],
-        result_type: type[R] | None = None,
+    def flatmap[S: Collection](
+        self: S,
+        f: Callable[[T], Iterable],
+        result_type: type | None = None,
         *,
         _coerce: bool = False
-    ) -> Collection[R]:
+    ) -> S:
         """
         Maps and flattens each element of the Collection and returns a new Collection containing the results.
 
         Requires that f returns an iterable (excluding str and bytes) for each element.
 
         :param f: Callable object to map the Collection with.
-        :type f: Callable[[T], Iterable[R]]
+        :type f: Callable[[T], Iterable]
 
         :param result_type: Type of Iterable expected to be returned by the Callable. If None, it will be inferred.
-        :type result_type: type[R] | None
+        :type result_type: type | None
 
         :param _coerce: State parameter to try to force coercion to the expected result type if it's not None.
         :type _coerce: bool
@@ -493,7 +415,7 @@ class Collection[T](GenericBase[T]):
             else type(self).of(flattened)
         )
 
-    def filter(self: Collection[T], predicate: Callable[[T], bool]) -> Collection[T]:
+    def filter[R: Collection](self: R, predicate: Callable[[T], bool]) -> R:
         """
         Filter the collection by a predicate function.
 

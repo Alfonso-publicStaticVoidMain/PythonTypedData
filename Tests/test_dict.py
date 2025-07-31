@@ -19,6 +19,7 @@ class DictionaryTest(unittest.TestCase):
         self.assertEqual(dic.data, imd.data)
         self.assertEqual(dic['a'], imd['a'])
         # The original dict and its "copy" are still considered equal
+        imd.__eq__(dic)
         self.assertEqual(imd, dic)
 
         # Converting back to a MutableDict preserves equality

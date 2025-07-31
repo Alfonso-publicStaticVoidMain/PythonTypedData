@@ -59,7 +59,7 @@ def _validate_type(obj: Any, expected_type: type) -> bool:
     return False
 
 
-def _validate_iterable(obj: Any, iterable_type: type, item_type: type) -> bool:
+def _validate_iterable[T](obj: Any, iterable_type: type[Iterable[T]], item_type: type[T]) -> bool:
     """
     Validates that all items in an iterable are of the expected type.
 
@@ -249,49 +249,6 @@ def _validate_or_coerce_tuple(
         raise ValueError(f"Types given for the tuple don't match the length of the values.")
     return tuple(_validate_or_coerce_value(value, tp, _coerce=_coerce) for value, tp in zip(tpl, item_types))
 
-def _validate_collection_type_and_get_values[T](
-    collection: Iterable[T] | Collection[T],
-    expected_type: type[T],
-    *,
-    _valid_typed_types: tuple[type[Collection], ...] = (Collection,),
-    _valid_built_in_types: tuple[type[Iterable], ...] = (Iterable,),
-    _coerce: bool = False
-) -> list[T]:
-    """
-    Validates and optionally coerces the elements, also checking that the Iterable is of one of the given allowed types.
-
-    Checks that an Iterable or Collection object other holds values of type item_type and that is of a given allowed
-    type from among this library's typed types or Python's built-ins. Returns a list containing the values the iterable
-    held, after performing type coercion if enabled.
-
-    :param collection: Typed or not object to check its contained type.
-    :type collection: Iterable[T] | Collection[T]
-
-    :param expected_type: Type to compare the type against.
-    :type expected_type: type[T]
-
-    :param _valid_typed_types: Types from this library that should be accepted.
-    :type _valid_typed_types: tuple[type[Collection], ...]
-
-    :param _valid_built_in_types: Typed from Python's built ins that should be accepted.
-    :type _valid_built_in_types: tuple[type[Iterable], ...]
-
-    :return: A list with the values of the iterable after validation and coercion.
-    :rtype: list[T]
-    """
-    if isinstance(collection, _valid_typed_types):
-        if not _coerce and not issubclass(collection.item_type, expected_type):
-            raise ValueError(f"Type mismatch between expected type {expected_type.__name__} and actual: {collection.item_type.__name__}")
-        other_values = _validate_or_coerce_iterable(collection.values, expected_type, _coerce=_coerce)
-
-    elif isinstance(collection, _valid_built_in_types):
-        other_values = _validate_or_coerce_iterable(collection, expected_type, _coerce=_coerce)
-
-    else:
-        raise TypeError(f"{collection} must be a valid type.")
-
-    return other_values
-
 
 def _validate_or_coerce_iterable_of_iterables[T](
     iterables: Iterable[Iterable[T]],
@@ -389,7 +346,7 @@ def _split_keys_values[K, V](keys_values: dict[K, V] | Mapping[K, V] | Iterable[
     return keys, values, keys_from_iterable
 
 
-def _infer_type(obj: Any) -> type:
+def _infer_type[T](obj: T) -> type[T]:
     """
     Infers the most specific typing annotation of a given object, recursively handling collections like list, dict, and tuple.
 
@@ -411,15 +368,15 @@ def _infer_type(obj: Any) -> type:
     return type(obj)
 
 
-def _infer_iterable_type(iterable: Iterable) -> type:
+def _infer_iterable_type[T](iterable: Iterable[T]) -> type[Iterable[T]]:
     """
     Infers the typing annotation of an iterable object, including its generics, which are handled recursively.
 
     :param iterable: Iterable to infer the type of.
-    :type iterable: Iterable
+    :type iterable: Iterable[T]
 
     :return: The type of the iterable.
-    :rtype: type
+    :rtype: type[T]
     """
     if isinstance(iterable, Collection):
         if hasattr(type(iterable), '_args'):
@@ -429,7 +386,7 @@ def _infer_iterable_type(iterable: Iterable) -> type:
     if not iterable:
         raise ValueError("Cannot infer type from empty iterable")
 
-    inner_type = _combine_types({_infer_type(value) for value in iterable})
+    inner_type: type[T] = _combine_types({_infer_type(value) for value in iterable})
 
     if isinstance(iterable, (list, set, frozenset)):
         return type(iterable)[inner_type]
@@ -437,7 +394,7 @@ def _infer_iterable_type(iterable: Iterable) -> type:
         return Iterable[inner_type]
 
 
-def _infer_mapping_type(mapping: Mapping) -> type:
+def _infer_mapping_type[K, V](mapping: Mapping[K, V]) -> type[Mapping[K, V]]:
     """
     Infers the typing annotation of a mapping object, including its generics, which are handled recursively.
 
@@ -466,7 +423,7 @@ def _infer_mapping_type(mapping: Mapping) -> type:
     return type(mapping)[key_type, value_type]
 
 
-def _infer_tuple_type(tpl: tuple) -> type:
+def _infer_tuple_type(tpl: tuple) -> type[tuple]:
     """
     Infers the typing annotation of a tuple, including its generic types, which are handled recursively.
 

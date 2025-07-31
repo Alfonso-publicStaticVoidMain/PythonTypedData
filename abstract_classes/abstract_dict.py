@@ -5,10 +5,11 @@ from typing import ClassVar, Callable, Any, Mapping, Iterable, TypeVar, Iterator
 from immutabledict import immutabledict
 
 from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation, _convert_to
+from abstract_classes.metadata import Metadata
 
 
 @forbid_instantiation
-class AbstractDict[K, V](GenericBase[K, V]):
+class AbstractDict[K, V](GenericBase[K, V], Metadata):
     """
     Abstract base class representing a dictionary with type enforced keys and values given by generic types.
 
@@ -44,6 +45,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
     value_type: type[V]
     data: dict[K, V]
 
+    # Metadata class attributes
     _finisher: ClassVar[Callable[[dict], immutabledict]] = _convert_to(immutabledict)
     _repr_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
     _eq_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
@@ -145,71 +147,6 @@ class AbstractDict[K, V](GenericBase[K, V]):
             key_type = None
             value_type = None
         return key_type, value_type
-
-    @classmethod
-    def _get_finisher(
-        cls: type[AbstractDict[K, V]],
-        default: Callable[[Iterable], Iterable] = lambda x : x
-    ) -> Callable[[Iterable], Iterable]:
-        """
-        Gets a callable that is applied to the data of this class's objects on init before setting the attribute.
-
-        :param default: Default value if the class doesn't have a _finisher attribute.
-        :type default: Callable[[Iterable], Iterable]
-
-        :return: The _finisher attribute of the class, or a default if it doesn't have one.
-        :rtype: Callable[[Iterable], Iterable]
-        """
-        return getattr(cls, '_finisher', default)
-
-    @classmethod
-    def _get_repr_finisher(
-        cls: type[AbstractDict[K, V]],
-        default: Callable[[Iterable], Iterable] = lambda x : x
-    ) -> Callable[[Iterable], Iterable]:
-        """
-        Gets a callable that is applied to the data of this class's objects when representing them as a string.
-
-        :param default: Default value if the class doesn't have a _repr_finisher attribute.
-        :type default: Callable[[Iterable], Iterable]
-
-        :return: The _repr_finisher attribute of the class, or a default if it doesn't have one.
-        :rtype: Callable[[Iterable], Iterable]
-        """
-        return getattr(cls, '_repr_finisher', default)
-
-    @classmethod
-    def _get_eq_finisher(
-        cls: type[AbstractDict[K, V]],
-        default: Callable[[Iterable], Iterable] = lambda x : x
-    ) -> Callable[[Iterable], Iterable]:
-        """
-        Gets a callable that is applied to the data of this class's objects when comparing with another collection.
-
-        :param default: Default value if the class doesn't have a _eq_finisher attribute.
-        :type default: Callable[[Iterable], Iterable]
-
-        :return: The _eq_finisher attribute of the class, or a default if it doesn't have one.
-        :rtype: Callable[[Iterable], Iterable]
-        """
-        return getattr(cls, '_eq_finisher', default)
-
-    @classmethod
-    def _get_comparable_types(
-        cls: type[AbstractDict[K, V]],
-        default: type[AbstractDict] | tuple[type[AbstractDict], ...] | None = None  # The real default value is AbstractDict
-    ) -> type[AbstractDict] | tuple[type[AbstractDict], ...]:
-        """
-        Gets the type or tuples of types this class can be expected to be possibly equal to.
-
-        :param default: Default value if the class doesn't have a _comparable_types attribute. When None, the method
-         returns AbstractDict instead in that case.
-        :type default: type[AbstractDict] | tuple[type[AbstractDict], ...] | None
-
-        :return: The _comparable_types attribute of the class, or a default if it doesn't have one.
-        :rtype: type[AbstractDict] | tuple[type[AbstractDict], ...]
-        """
-        return getattr(cls, '_comparable_types', default) or AbstractDict
 
     @classmethod
     def of(
@@ -371,7 +308,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
         :rtype: bool
         """
         eq_finisher = type(self)._get_eq_finisher()
-        comparable_types = type(self)._get_comparable_types()
+        comparable_types = type(self)._get_comparable_types(AbstractDict)
         return (
             isinstance(other, comparable_types)
             and self.key_type == other.key_type

@@ -50,6 +50,21 @@ class TestCollection(unittest.TestCase):
         self.assertTrue({'a', 'b', '2'} in mul)
         self.assertFalse({'d'} in mul)
 
+    def test_eq(self):
+        mul = MutableList[int](0, 1)
+        iml = ImmutableList[int](0, 1)
+        self.assertEqual(mul, iml)
+        self.assertNotEqual(mul, mul.reversed())
+
+        mus = MutableSet[str]('a', 'b')
+        ims = ImmutableSet[str]('b', 'a')
+        self.assertEqual(mus, ims)
+
+        mus_int = MutableSet[int](0, 1)
+        self.assertNotEqual(mul, mus_int)
+        self.assertNotEqual(iml, mus_int)
+
+
     def test_copy(self):
         lst = MutableList[int](1, 2)
         new_lst = lst.copy()
@@ -57,7 +72,7 @@ class TestCollection(unittest.TestCase):
         self.assertIsNot(lst, new_lst)
 
         nested_lst = MutableList[ImmutableList[int]](ImmutableList.of(0, 1), ImmutableList.of(0, 0))
-        new_nested_lst = nested_lst.copy(deep=True)
+        new_nested_lst: MutableList[ImmutableList[int]] = nested_lst.copy(deep=True)
         self.assertEqual(nested_lst, new_nested_lst)
         self.assertEqual(nested_lst[0], new_nested_lst[0])
         self.assertIsNot(nested_lst[0], new_nested_lst[0])

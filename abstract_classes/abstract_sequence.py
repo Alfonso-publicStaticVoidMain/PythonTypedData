@@ -132,10 +132,10 @@ class AbstractSequence[T](Collection[T]):
 
         :raises TypeError: If `other` has incompatible types.
         """
-        from type_validation.type_validation import _validate_collection_type_and_get_values
+        from type_validation.type_validation import _validate_or_coerce_iterable
         if not isinstance(other, (AbstractSequence, list, tuple)):
             return NotImplemented
-        return type(self)(self.values + _validate_collection_type_and_get_values(other, self.item_type))
+        return type(self)(self.values + _validate_or_coerce_iterable(other, self.item_type))
 
     def __mul__(
         self: AbstractSequence[T],
@@ -300,10 +300,12 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
 
         :raises TypeError: If index is not int or slice.
         """
-        from type_validation.type_validation import _validate_collection_type_and_get_values, _validate_or_coerce_value
+        from type_validation.type_validation import _validate_or_coerce_iterable, _validate_or_coerce_value
 
         if isinstance(index, slice):
-            self.values[index] = _validate_collection_type_and_get_values(value, self.item_type)
+            if not isinstance(value, (list, tuple, AbstractSequence)):
+                raise ValueError("You can't assign a value that isn't a sequence to a slice!")
+            self.values[index] = _validate_or_coerce_iterable(value, self.item_type)
 
         elif isinstance(index, int):
             self.values[index] = _validate_or_coerce_value(value, self.item_type, _coerce=_coerce)
