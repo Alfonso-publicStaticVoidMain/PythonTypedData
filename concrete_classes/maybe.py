@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Any, Iterator
 
 from abstract_classes.generic_base import GenericBase
 
@@ -128,6 +128,121 @@ class Maybe[T](GenericBase[T]):
             raise ValueError("You must give a type when using Maybe.of_nullable")
         from type_validation.type_validation import _validate_or_coerce_value
         return Maybe[item_type](_validate_or_coerce_value(value, item_type)) if value is not None else Maybe[item_type]()
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Allows calling the methods of the type holt in a Maybe object directly, provided it's not empty.
+
+        :param name: Name of the attribute being called.
+        :type name: str
+
+        :return: The method being called, if it's present.
+        :rtype: Any
+
+        :raises AttributeError: If self is empty, or if its holt value doesn't have that attribute.
+        """
+        if self.value is None:
+            raise AttributeError(f"'Maybe' has no value; cannot access attribute '{name}'")
+        return getattr(self.value, name)
+
+    def __call__(self, *args, **kwargs) -> Any:
+        """
+        Calls the contained value if it's callable and not None.
+
+        :param args: args to be called upon.
+        :param kwargs: kwargs to be called upon.
+
+        :return: Whatever the stored value shall return.
+        :rtype: Any
+
+        :raises ValueError: If the stored value is None.
+        :raises TypeError: If the stored value is not callable.
+        """
+        if self.value is None:
+            raise ValueError("Cannot call an empty Maybe")
+        if not callable(self.value):
+            raise TypeError(f"Value of type {type(self.value).__name__} is not callable")
+        return self.value(*args, **kwargs)
+
+    def __getitem__(self, key: Any) -> Any:
+        """
+        Access a key of the stored value if it's not None, and it supports it.
+
+        :param key: Key to access.
+        :type key: Any
+
+        :return: Whatever shall be returned.
+        :rtype: Any
+
+        :raises ValueError: If the value is None.
+        :raises TypeError: If the value is not indexable.
+        :raises KeyError: If the key wasn't found in the value.
+        :raises IndexError: If the key is an index out of range for the value.
+        """
+        if self.value is None:
+            raise ValueError("Cannot index into an empty Maybe")
+        try:
+            return self.value[key]
+        except TypeError:
+            raise TypeError(f"Value of type {type(self.value).__name__} is not indexable")
+        except KeyError as e:
+            raise KeyError(f"Key {key!r} not found in value of type {type(self.value).__name__}") from e
+        except IndexError as e:
+            raise IndexError(f"Index {key!r} out of range for value of type {type(self.value).__name__}") from e
+
+    def __len__(self) -> int:
+        """
+        Gets the length of the subjacent value if it supports it and is not None.
+
+        :return: The length of the stored value, if able.
+        :rtype: int
+
+        :raises ValueError: If the value is None.
+        :raises TypeError: If the value doesn't implement __len__.
+        """
+        if self.value is None:
+            raise ValueError("Cannot get length of an empty Maybe")
+        try:
+            return len(self.value)
+        except TypeError:
+            raise TypeError(f"Value of type {type(self.value).__name__} has no len()")
+
+    def __iter__(self) -> Iterator:
+        """
+        Iterates over the value stored, if able.
+
+        :return: An Iterator over the stored value, if it's an Iterable.
+        :rtype: Iterator
+
+        :raises ValueError: If the value is None.
+        :raises TypeError: If the value is not iterable.
+        """
+        if self.value is None:
+            raise ValueError("Cannot iterate over an empty Maybe")
+        try:
+            return iter(self.value)
+        except TypeError:
+            raise TypeError(f"Value of type {type(self.value).__name__} is not iterable")
+
+    def __contains__(self, item: Any) -> bool:
+        """
+        Checks membership of the item to the stored value, if supported.
+
+        :param item: Item to check membership of.
+        :type item: Any
+
+        :return: True if the item is contained in the stored value, False otherwise.
+        :rtype: bool
+
+        :raises ValueError: If the value is None.
+        :raises TypeError: If the value's type doesn't implement __contains__.
+        """
+        if self.value is None:
+            raise ValueError("Cannot use 'in' on an empty Maybe")
+        try:
+            return item in self.value
+        except TypeError:
+            raise TypeError(f"Value of type {type(self.value).__name__} does not support 'in'")
 
     def is_present(self: Maybe[T]) -> bool:
         """
