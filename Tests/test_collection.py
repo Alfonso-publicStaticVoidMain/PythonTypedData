@@ -227,6 +227,13 @@ class TestCollection(unittest.TestCase):
         clt_lst.append(d)
         self.assertEqual(clt_lst, MutableList[Collection[str]](a, b, c, d))
 
+    def test_independence_of_values(self):
+        lst = [0, 1, 2]
+        mul = MutableList[int](lst, _skip_validation=True)
+        mul.append(3)
+        self.assertEqual(lst, [0, 1, 2])
+        self.assertNotEqual(lst, [0, 1, 2, 3])
+
 
 if __name__ == '__main__':
     unittest.main()

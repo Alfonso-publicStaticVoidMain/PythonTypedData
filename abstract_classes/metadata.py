@@ -28,6 +28,22 @@ class Metadata:
         return getattr(cls, '_finisher', default)
 
     @classmethod
+    def _get_skip_validation_finisher(
+        cls: type[Metadata],
+        default: Callable[[Iterable], Iterable] = lambda x : x
+    ) -> Callable[[Iterable], Iterable]:
+        """
+        Gets a callable that is applied to the values on init when skipping validation to avoid forwarding the reference.
+
+        :param default: Default value if the class doesn't have a _skip_validation_finisher attribute.
+        :type default: Callable[[Iterable], Iterable]
+
+        :return: The _skip_validation_finisher attribute of the class, or a default if it doesn't have one.
+        :rtype: Callable[[Iterable], Iterable]
+        """
+        return getattr(cls, '_skip_validation_finisher', default)
+
+    @classmethod
     def _get_repr_finisher(
         cls: type[Metadata],
         default: Callable[[Iterable], Iterable] = lambda x : x

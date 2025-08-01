@@ -10,7 +10,7 @@ from abstract_classes.metadata import Metadata
 
 
 @forbid_instantiation
-class AbstractSet[T](Collection[T], Metadata):
+class AbstractSet[T](Collection[T]):
     """
     Abstract base class for hashable Collections of type T supporting set operations.
 
@@ -27,15 +27,16 @@ class AbstractSet[T](Collection[T], Metadata):
     """
 
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(frozenset)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = frozenset
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
 
-    def __lt__(self: AbstractSet, other: AbstractSet | set | frozenset | collections.abc.Set) -> bool:
+    def __lt__(self: AbstractSet, other: AbstractSet) -> bool:
         """
         Checks whether this set is a proper subset of another AbstractSet, set or frozenset.
 
         :param other: The set to compare against.
-        :type other: AbstractSet | set | frozenset | collections.abc.Set
+        :type other: AbstractSet
 
         :return: True if this set is a proper subset of `other`, False otherwise. When comparing with another
          AbstractSet, their item_type must match exactly.
@@ -43,16 +44,14 @@ class AbstractSet[T](Collection[T], Metadata):
         """
         if isinstance(other, AbstractSet):
             return self.item_type == other.item_type and self.values < other.values
-        if isinstance(other, (set, frozenset, collections.abc.Set)):
-            return self.values < other
         return NotImplemented
 
-    def __le__(self: AbstractSet, other: AbstractSet | set | frozenset | collections.abc.Set) -> bool:
+    def __le__(self: AbstractSet, other: AbstractSet) -> bool:
         """
         Checks whether this set is a subset (or equal to) another AbstractSet, set or frozenset.
 
         :param other: The set to compare against.
-        :type other: AbstractSet | set | frozenset | collections.abc.Set
+        :type other: AbstractSet
 
         :return: True if this set is a subset or equal to `other`, False otherwise. When comparing with another
          AbstractSet, their item_type must match exactly.
@@ -60,11 +59,9 @@ class AbstractSet[T](Collection[T], Metadata):
         """
         if isinstance(other, AbstractSet):
             return self.item_type == other.item_type and self.values <= other.values
-        if isinstance(other, (set, frozenset, collections.abc.Set)):
-            return self.values <= other
         return NotImplemented
 
-    def __gt__(self: AbstractSet, other: AbstractSet | set | frozenset | collections.abc.Set) -> bool:
+    def __gt__(self: AbstractSet, other: AbstractSet) -> bool:
         """
         Checks whether this set is a proper superset of another AbstractSet, set or frozenset.
 
@@ -77,16 +74,14 @@ class AbstractSet[T](Collection[T], Metadata):
         """
         if isinstance(other, AbstractSet):
             return self.item_type == other.item_type and self.values > other.values
-        if isinstance(other, (set, frozenset, collections.abc.Set)):
-            return self.values > other
         return NotImplemented
 
-    def __ge__(self: AbstractSet, other: AbstractSet | set | frozenset | collections.abc.Set) -> bool:
+    def __ge__(self: AbstractSet, other: AbstractSet) -> bool:
         """
         Checks whether this set is a superset (or equal to) another AbstractSet, set or frozenset.
 
         :param other: The set to compare against.
-        :type other: AbstractSet | set | frozenset | collections.abc.Set
+        :type other: AbstractSet
 
         :return: True if this set is a superset or equal to `other`, False otherwise. When comparing with another
          AbstractSet, their item_type must match exactly.
@@ -94,8 +89,6 @@ class AbstractSet[T](Collection[T], Metadata):
         """
         if isinstance(other, AbstractSet):
             return self.item_type == other.item_type and self.values >= other.values
-        if isinstance(other, (set, frozenset, collections.abc.Set)):
-            return self.values >= other
         return NotImplemented
 
     def __or__[S: AbstractSet](self: S, other: Iterable) -> S:
@@ -249,7 +242,7 @@ class AbstractSet[T](Collection[T], Metadata):
 
     def is_subset(
         self: AbstractSet,
-        other: AbstractSet | set | frozenset | collections.abc.Set,
+        other: AbstractSet,
         *,
         _coerce: bool = False
     ) -> bool:
@@ -257,7 +250,7 @@ class AbstractSet[T](Collection[T], Metadata):
         Checks if this set is a subset of another set or AbstractSet.
 
         :param other: The set to compare against.
-        :type other: AbstractSet | set | frozenset | collections.abc.Set
+        :type other: AbstractSet
 
         :param _coerce: State parameter that, if True, attempts to coerce values before checking.
         :type _coerce: bool
@@ -265,21 +258,15 @@ class AbstractSet[T](Collection[T], Metadata):
         :return: True if this set is a subset of `other`, False otherwise.
         :rtype: bool
         """
-        from type_validation.type_validation import _validate_or_coerce_iterable
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
         if not _coerce and isinstance(other, AbstractSet) and other.item_type != self.item_type:
-            return False
-        return self.values.issubset(
-            _validate_or_coerce_iterable(
-                other,
-                self.item_type,
-                _coerce=_coerce,
-                _finisher=set
-            )
-        )
+            raise ValueError(f"Cannot compare sets of different types: {self.item_type} != {other.item_type}")
+        return self.values.issubset(other.values)
 
     def is_superset(
         self: AbstractSet,
-        other: AbstractSet | set | frozenset | collections.abc.Set,
+        other: AbstractSet,
         *,
         _coerce: bool = False
     ) -> bool:
@@ -287,7 +274,7 @@ class AbstractSet[T](Collection[T], Metadata):
         Checks if this set is a superset of another set or AbstractSet.
 
         :param other: The set to compare against.
-        :type other: AbstractSet | set | frozenset | collections.abc.Set
+        :type other: AbstractSet
 
         :param _coerce: State parameter that, if True, attempts to coerce values before checking.
         :type _coerce: bool
@@ -295,21 +282,15 @@ class AbstractSet[T](Collection[T], Metadata):
         :return: True if this set is a superset of `other`, False otherwise.
         :rtype: bool
         """
-        from type_validation.type_validation import _validate_or_coerce_iterable
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
         if not _coerce and isinstance(other, AbstractSet) and other.item_type != self.item_type:
-            return False
-        return self.values.issuperset(
-            _validate_or_coerce_iterable(
-                other,
-                self.item_type,
-                _coerce=_coerce,
-                _finisher=set
-            )
-        )
+            raise ValueError(f"Cannot compare sets of different types: {self.item_type} != {other.item_type}")
+        return self.values.issuperset(other.values)
 
     def is_disjoint(
         self: AbstractSet,
-        other: AbstractSet | set | frozenset | collections.abc.Set,
+        other: AbstractSet,
         *,
         _coerce: bool = False
     ) -> bool:
@@ -317,7 +298,7 @@ class AbstractSet[T](Collection[T], Metadata):
         Checks if this set is disjoint with another set or AbstractSet.
 
         :param other: The set to compare against.
-        :type other: AbstractSet | set | frozenset | collections.abc.Set
+        :type other: AbstractSet
 
         :param _coerce: State parameter that, if True, attempts to coerce values before checking.
         :type _coerce: bool
@@ -325,17 +306,11 @@ class AbstractSet[T](Collection[T], Metadata):
         :return: True if this set has no elements in common with `other`, False otherwise.
         :rtype: bool
         """
-        from type_validation.type_validation import _validate_or_coerce_iterable
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
         if not _coerce and isinstance(other, AbstractSet) and other.item_type != self.item_type:
-            return False
-        return self.values.isdisjoint(
-            _validate_or_coerce_iterable(
-                other,
-                self.item_type,
-                _coerce=_coerce,
-                _finisher=set
-            )
-        )
+            raise ValueError(f"Cannot compare sets of different types: {self.item_type} != {other.item_type}")
+        return self.values.isdisjoint(other.values)
 
 
 @forbid_instantiation
@@ -356,6 +331,7 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     """
 
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = set
     _mutable: ClassVar[bool] = True
 
     def __ior__[S: AbstractMutableSet](

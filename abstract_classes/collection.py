@@ -70,7 +70,7 @@ class Collection[T](GenericBase[T], Metadata):
         _args attribute of the class returned by __class_getitem__ and then fetched by _inferred_item_type.
 
         :param values: Values to store in the Collection, received as an iterable or one by one.
-        :type values: T
+        :type values: T | Iterable[T]
 
         :param _coerce: State parameter to force type coercion or not. Some numeric type coercions are always performed.
         :type _coerce: bool
@@ -111,15 +111,15 @@ class Collection[T](GenericBase[T], Metadata):
 
         forbidden_iterable_types = _forbidden_iterable_types or type(self)._get_forbidden_iterable_types()
 
-        # If values is of one of the forbidden iterable types, raises a TypeError.
         if isinstance(values, forbidden_iterable_types):
             raise TypeError(f"Invalid type {type(values).__name__} for class {type(self).__name__}.")
 
         object.__setattr__(self, 'item_type', generic_item_type)
 
         finisher = _finisher or type(self)._get_finisher()
+        skip_validation_finisher = type(self)._get_skip_validation_finisher() or finisher
 
-        final_values = finisher(values) if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce, _finisher=finisher)
+        final_values = skip_validation_finisher(values) if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce, _finisher=finisher)
 
         object.__setattr__(self, 'values', final_values)
 

@@ -47,6 +47,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
 
     # Metadata class attributes
     _finisher: ClassVar[Callable[[dict], immutabledict]] = _convert_to(immutabledict)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = immutabledict
     _repr_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
     _eq_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
 
@@ -97,7 +98,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
             raise TypeError(f"Not all generic types were provided. Key: {key_type} | Value: {value_type}")
 
         if isinstance(key_type, TypeVar) or isinstance(value_type, TypeVar):
-            raise TypeError(f"Generic types must be fully specified for {type(self).__name__}. Use {type(self)._origin.__name__}.of(...) to infer types from iterable.")
+            raise TypeError(f"Generic types must be fully specified for {type(self).__name__}. Use {type(self)._origin.__name__}.of to infer types from iterable.")
 
         object.__setattr__(self, "key_type", key_type)
         object.__setattr__(self, "value_type", value_type)
@@ -127,7 +128,11 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         if keys_from_iterable and not _skip_validation:
             _validate_duplicates_and_hash(actual_keys)
 
-        object.__setattr__(self, "data", finisher(dict(zip(actual_keys, actual_values))))
+        if _skip_validation:
+            skip_validation_finisher = type(self)._get_skip_validation_finisher() or finisher
+            object.__setattr__(self, "data", skip_validation_finisher(dict(zip(actual_keys, actual_values))))
+        else:
+            object.__setattr__(self, "data", finisher(dict(zip(actual_keys, actual_values))))
 
     @classmethod
     def _inferred_key_value_types(cls: AbstractDict[K, V]) -> tuple[type[K] | None, type[V] | None]:
@@ -537,6 +542,7 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
     """
 
     _finisher: ClassVar[Callable[[dict], Mapping]] = _convert_to(dict)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = immutabledict
     _mutable: bool = True
 
     def __setitem__(self: AbstractMutableDict[K, V], key: K, value: V) -> None:

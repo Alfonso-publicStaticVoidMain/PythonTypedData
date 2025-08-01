@@ -78,8 +78,8 @@ class TestSet(unittest.TestCase):
         self.assertTrue(s3.is_subset(s1))
         self.assertEqual(s3.is_subset(s1), s1.is_superset(s3))
 
-        self.assertFalse(s5.is_subset(s1))
-        self.assertEqual(s5.is_subset(s1), s1.is_superset(s5))
+        with self.assertRaises(ValueError):
+            s5.is_subset(s1)
 
         s6 = ImmutableSet[str]("b", 2, 3, 4, "c")
         self.assertFalse(s1.is_disjoint(s6))
@@ -87,12 +87,6 @@ class TestSet(unittest.TestCase):
 
         self.assertTrue(s4.is_disjoint(s3))
         self.assertEqual(s4.is_disjoint(s3), s3.is_disjoint(s4))
-
-    def test_sub_super_set_coercion(self):
-        int_st = MutableSet[int](1, 2, 3)
-        str_st = MutableSet[str]('1', '2', '3')
-        self.assertTrue(int_st.is_subset(str_st, _coerce=True))
-        self.assertTrue(str_st.is_subset(int_st, _coerce=True))
 
     def test_add_remove(self):
         s = MutableSet[str]('a')

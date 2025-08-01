@@ -108,13 +108,14 @@ class TestList(unittest.TestCase):
 
         self.assertTrue(lst <= lst)
         self.assertTrue(lst >= ImmutableList[int](lst))
+        self.assertFalse(lst < lst)
+        self.assertFalse(ImmutableList[int](lst) > lst)
 
-        self.assertTrue(lst > [10, 1, 5])
-        self.assertTrue(lst < (11, 100, 100))
+        self.assertTrue(lst > MutableList[int]((10, 1, 5)))
+        self.assertTrue(lst < MutableList[int]([11, 100, 100]))
 
-    def test_add_substr_mul(self):
-        self.assertEqual(MutableList[float]([0.1, 2, 0.3]) + [0.6, 1], MutableList[float]([0.1, 2, 0.3, 0.6, 1]))
-        self.assertEqual(MutableList[int](1, 2, 3, 4) - [3, 4], MutableList[int]([1, 2]))
+    def test_add_mul(self):
+        self.assertEqual(MutableList[float]([0.1, 2, 0.3]) + MutableList[float]([0.6, 1]), MutableList[float]([0.1, 2, 0.3, 0.6, 1]))
         self.assertEqual(MutableList[int]([0, 1]) * 2, MutableList[int]([0, 1, 0, 1]))
 
     def test_contains_iter(self):
