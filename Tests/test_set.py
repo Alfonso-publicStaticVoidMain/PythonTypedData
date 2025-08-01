@@ -181,6 +181,14 @@ class TestSet(unittest.TestCase):
         mus.replace_many({2 : 1, 1 : 3, 3 : 7})
         self.assertEqual(mus, MutableSet.of(1, 3))
 
+    def test_or_and_xor_etc(self):
+        mus = MutableSet[int](0, 1)
+        mus_2 = MutableSet[int](1, 2)
+        or_st = mus | mus_2
+        self.assertEqual(or_st, MutableSet[int](0, 1, 2))
+        or_st = mus | {1, 2}
+        self.assertEqual(or_st, MutableSet[int](0, 1, 2))
+
 
 if __name__ == '__main__':
     unittest.main()

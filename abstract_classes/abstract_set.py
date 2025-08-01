@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import typing
 from typing import ClassVar, Callable, Iterable, Any, Mapping
 
 from abstract_classes.collection import Collection, MutableCollection
-from abstract_classes.generic_base import forbid_instantiation, _convert_to
+from abstract_classes.generic_base import forbid_instantiation, _convert_to, class_name
+from abstract_classes.metadata import Metadata
 
 
 @forbid_instantiation
-class AbstractSet[T](Collection[T]):
+class AbstractSet[T](Collection[T], Metadata):
     """
     Abstract base class for hashable Collections of type T supporting set operations.
 
@@ -91,7 +93,7 @@ class AbstractSet[T](Collection[T]):
             return self.values >= other
         return NotImplemented
 
-    def __or__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+    def __or__[S: AbstractSet](self: S, other: S) -> S:
         """
         Computes the union of two AbstractSet instances.
 
@@ -102,9 +104,11 @@ class AbstractSet[T](Collection[T]):
         :rtype: AbstractSet[T]
         """
         from type_validation.type_validation import _validate_or_coerce_iterable
-        return type(self)(self.values | _validate_or_coerce_iterable(other.values, self.item_type, _finisher=set), _skip_validation=True)
+        if not isinstance(other, (AbstractSet, set, frozenset, typing.AbstractSet)):
+            raise TypeError(f"{type(other).__name__} isn't a comparable type with {class_name(type(self))}")
+        return type(self)(self.values | _validate_or_coerce_iterable(other, self.item_type, _finisher=set), _skip_validation=True)
 
-    def __and__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+    def __and__[S: AbstractSet](self: S, other: S) -> S:
         """
         Computes the intersection of two AbstractSet instances.
 
@@ -117,7 +121,7 @@ class AbstractSet[T](Collection[T]):
         from type_validation.type_validation import _validate_or_coerce_iterable
         return type(self)(self.values & _validate_or_coerce_iterable(other.values, self.item_type, _finisher=set), _skip_validation=True)
 
-    def __sub__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+    def __sub__[S: AbstractSet](self: S, other: S) -> S:
         """
         Computes the difference between two AbstractSet instances.
 
@@ -131,7 +135,7 @@ class AbstractSet[T](Collection[T]):
         from type_validation.type_validation import _validate_or_coerce_iterable
         return type(self)(self.values - _validate_or_coerce_iterable(other.values, self.item_type, _finisher=set), _skip_validation=True)
 
-    def __xor__(self: AbstractSet[T], other: AbstractSet[T]) -> AbstractSet[T]:
+    def __xor__[S: AbstractSet](self: S, other: S) -> S:
         """
         Computes the symmetric difference between two AbstractSet instances.
 
@@ -144,11 +148,11 @@ class AbstractSet[T](Collection[T]):
         from type_validation.type_validation import _validate_or_coerce_iterable
         return type(self)(self.values ^ _validate_or_coerce_iterable(other.values, self.item_type, _finisher=set), _skip_validation=True)
 
-    def union(
-        self: AbstractSet[T],
+    def union[S: AbstractSet](
+        self: S,
         *others: Iterable[T] | Collection[T],
         _coerce: bool = False
-    ) -> AbstractSet[T]:
+    ) -> S:
         """
         Returns the union of this set with one or more iterables or collections.
 
@@ -168,11 +172,11 @@ class AbstractSet[T](Collection[T]):
         from type_validation.type_validation import _validate_or_coerce_iterable_of_iterables
         return type(self)(self.values.union(*_validate_or_coerce_iterable_of_iterables(others, self.item_type, _coerce=_coerce)), _skip_validation=True)
 
-    def intersection(
-        self: AbstractSet[T],
+    def intersection[S: AbstractSet](
+        self: S,
         *others: Iterable[T] | Collection[T],
         _coerce: bool = False
-    ) -> AbstractSet[T]:
+    ) -> S:
         """
         Returns the intersection of this set with one or more iterables or collections.
 
