@@ -141,7 +141,7 @@ class Collection[T](GenericBase[T], Metadata):
             return None
 
     @classmethod
-    def of[R: Collection](cls: R, *values: Any) -> R:
+    def of[C: Collection](cls: C, *values: Any) -> C:
         """
         Creates a Collection object containing the given values, inferring their common type.
 
@@ -152,7 +152,7 @@ class Collection[T](GenericBase[T], Metadata):
         :type values: T
 
         :return: A new Collection that is an instance of cls containing the passed values, inferring its item type.
-        :rtype: Collection[T]
+        :rtype: C
 
         :raises ValueError: If no values are provided.
         """
@@ -170,12 +170,12 @@ class Collection[T](GenericBase[T], Metadata):
         that typing MutableList.empty() will raise a ValueError.
 
         :return: An empty Collection that is an instance of this class, keeping its generic type too.
-        :rtype: Collection[R]
+        :rtype: Collection[C]
 
         :raises ValueError: If the class calling this method has no generic type on its _args attribute.
         """
         if cls._inferred_item_type() is None:
-            raise ValueError(f"Trying to call {cls.__name__}.empty without a generic type.")
+            raise ValueError(f"Trying to call {cls.__name__}.empty() without a generic type.")
         return cls()
 
     def __len__(self: Collection[T]) -> int:
@@ -231,7 +231,8 @@ class Collection[T](GenericBase[T], Metadata):
         """
         Returns a string representation of the Collection, showing its generic type name and contained values.
 
-        :return: A string representation of the object.
+        :return: A string representation of the object, applying the _repr_finisher callable attribute of the class
+         to the values before showing them.
         :rtype: str
         """
         repr_finisher = type(self)._get_repr_finisher()
@@ -246,7 +247,7 @@ class Collection[T](GenericBase[T], Metadata):
         """
         return bool(self.values)
 
-    def copy[R: Collection](self: R, deep: bool = False) -> R:
+    def copy[C: Collection](self: C, deep: bool = False) -> C:
         """
         Returns a shallow or deep copy of the Collection.
 
@@ -257,7 +258,7 @@ class Collection[T](GenericBase[T], Metadata):
         :type deep: bool
 
         :return: A shallow or deep copy of the object.
-        :rtype: R
+        :rtype: C
         """
         from copy import deepcopy
         values = deepcopy(self.values) if deep else (self.values.copy() if hasattr(self.values, 'copy') else self.values)
@@ -350,13 +351,13 @@ class Collection[T](GenericBase[T], Metadata):
 
     # Functional Methods:
 
-    def map[S: Collection](
-        self: S,
+    def map[C: Collection](
+        self: C,
         f: Callable[[T], Any],
         result_type: type | None = None,
         *,
         _coerce: bool = False
-    ) -> S:
+    ) -> C:
         """
         Maps each value of the Collection to its image by the function `f` and returns a new Collection of them.
 
@@ -371,7 +372,7 @@ class Collection[T](GenericBase[T], Metadata):
 
         :return: A new Collection of the same subclass as self containing those values. If result_type is given,
         it is used as the item_type of the returned Collection, if not that is inferred from the mapped values.
-        :rtype: Collection[R]
+        :rtype: C
         """
         mapped_values = [f(value) for value in self.values]
         return (
@@ -379,13 +380,13 @@ class Collection[T](GenericBase[T], Metadata):
             else type(self).of(mapped_values)
         )
 
-    def flatmap[S: Collection](
-        self: S,
+    def flatmap[C: Collection](
+        self: C,
         f: Callable[[T], Iterable],
         result_type: type | None = None,
         *,
         _coerce: bool = False
-    ) -> S:
+    ) -> C:
         """
         Maps and flattens each element of the Collection and returns a new Collection containing the results.
 
@@ -402,7 +403,7 @@ class Collection[T](GenericBase[T], Metadata):
 
         :return: A new Collection of the same subclass as self containing those values. If result_type is given,
          it is used as the type of the returned Collection, if not that is inferred.
-        :rtype: Collection[R]
+        :rtype: C
         """
         flattened = []
         for value in self.values:
@@ -415,14 +416,14 @@ class Collection[T](GenericBase[T], Metadata):
             else type(self).of(flattened)
         )
 
-    def filter[R: Collection](self: R, predicate: Callable[[T], bool]) -> R:
+    def filter[C: Collection](self: C, predicate: Callable[[T], bool]) -> C:
         """
         Filter the collection by a predicate function.
 
         :param predicate: A function from T to the booleans that the kept values will satisfy.
         :type predicate: Callable[[T], bool]
         :return: A filtered collection containing only the values that were evaluated to True by the predicate.
-        :rtype: Collection[T]
+        :rtype: C
         """
         return type(self)([value for value in self.values if predicate(value)], _skip_validation=True)
 
@@ -490,7 +491,7 @@ class Collection[T](GenericBase[T], Metadata):
         for value in self.values:
             consumer(value)
 
-    def peek(self: Collection[T], consumer: Callable[[T], None]) -> Collection[T]:
+    def peek[C: Collection](self: C, consumer: Callable[[T], None]) -> C:
         """
         Performs the given consumer function on each element for side effects and returns the original Collection.
 
@@ -498,13 +499,13 @@ class Collection[T](GenericBase[T], Metadata):
         :type consumer: Callable[[T], None]
 
         :return: The original collection (self).
-        :rtype: Collection[T]
+        :rtype: C
         """
         for item in self.values:
             consumer(item)
         return self
 
-    def distinct[K](self: Collection[T], key: Callable[[T], K] = lambda x : x) -> Collection[T]:
+    def distinct[K, C: Collection](self: C, key: Callable[[T], K] = lambda x : x) -> C:
         """
         Returns a new Collection with only distinct elements, determined by a key function.
 
@@ -512,7 +513,7 @@ class Collection[T](GenericBase[T], Metadata):
         :type key: Callable[[T], K]
 
         :return: A Collection of the same dynamic subclass as self with duplicates removed based on the key.
-        :rtype: Collection[T]
+        :rtype: C
         """
         result = []
         seen_hashable = set()
@@ -587,10 +588,10 @@ class Collection[T](GenericBase[T], Metadata):
             return None
         return min(self.values, key=key)
 
-    def group_by[K](
-        self: Collection[T],
+    def group_by[K, C: Collection](
+        self: C,
         key: Callable[[T], K]
-    ) -> dict[K, Collection[T]]:
+    ) -> dict[K, C]:
         """
         Groups the items in the Collection on a dict by their value by the key function.
 
@@ -599,7 +600,7 @@ class Collection[T](GenericBase[T], Metadata):
 
         :return: A dict mapping each value of key onto a Collection of the same dynamic subclass as self containing the
         items that were mapped to that value by the key function.
-        :rtype: dict[K, Collection[T]]
+        :rtype: dict[K, C]
         """
         groups: dict[K, list[T]] = defaultdict(list)
         for item in self.values:
@@ -609,10 +610,10 @@ class Collection[T](GenericBase[T], Metadata):
             for key, group in groups.items()
         }
 
-    def partition_by(
-        self: Collection[T],
+    def partition_by[C: Collection](
+        self: C,
         predicate: Callable[[T], bool]
-    ) -> dict[bool, Collection[T]]:
+    ) -> dict[bool, C]:
         """
         A specialized binary version of group_by grouping by a predicate to bool.
 
@@ -621,7 +622,7 @@ class Collection[T](GenericBase[T], Metadata):
 
         :return: A dict whose True key is mapped to a Collection of the same dynamic subclass as self containing all
         items in it that satisfied the predicate, likewise for False.
-        :rtype: dict[bool, Collection[T]]
+        :rtype: dict[bool, C]
         """
         return self.group_by(predicate)
 
@@ -721,7 +722,7 @@ class Collection[T](GenericBase[T], Metadata):
         :rtype: R
         """
         return self.collect(
-            supplier=lambda:(supplier(), state_supplier()),
+            supplier=lambda: (supplier(), state_supplier()),
             accumulator=lambda acc_state, item : accumulator(*acc_state, item),
             finisher=lambda acc_state : finisher(*acc_state)
         )

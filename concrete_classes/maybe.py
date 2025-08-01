@@ -142,8 +142,49 @@ class Maybe[T](GenericBase[T]):
         :raises AttributeError: If self is empty, or if its holt value doesn't have that attribute.
         """
         if self.value is None:
-            raise AttributeError(f"'Maybe' has no value; cannot access attribute '{name}'")
+            raise AttributeError(f"{self} is empty; cannot access attribute '{name}'")
         return getattr(self.value, name)
+
+    def __bool__(self: Maybe[T]) -> bool:
+        """
+        Delegates the bool implementation to that of the value's.
+
+        :return: True if the value is evaluated to True by bool(), False otherwise or if it's None.
+        :rtype: bool
+        """
+        return bool(self.value)
+
+    def __eq__(self: Maybe[T], other: object) -> bool:
+        """
+        Checks equality between two Maybe objects, comparing their item_type and value.
+
+        :param other: Another Maybe object to compare.
+        :type other: object
+
+        :return: True if other is an instance of Maybe of the same item_type and holding the same value by the `==`
+        operator, False otherwise.
+        """
+        return (
+            isinstance(other, Maybe)
+            and self.item_type == other.item_type
+            and self.value == other.value
+        )
+
+    def __hash__(self: Maybe[T]) -> int:
+        """
+        Hashes the Maybe object by trying to hash the tuple of its item_type and value.
+        """
+        return hash((self.item_type, self.value))
+
+    def __repr__(self: Maybe[T]) -> str:
+        """
+        Gives a str representation of this Maybe object, displaying its wrapped value or indicating if it holds None.
+
+        :return: A str of the format Maybe[self.item_type].of(self.value), or Maybe[self.item_type].empty().
+        :rtype: str
+        """
+        from abstract_classes.generic_base import class_name
+        return f"{class_name(type(self))}.of({self.value!r})" if self.value is not None else f"{class_name(type(self))}.empty()"
 
     def __call__(self, *args, **kwargs) -> Any:
         """
@@ -159,7 +200,7 @@ class Maybe[T](GenericBase[T]):
         :raises TypeError: If the stored value is not callable.
         """
         if self.value is None:
-            raise ValueError("Cannot call an empty Maybe")
+            raise ValueError(f"Cannot call with {self}")
         if not callable(self.value):
             raise TypeError(f"Value of type {type(self.value).__name__} is not callable")
         return self.value(*args, **kwargs)
@@ -180,7 +221,7 @@ class Maybe[T](GenericBase[T]):
         :raises IndexError: If the key is an index out of range for the value.
         """
         if self.value is None:
-            raise ValueError("Cannot index into an empty Maybe")
+            raise ValueError(f"Cannot access an index of {self}")
         try:
             return self.value[key]
         except TypeError:
@@ -201,7 +242,7 @@ class Maybe[T](GenericBase[T]):
         :raises TypeError: If the value doesn't implement __len__.
         """
         if self.value is None:
-            raise ValueError("Cannot get length of an empty Maybe")
+            raise ValueError(f"Cannot get length of {self}")
         try:
             return len(self.value)
         except TypeError:
@@ -335,9 +376,9 @@ class Maybe[T](GenericBase[T]):
 
         :raises Exception: Of the type provided by the exception_supplier, if self was empty.
         """
-        if self.is_present():
-            return self.value
-        raise exception_supplier()
+        if self.value is None:
+            raise exception_supplier()
+        return self.value
 
     def if_present(self: Maybe[T], consumer: Callable[[T], None]) -> None:
         """
@@ -346,7 +387,7 @@ class Maybe[T](GenericBase[T]):
         :param consumer: Consumer function to apply to the value.
         :type consumer: Callable[[T], None]
         """
-        if self.is_present():
+        if self.value is not None:
             consumer(self.value)
 
     def map[U](
@@ -452,44 +493,3 @@ class Maybe[T](GenericBase[T]):
         :rtype: Maybe[T]
         """
         return self if self.is_present() and predicate(self.value) else type(self).empty()
-
-    def __bool__(self: Maybe[T]) -> bool:
-        """
-        Delegates the bool implementation to that of the value's.
-
-        :return: True if the value is evaluated to True by bool(), False otherwise or if it's None.
-        :rtype: bool
-        """
-        return bool(self.value)
-
-    def __eq__(self: Maybe[T], other: object) -> bool:
-        """
-        Checks equality between two Maybe objects, comparing their item_type and value.
-
-        :param other: Another Maybe object to compare.
-        :type other: object
-
-        :return: True if other is an instance of Maybe of the same item_type and holding the same value by the `==`
-        operator, False otherwise.
-        """
-        return (
-            isinstance(other, Maybe)
-            and self.item_type == other.item_type
-            and self.value == other.value
-        )
-
-    def __hash__(self: Maybe[T]) -> int:
-        """
-        Hashes the Maybe object by trying to hash the tuple of its item_type and value.
-        """
-        return hash((self.item_type, self.value))
-
-    def __repr__(self: Maybe[T]) -> str:
-        """
-        Gives a str representation of this Maybe object, displaying its wrapped value or indicating if it holds None.
-
-        :return: A str of the format Maybe[self.item_type].of(self.value), or Maybe[self.item_type].empty().
-        :rtype: str
-        """
-        from abstract_classes.generic_base import class_name
-        return f"{class_name(type(self))}.of({self.value!r})" if self.is_present() else f"{class_name(type(self))}.empty()"

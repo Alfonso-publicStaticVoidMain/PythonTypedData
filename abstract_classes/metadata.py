@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Callable, Iterable, TYPE_CHECKING
+
 if TYPE_CHECKING:
     from abstract_classes.abstract_dict import AbstractDict
     from abstract_classes.collection import Collection
@@ -9,10 +10,11 @@ from abstract_classes.generic_base import forbid_instantiation
 
 @forbid_instantiation
 class Metadata:
+
     @classmethod
     def _get_finisher(
         cls: type[Metadata],
-        default: Callable[[Iterable], Iterable] = lambda x: x
+        default: Callable[[Iterable], Iterable] = lambda x : x
     ) -> Callable[[Iterable], Iterable]:
         """
         Gets a callable that is applied to the values of this class's objects on init before setting the attribute.
@@ -28,7 +30,7 @@ class Metadata:
     @classmethod
     def _get_repr_finisher(
         cls: type[Metadata],
-        default: Callable[[Iterable], Iterable] = lambda x: x
+        default: Callable[[Iterable], Iterable] = lambda x : x
     ) -> Callable[[Iterable], Iterable]:
         """
         Gets a callable that is applied to the values of this class's objects when representing them as a string.
@@ -44,7 +46,7 @@ class Metadata:
     @classmethod
     def _get_eq_finisher(
         cls: type[Metadata],
-        default: Callable[[Iterable], Iterable] = lambda x: x
+        default: Callable[[Iterable], Iterable] = lambda x : x
     ) -> Callable[[Iterable], Iterable]:
         """
         Gets a callable that is applied to the values of this class's objects when comparing with others.

@@ -463,17 +463,17 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         The output dictionary is of the same subclass as self.
 
         :param f: A function mapping each value to a new value.
-        :type f: Callable[[V], R]
+        :type f: Callable[[V], C]
 
         :param result_type: Optional explicit result type for values after transformation.
-        :type result_type: type[R] | None
+        :type result_type: type[C] | None
 
         :param _coerce_values: State parameter that, if True, coerces the transformed values to the given result type.
         :type _coerce_values: bool
 
         :return: A new AbstractDict of the same subclass as self with transformed values. Its key type is the same as
         self, and its value type is either inferred from the mapped values or taken from result_type if it's not None.
-        :rtype: AbstractDict[K, R]
+        :rtype: AbstractDict[K, C]
         """
         new_data = {key : f(value) for key, value in self.data.items()}
         if result_type is not None:

@@ -177,7 +177,7 @@ class AbstractSequence[T](Collection[T]):
         """
         return reversed(self.values)
 
-    def reversed(self) -> AbstractSequence[T]:
+    def reversed(self: AbstractSequence[T]) -> AbstractSequence[T]:
         """
         Returns a new AbstractSequence with its elements in reverse order.
 
@@ -235,7 +235,7 @@ class AbstractSequence[T](Collection[T]):
         :type reverse: bool
 
         :return: A new AbstractSequence of the same dynamic subclass as self with the same elements but sorted
-        according to the key and reverse parameters.
+         according to the key and reverse parameters.
         :rtype: AbstractSequence[T]
         """
         return type(self)(sorted(self.values, key=key, reverse=reverse), _skip_validation=True)

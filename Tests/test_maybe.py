@@ -71,6 +71,10 @@ class TestMaybe(unittest.TestCase):
             mb(1)
         with self.assertRaises(TypeError):
             2 in mb
+        with self.assertRaises(TypeError):
+            for x in mb: pass
+        with self.assertRaises(TypeError):
+            len(mb)
 
         mb = Maybe.of([0, 1, 2])
         mb.append(3)
@@ -88,6 +92,8 @@ class TestMaybe(unittest.TestCase):
             len(mb)
         with self.assertRaises(ValueError):
             mb(1)
+        with self.assertRaises(ValueError):
+            for x in mb: pass
 
         mb = Maybe.of(lambda x : x + 1)
         self.assertEqual(mb(1), 2)
