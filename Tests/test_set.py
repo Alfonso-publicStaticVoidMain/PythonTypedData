@@ -88,6 +88,36 @@ class TestSet(unittest.TestCase):
         self.assertTrue(s4.is_disjoint(s3))
         self.assertEqual(s4.is_disjoint(s3), s3.is_disjoint(s4))
 
+    def test_sub_super_set_disjoint_coercion(self):
+        st_int = MutableSet[int](0)
+        st_int_str = MutableSet[int | str](0, 'a')
+
+        self.assertTrue(st_int.is_subset(st_int_str, _coerce=True))
+        with self.assertRaises(ValueError):
+            st_int.is_subset(st_int_str, _coerce=False)
+
+        self.assertTrue(st_int_str.is_superset(st_int, _coerce=True))
+        with self.assertRaises(ValueError):
+            st_int_str.is_superset(st_int, _coerce=False)
+
+        self.assertFalse(st_int.is_disjoint(st_int_str, _coerce=True))
+        with self.assertRaises(ValueError):
+            st_int.is_disjoint(st_int_str, _coerce=False)
+        self.assertFalse(st_int_str.is_disjoint(st_int, _coerce=True))
+        with self.assertRaises(ValueError):
+            st_int_str.is_disjoint(st_int, _coerce=False)
+
+        st_int = MutableSet[int](0, 1)
+        st_int_str = MutableSet[int | str](0)
+
+        self.assertTrue(st_int_str.is_subset(st_int, _coerce=True))
+        with self.assertRaises(ValueError):
+            st_int_str.is_subset(st_int, _coerce=False)
+
+        self.assertTrue(st_int.is_superset(st_int_str, _coerce=True))
+        with self.assertRaises(ValueError):
+            st_int.is_superset(st_int_str, _coerce=False)
+
     def test_add_remove(self):
         s = MutableSet[str]('a')
         s.add('b')

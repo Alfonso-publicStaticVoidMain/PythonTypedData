@@ -234,6 +234,12 @@ class TestCollection(unittest.TestCase):
         self.assertEqual(lst, [0, 1, 2])
         self.assertNotEqual(lst, [0, 1, 2, 3])
 
+        st = {'a', 'b'}
+        mus = MutableSet[str](st, _skip_validation=True)
+        mus.add('c')
+        self.assertEqual(st, {'a', 'b'})
+        self.assertNotEqual(st, {'a', 'b', 'c'})
+
 
 if __name__ == '__main__':
     unittest.main()

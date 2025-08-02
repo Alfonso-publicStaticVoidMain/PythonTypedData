@@ -219,8 +219,8 @@ class Collection[T](GenericBase[T], Metadata):
          False otherwise.
         :rtype: bool
         """
-        eq_finisher = type(self)._get_eq_finisher()
-        comparable_types: type[Collection] | tuple[type[Collection], ...] = type(self)._get_comparable_types(Collection)
+        eq_finisher: Callable[[Iterable], Iterable] = type(self)._get_eq_finisher()
+        comparable_types: type[Collection] | tuple[type[Collection], ...] = type(self)._get_comparable_types(default=Collection)
         return (
             isinstance(other, comparable_types)
             and self.item_type == other.item_type
@@ -235,7 +235,7 @@ class Collection[T](GenericBase[T], Metadata):
          to the values before showing them.
         :rtype: str
         """
-        repr_finisher = type(self)._get_repr_finisher()
+        repr_finisher: Callable[[Iterable], Iterable] = type(self)._get_repr_finisher()
         return f"{class_name(type(self))}{repr_finisher(self.values)}"
 
     def __bool__(self: Collection[T]) -> bool:

@@ -134,7 +134,7 @@ class GenericBase[*Ts]:
     _origin: ClassVar[type]
 
     @classmethod
-    def __class_getitem__(cls, item: type | tuple[type, ...]):
+    def __class_getitem__(cls, item: type | UnionType | tuple[type, ...]):
         """
         Extends the class cls to store the generic arguments it was called upon (item) and use them on runtime.
 

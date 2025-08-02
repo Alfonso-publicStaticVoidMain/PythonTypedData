@@ -235,16 +235,17 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
             if sample_key is None:
                 return type(self)({})
 
-            try:
-                # Try comparing sample key with start/stop if provided
-                if start is not None:
-                    sample_key >= start
-                elif stop is not None:
-                    sample_key <= stop
-            except TypeError:
-                raise TypeError("Keys must support ordering for subdict slicing.")
+            def predicate(k):
+                try:
+                    if start is not None and not (start <= k):
+                        return False
+                    if stop is not None and not (k <= stop):
+                        return False
+                    return True
+                except (TypeError, ValueError):
+                    raise TypeError(f"Key {k!r} is not comparable with given bounds" + (f" start={start}" if start is not None else "") + (f" stop={stop}" if stop is not None else ""))
 
-            return self.filter_keys(lambda k : (start is None or start <= k) and (stop is None or k <= stop))
+            return self.filter_keys(predicate)
         else:
             # Regular key access
             return self.data[key]
@@ -304,7 +305,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         """
         Checks equality with another AbstractDict.
 
-        Two dictionaries are considered equal if they share the same class, key/value types, and contents.
+        Two dictionaries are considered equal if they share the same key/value types and contents.
 
         :param other: The object to compare against.
         :type other: Any
@@ -312,8 +313,8 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         :return: True if `other` is an AbstractDict with the same key and values types and contents, False otherwise.
         :rtype: bool
         """
-        eq_finisher = type(self)._get_eq_finisher()
-        comparable_types = type(self)._get_comparable_types(AbstractDict)
+        eq_finisher: Callable[[Iterable], Iterable] = type(self)._get_eq_finisher()
+        comparable_types: type[AbstractDict] | tuple[type[AbstractDict], ...] = type(self)._get_comparable_types(default=AbstractDict)
         return (
             isinstance(other, comparable_types)
             and self.key_type == other.key_type
@@ -328,7 +329,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         :return: A string representation of this AbstractDict.
         :rtype: str
         """
-        repr_finisher = type(self)._get_repr_finisher()
+        repr_finisher: Callable[[Iterable], Iterable] = type(self)._get_repr_finisher()
         return f"{class_name(type(self))}{repr_finisher(self.data)}"
 
     def __or__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:

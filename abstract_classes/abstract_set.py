@@ -247,12 +247,12 @@ class AbstractSet[T](Collection[T]):
         _coerce: bool = False
     ) -> bool:
         """
-        Checks if this set is a subset of another set or AbstractSet.
+        Checks if this set is a subset of another AbstractSet.
 
         :param other: The set to compare against.
         :type other: AbstractSet
 
-        :param _coerce: State parameter that, if True, attempts to coerce values before checking.
+        :param _coerce: State parameter that, if True, performs the check even if item_types differ.
         :type _coerce: bool
 
         :return: True if this set is a subset of `other`, False otherwise.
@@ -271,12 +271,12 @@ class AbstractSet[T](Collection[T]):
         _coerce: bool = False
     ) -> bool:
         """
-        Checks if this set is a superset of another set or AbstractSet.
+        Checks if this set is a superset of another AbstractSet.
 
         :param other: The set to compare against.
         :type other: AbstractSet
 
-        :param _coerce: State parameter that, if True, attempts to coerce values before checking.
+        :param _coerce: State parameter that, if True, performs the check even if item_types differ.
         :type _coerce: bool
 
         :return: True if this set is a superset of `other`, False otherwise.
@@ -295,12 +295,12 @@ class AbstractSet[T](Collection[T]):
         _coerce: bool = False
     ) -> bool:
         """
-        Checks if this set is disjoint with another set or AbstractSet.
+        Checks if this set is disjoint with another AbstractSet.
 
         :param other: The set to compare against.
         :type other: AbstractSet
 
-        :param _coerce: State parameter that, if True, attempts to coerce values before checking.
+        :param _coerce: State parameter that, if True, performs the check even if item_types differ.
         :type _coerce: bool
 
         :return: True if this set has no elements in common with `other`, False otherwise.
