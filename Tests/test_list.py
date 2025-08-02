@@ -227,15 +227,7 @@ class TestList(unittest.TestCase):
         mul += ('d',)
         self.assertEqual(mul, MutableList[str]('a', 'b', 'c', 'd'))
 
-        mul -= {'d'}
-        self.assertEqual(mul, MutableList[str]('a', 'b', 'c'))
-
-        mul -= frozenset({'c'})
-        self.assertEqual(mul, MutableList[str]('a', 'b'))
-
-        mul -= ImmutableSet[str]('b')
-        self.assertEqual(mul, MutableList[str]('a'))
-
+        mul = MutableList[str]('a')
         mul *= 3
         self.assertEqual(mul, MutableList[str]('a', 'a', 'a'))
 

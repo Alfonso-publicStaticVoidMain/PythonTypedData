@@ -325,10 +325,10 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         """
         del self.values[index]
 
-    def __iadd__(
-        self: AbstractMutableSequence[T],
+    def __iadd__[S: AbstractMutableSequence](
+        self: S,
         other: AbstractSequence[T] | list[T] | tuple[T, ...]
-    ) -> AbstractMutableSequence[T]:
+    ) -> S:
         """
         Appends the elements from `other` to this sequence in-place.
 
@@ -338,7 +338,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         :type other: AbstractSequence[T] | list[T] | tuple[T]
 
         :return: Self after appending the contents of `other`.
-        :rtype: AbstractMutableSequence[T]
+        :rtype: S
 
         :raises TypeError: If `other` contains elements of an incompatible type.
         """
@@ -347,7 +347,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         self.extend(other)
         return self
 
-    def __imul__(self: AbstractMutableSequence[T], n: int) -> AbstractMutableSequence[T]:
+    def __imul__[S: AbstractMutableSequence](self: S, n: int) -> S:
         """
         Concatenates the contents of this sequence n times in-place.
 
@@ -355,7 +355,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         :type n: int
 
         :return: Self after concatenation.
-        :rtype: AbstractMutableSequence[T]
+        :rtype: S
 
         :raises TypeError: If `n` is not an integer.
         """
