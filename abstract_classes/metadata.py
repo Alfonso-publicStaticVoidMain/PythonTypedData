@@ -107,3 +107,19 @@ class Metadata:
         :rtype: type | tuple[type, ...]
         """
         return getattr(cls, '_forbidden_iterable_types', default)
+
+    @classmethod
+    def _get_allowed_ordered_types(
+        cls: type[Metadata],
+        default: type | tuple[type, ...] = ()
+    ) -> type | tuple[type, ...]:
+        """
+        Gets the iterable types that can be assigned with the setitem method.
+
+        :param default: Default value if the class doesn't have a _allowed_ordered_types attribute.
+        :type default: type | tuple[type, ...]
+
+        :return: The _allowed_ordered_types attribute of the class, or a default if it doesn't have one.
+        :rtype: type | tuple[type, ...]
+        """
+        return getattr(cls, '_allowed_ordered_types', default)

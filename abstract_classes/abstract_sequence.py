@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections
 import typing
 from typing import ClassVar, Callable, Iterable, Any, Iterator
 
@@ -260,6 +261,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
 
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = list
+    _allowed_ordered_types: ClassVar[tuple[type, ...]] = (list, tuple, AbstractSequence, range, collections.deque, collections.abc.Sequence)
     _mutable: ClassVar[bool] = True
 
     def append(
@@ -304,9 +306,9 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         from type_validation.type_validation import _validate_or_coerce_iterable, _validate_or_coerce_value
 
         if isinstance(index, slice):
-            if not isinstance(value, (list, tuple, AbstractSequence)):
+            if not isinstance(value, type(self)._get_allowed_ordered_types()):
                 raise ValueError("You can't assign a value that isn't a sequence to a slice!")
-            self.values[index] = _validate_or_coerce_iterable(value, self.item_type)
+            self.values[index] = _validate_or_coerce_iterable(value, self.item_type, _coerce=_coerce)
 
         elif isinstance(index, int):
             self.values[index] = _validate_or_coerce_value(value, self.item_type, _coerce=_coerce)
@@ -340,7 +342,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
 
         :raises TypeError: If `other` contains elements of an incompatible type.
         """
-        if not isinstance(other, (AbstractSequence, list, tuple)):
+        if not isinstance(other, type(self)._get_allowed_ordered_types()):
             return NotImplemented
         self.extend(other)
         return self
@@ -360,21 +362,6 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         if not isinstance(n, int):
             return NotImplemented
         self.values[:] = self.values * n
-        return self
-
-    def __isub__(self: AbstractMutableSequence[T], other: Iterable[T]) -> AbstractMutableSequence[T]:
-        """
-        Removes all elements in `other` from this sequence in-place.
-
-        Retains only elements that are not in `other`, preserving order.
-
-        :param other: An iterable of elements to remove.
-        :type other: Iterable[T]
-
-        :return: Self after removing all matching elements.
-        :rtype: AbstractMutableSequence[T]
-        """
-        self.values[:] = [item for item in self.values if item not in other]
         return self
 
     def sort(
