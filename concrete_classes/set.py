@@ -137,9 +137,6 @@ class ImmutableSet[T](AbstractSet[T]):
         """
         Collection.__init__(self, *values, _coerce=_coerce, _skip_validation=_skip_validation)
 
-    def __repr__(self: Collection[T]) -> str:
-        return f"{type(self).__name__}{set(self.values)}"
-
     def to_mutable_set(self: ImmutableSet[T]) -> MutableSet[T]:
         """
         Returns this set as a MutableSet.

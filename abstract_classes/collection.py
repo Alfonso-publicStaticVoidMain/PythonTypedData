@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from functools import reduce
+from functools import reduce as reduce
 from typing import Iterable, Any, Callable, TypeVar, ClassVar, Iterator
 from collections import defaultdict
 
@@ -25,15 +25,6 @@ class Collection[T](GenericBase[T], Metadata):
     It is an abstract class and cannot be directly instantiated. Its subclasses must be parameterized by a concrete type
     when the constructor is called (e.g., MutableList[int]).
 
-    Attributes:
-        item_type (T): The type of elements stored in the collection, derived from the generic type.
-
-        values (Any): The internal container of stored values, usually of one of Python's built-in Iterables.
-
-        _finisher (ClassVar[Callable]): A function that is applied to the values during __init__ before setting it as the
-        attribute of the object. It's generally used to transform them into another Iterable type. If missing, it's
-        assumed to be the identity mapping on Collection's __init__ method.
-
     Note:
         Any method that returns a new Collection instance (e.g., filter, union, sorted, etc.) constructs the returned
         value using type(self)(...). This is because:
@@ -44,12 +35,17 @@ class Collection[T](GenericBase[T], Metadata):
               of the class it returned, which is precisely type(self), while the original Collection subclass was stored
               in the _origin attribute.
             - Then, calling type(self)'s constructor correctly passes to Collection's __init__ the same values of the
-              generic types that were used to construct `self`, as well as the same base subclass, ensuring then they have
-              the same structure.
+              generic types that were used to construct `self`, as well as the same base subclass, ensuring then they
+              have the same structure.
             - Furthermore, calling type(self)[another_item_type] correctly creates a new dynamic subclass with the same
               base class as self but with the new generic type.
-        This makes behavior consistent across all subclasses of Collection: type(self) guarantees the returned value
-        matches the exact type and structure of self, unless otherwise explicitly overridden.
+        This makes behavior consistent across all subclasses of Collection: type(self)(...) guarantees the returned
+        value matches the exact type and structure of self, unless otherwise explicitly overridden.
+
+    Attributes:
+        item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
+
+        values (Any): The internal container of stored values, usually of one of Python's built-in Iterables.
     """
 
     item_type: type[T]
@@ -96,16 +92,16 @@ class Collection[T](GenericBase[T], Metadata):
 
         # If the generic item type is None or a TypeVar, raises a TypeError.
         if generic_item_type is None:
-            raise TypeError(f"{type(self).__name__} must be instantiated with a generic type, e.g., MutableList[int](...) or via .of().")
+            raise TypeError(f"{type(self).__name__} must be instantiated with a generic type, e.g., {type(self).__name__}[int](...) or infer the type with {type(self).__name__}.of().")
 
         if isinstance(generic_item_type, TypeVar):
-            raise TypeError(f"{type(self).__name__} was instantiated without a generic type, somehow {generic_item_type} was a TypeVar.")
+            raise TypeError(f"{type(self).__name__} was instantiated without a proper generic type, somehow {generic_item_type} was a TypeVar.")
 
         if (
-            len(values) == 1  # The values are of length 1.
-            and not _validate_type(values[0], generic_item_type)  # Their only value doesn't validate the expected type.
-            and isinstance(values[0], Iterable)  # Their only value is an Iterable.
-            and not isinstance(values[0], (str, bytes))  # But it's not a str or bytes.
+            len(values) == 1
+            and not _validate_type(values[0], generic_item_type)
+            and isinstance(values[0], Iterable)
+            and not isinstance(values[0], (str, bytes))
         ):
             values = values[0]  # Then, the values are unpacked.
 
@@ -141,15 +137,15 @@ class Collection[T](GenericBase[T], Metadata):
             return None
 
     @classmethod
-    def of[C: Collection](cls: C, *values: Any) -> C:
+    def of[C: Collection](cls: type[C], *values: Any) -> C:
         """
         Creates a Collection object containing the given values, inferring their common type.
 
-        Acts as a type-safe factory method for constructing properly parameterized collections when the type
-        is not known beforehand.
+        Acts as a type-safe factory method for constructing properly parameterized collections when the type is not
+        known beforehand.
 
         :param values: Values to store in the Collection, received as an iterable or one by one.
-        :type values: T
+        :type values: Any
 
         :return: A new Collection that is an instance of cls containing the passed values, inferring its item type.
         :rtype: C
@@ -162,15 +158,15 @@ class Collection[T](GenericBase[T], Metadata):
         return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
 
     @classmethod
-    def empty(cls: type[Collection[T]]) -> Collection[T]:
+    def empty[C: Collection](cls: type[C]) -> C:
         """
         Creates an empty Collection subclass of the current class, parameterized with its generic type.
 
         Useful for initialization of empty collections with known type context, like MutableList[int].empty(). Note
-        that typing MutableList.empty() will raise a ValueError.
+        that calling MutableList.empty() will raise a ValueError.
 
         :return: An empty Collection that is an instance of this class, keeping its generic type too.
-        :rtype: Collection[C]
+        :rtype: C
 
         :raises ValueError: If the class calling this method has no generic type on its _args attribute.
         """
@@ -178,7 +174,7 @@ class Collection[T](GenericBase[T], Metadata):
             raise ValueError(f"Trying to call {cls.__name__}.empty() without a generic type.")
         return cls()
 
-    def __len__(self: Collection[T]) -> int:
+    def __len__(self) -> int:
         """
         Returns the number of elements in the Collection by delegating to the internal container's __len__ method.
 
@@ -196,27 +192,21 @@ class Collection[T](GenericBase[T], Metadata):
         """
         return iter(self.values)
 
-    def __contains__(self: Collection[T], item: T | Iterable[T]) -> bool:
+    def __contains__(self: Collection[T], item: T) -> bool:
         """
-        Returns True if the provided item (or iterable of items) is contained in the Collection's internal container.
+        Returns True if the provided item is contained in the Collection's internal container.
 
-        :return: True if item is of the collection's item type and is contained in its values, or if it's an Iterable
-         whose elements are all contained on self's values. False otherwise.
+        :return: True if the item is contained in the collection's values. False otherwise.
         :rtype: bool
         """
-        if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
-            return all(i in self.values for i in item)
         return item in self.values
 
-    def __eq__(self: Collection[T], other: Any) -> bool:
+    def __eq__(self, other) -> bool:
         """
         Checks if two Collections are equal comparing their values and item type.
 
-        If each Collection has a different internal container, they won't be equal unless those containers are designed
-        to be compatible, like set and frozenset, but unlike list and tuple.
-
-        :return: True if self and other share the same subclass, item type and underlying values (compared with ==),
-         False otherwise.
+        :return: True if other is of a comparable class to self's class, has the same item_type and the same values
+         after applying the class's _eq_finisher callable attribute to them.
         :rtype: bool
         """
         eq_finisher: Callable[[Iterable], Iterable] = type(self)._get_eq_finisher()
@@ -227,7 +217,7 @@ class Collection[T](GenericBase[T], Metadata):
             and eq_finisher(self.values) == eq_finisher(other.values)
         )
 
-    def __repr__(self: Collection[T]) -> str:
+    def __repr__(self) -> str:
         """
         Returns a string representation of the Collection, showing its generic type name and contained values.
 
@@ -238,7 +228,7 @@ class Collection[T](GenericBase[T], Metadata):
         repr_finisher: Callable[[Iterable], Iterable] = type(self)._get_repr_finisher()
         return f"{class_name(type(self))}{repr_finisher(self.values)}"
 
-    def __bool__(self: Collection[T]) -> bool:
+    def __bool__(self) -> bool:
         """
         Returns a boolean interpretation of the Collection delegating to the underlying container's __bool__ method.
 
@@ -260,13 +250,16 @@ class Collection[T](GenericBase[T], Metadata):
         :return: A shallow or deep copy of the object.
         :rtype: C
         """
-        from copy import deepcopy
-        values = deepcopy(self.values) if deep else (self.values.copy() if hasattr(self.values, 'copy') else self.values)
+        if deep:
+            from copy import deepcopy
+            values = deepcopy(self.values)
+        else:
+            values = self.values.copy() if hasattr(self.values, 'copy') else self.values
         return type(self)(values, _skip_validation=True)
 
     def to_list(self: Collection[T]) -> list[T]:
         """
-        Returns the contents of the Collection as a list.
+        Returns the contents of the Collection as a built-in list.
 
         :return: A list containing the values of the Collection.
         :rtype: list[T]
@@ -275,7 +268,7 @@ class Collection[T](GenericBase[T], Metadata):
 
     def to_tuple(self: Collection[T]) -> tuple[T, ...]:
         """
-        Returns the contents of the Collection as a tuple.
+        Returns the contents of the Collection as a built-in tuple.
 
         :return: A tuple containing the values of the Collection.
         :rtype: tuple[T, ...]
@@ -284,7 +277,7 @@ class Collection[T](GenericBase[T], Metadata):
 
     def to_set(self: Collection[T]) -> set[T]:
         """
-        Returns the contents of the Collection as a set.
+        Returns the contents of the Collection as a built-in set.
 
         :return: A set containing the values of the Collection.
         :rtype: set[T]
@@ -293,7 +286,7 @@ class Collection[T](GenericBase[T], Metadata):
 
     def to_frozen_set(self: Collection[T]) -> frozenset[T]:
         """
-        Returns the contents of the Collection as a frozenset.
+        Returns the contents of the Collection as a built-in frozenset.
 
         :return: A frozenset containing the values of the Collection.
         :rtype: frozenset[T]
@@ -325,13 +318,13 @@ class Collection[T](GenericBase[T], Metadata):
 
     def count(self: Collection[T], value: T) -> int:
         """
-        Returns the number of occurrences of the given value in the Collection.
+        Returns the number of occurrences of the given value in the Collection. Supports unhashable values.
 
         :param value: Value to count within the Collection.
         :type value: T
 
         :return: The number of appearances of the value in the Collection. If the underlying container supports
-        `.count`, it uses that method; otherwise, falls back to manual equality counting. Supports unhashable values.
+        `.count`, it uses that method; otherwise, falls back to manual equality counting.
         :rtype: int
         """
         try:
@@ -371,7 +364,7 @@ class Collection[T](GenericBase[T], Metadata):
         :type _coerce: bool
 
         :return: A new Collection of the same subclass as self containing those values. If result_type is given,
-        it is used as the item_type of the returned Collection, if not that is inferred from the mapped values.
+         it is used as the item_type of the returned Collection, if not that is inferred from the mapped values.
         :rtype: C
         """
         mapped_values = [f(value) for value in self.values]
@@ -420,7 +413,7 @@ class Collection[T](GenericBase[T], Metadata):
         """
         Filter the collection by a predicate function.
 
-        :param predicate: A function from T to the booleans that the kept values will satisfy.
+        :param predicate: A function from the type of the collection to the booleans that the kept values will satisfy.
         :type predicate: Callable[[T], bool]
         :return: A filtered collection containing only the values that were evaluated to True by the predicate.
         :rtype: C
@@ -431,7 +424,7 @@ class Collection[T](GenericBase[T], Metadata):
         """
         Returns True if all elements in the Collection satisfy the given predicate.
 
-        :param predicate: A function from T to the booleans.
+        :param predicate: A function from the type of the collection to the booleans.
         :type predicate: Callable[[T], bool]
 
         :return: True if all elements match the predicate, False otherwise.
@@ -443,7 +436,7 @@ class Collection[T](GenericBase[T], Metadata):
         """
         Returns True if any element in the Collection satisfies the given predicate.
 
-        :param predicate: A function from T to the booleans.
+        :param predicate: A function from the type of the collection to the booleans.
         :type predicate: Callable[[T], bool]
 
         :return: True if at least one element matches the predicate, False otherwise.
@@ -455,7 +448,7 @@ class Collection[T](GenericBase[T], Metadata):
         """
         Returns True if no element in the Collection satisfies the given predicate.
 
-        :param predicate: A function from T to the booleans.
+        :param predicate: A function from the type of the collection to the booleans.
         :type predicate: Callable[[T], bool]
 
         :return: True if no elements match the predicate, False otherwise.
@@ -463,23 +456,32 @@ class Collection[T](GenericBase[T], Metadata):
         """
         return not any(predicate(value) for value in self.values)
 
-    def reduce(self: Collection[T], f: Callable[[T, T], T], unit: T | None = None) -> T:
+    def reduce(self: Collection[T], f: Callable[[T, T], T], unit: T = object()) -> T:
         """
         Reduces the Collection to a single value using a binary operator function and an optional initial unit.
 
-        :param f: A function that combines two elements of type T into one.
+        :param f: A binary operator that combines two elements of the type of the collection into one.
         :type f: Callable[[T, T], T]
 
         :param unit: Optional initial value for the reduction. If provided, the reduction starts with this.
         :type unit: T | None
 
-        :return: The result of the reduction, as done after being delegated to the reduce() function applied to the
-        internal container.
+        :return: The result of the reduction, as done after being delegated to functools's reduce() function applied to
+         the internal container.
         :rtype: T
         """
-        if unit is not None:
-            return reduce(f, self.values, unit)
-        return reduce(f, self.values)
+        from type_validation.type_validation import _validate_type
+
+        if unit is self.reduce.__defaults__[0]:  # unit not passed
+            return reduce(f, self.values)
+
+        if not _validate_type(unit, self.item_type):
+            raise TypeError(
+                f"The unit provided {unit} was of type {class_name(unit)} "
+                f"instead of {class_name(self.item_type)}"
+            )
+
+        return reduce(f, self.values, unit)
 
     def for_each(self: Collection[T], consumer: Callable[[T], None]) -> None:
         """
@@ -505,7 +507,7 @@ class Collection[T](GenericBase[T], Metadata):
             consumer(item)
         return self
 
-    def distinct[K, C: Collection](self: C, key: Callable[[T], K] = lambda x : x) -> C:
+    def distinct[K, C: Collection](self: C, key: Callable[[T], K] = object()) -> C:
         """
         Returns a new Collection with only distinct elements, determined by a key function.
 
@@ -515,6 +517,11 @@ class Collection[T](GenericBase[T], Metadata):
         :return: A Collection of the same dynamic subclass as self with duplicates removed based on the key.
         :rtype: C
         """
+        if key is self.distinct.__defaults__[0]:
+            if isinstance(self.values, (set, frozenset)):
+                return type(self)(self.values, _skip_validation=True)
+            key = lambda x : x
+
         result = []
         seen_hashable = set()
         seen_unhashable = []
@@ -543,7 +550,7 @@ class Collection[T](GenericBase[T], Metadata):
     def max(
         self: Collection[T],
         *,
-        default: T | None = None,
+        default: T = object(),
         key: Callable[[T], Any] = None
     ) -> T | None:
         """
@@ -558,23 +565,21 @@ class Collection[T](GenericBase[T], Metadata):
         :return: The maximum element, or default if provided and self is empty.
         :rtype: T | None
         """
-        if default is not None:
+        if default is not self.max.__kwdefaults__['default']:
             return max(self.values, default=default, key=key)
-        if not self.values:
-            return None
         return max(self.values, key=key)
 
     def min(
         self: Collection[T],
         *,
-        default: T | None = None,
+        default: T = object(),
         key: Callable[[T], Any] = None
     ) -> T | None:
         """
         Returns the minimum element in the collection, optionally using a key function or default.
 
         :param default: A value to return if the collection is empty.
-        :type default: T | None
+        :type default: T
 
         :param key: A function to extract a comparison key from each element.
         :type key: Callable[[T], Any], optional
@@ -582,10 +587,8 @@ class Collection[T](GenericBase[T], Metadata):
         :return: The minimum element, or default if provided and self is empty.
         :rtype: T | None
         """
-        if default is not None:
+        if default is not self.min.__kwdefaults__['default']:
             return min(self.values, default=default, key=key)
-        if not self.values:
-            return None
         return min(self.values, key=key)
 
     def group_by[K, C: Collection](
@@ -599,7 +602,7 @@ class Collection[T](GenericBase[T], Metadata):
         :type key: Callable[[T], K]
 
         :return: A dict mapping each value of key onto a Collection of the same dynamic subclass as self containing the
-        items that were mapped to that value by the key function.
+         items that were mapped to that value by the key function.
         :rtype: dict[K, C]
         """
         groups: dict[K, list[T]] = defaultdict(list)
@@ -617,11 +620,11 @@ class Collection[T](GenericBase[T], Metadata):
         """
         A specialized binary version of group_by grouping by a predicate to bool.
 
-        :param predicate: Function from T to the booleans to partition the Collection by.
+        :param predicate: Function from the type of the collection to the booleans to partition by.
         :type predicate: Callable[[T], bool]
 
         :return: A dict whose True key is mapped to a Collection of the same dynamic subclass as self containing all
-        items in it that satisfied the predicate, likewise for False.
+         items in it that satisfied the predicate, likewise for False.
         :rtype: dict[bool, C]
         """
         return self.group_by(predicate)
@@ -798,7 +801,7 @@ class MutableCollection[T](Collection[T]):
                 pass
         self.values.remove(value_to_remove)
 
-    def clear(self: MutableCollection[T]) -> None:
+    def clear(self) -> None:
         """
         Remove all elements from the collection.
         """
@@ -841,18 +844,22 @@ class MutableCollection[T](Collection[T]):
         The class must implement replace_many and in case it's a Sequence, it should respect its ordering.
 
         :param f: Mapping to apply to the Collection.
+        :type f: Callable[[T], T]
+
         :param _coerce: State parameter that, if True, attempts to coerce the new values to the collection's item type.
         :type _coerce: bool
+
+        :raises AttributeError: If self's class doesn't implement replace_many.
         """
         replace_many = getattr(self, "replace_many", None)
         if callable(replace_many):
             replace_many({x : f(x) for x in self.values}, _coerce=_coerce)
         else:
-            pass
+            raise AttributeError(f"{class_name(type(self))} doesn't implement replace_many!")
 
     def remove_all(self: MutableCollection[T], items: Iterable[T]) -> None:
         """
-        Removes from the collection all values within an iterable.
+        Removes from the collection all values within an iterable. On sequences, removes all occurrences of those values.
 
         :param items: Iterable of items to remove.
         :type items: Iterable[T]

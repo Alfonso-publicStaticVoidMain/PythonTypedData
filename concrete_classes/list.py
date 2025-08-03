@@ -167,9 +167,6 @@ class ImmutableList[T](AbstractSequence[T]):
         """
         Collection.__init__(self, *values, _coerce=_coerce, _skip_validation=_skip_validation)
 
-    def __repr__(self: Collection[T]) -> str:
-        return f"{class_name(type(self))}{list(self.values)}"
-
     def to_mutable_list(self: ImmutableList[T]) -> MutableList[T]:
         """
         Returns this list as a MutableList.

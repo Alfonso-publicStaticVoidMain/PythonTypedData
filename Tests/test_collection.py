@@ -40,14 +40,13 @@ class TestCollection(unittest.TestCase):
     def test_contains(self):
         mus = MutableSet[int](0, 1, 2)
         self.assertTrue(0 in mus)
-        self.assertTrue([0, 1] in mus)
-        self.assertFalse([2, 3] in mus)
+        self.assertTrue(1 in mus)
+        self.assertFalse(3 in mus)
 
         mul = MutableList[str]('a', 'b', 'c', 2)
         self.assertTrue('a' in mul)
         self.assertTrue('2' in mul)
         self.assertFalse(2 in mul)
-        self.assertTrue({'a', 'b', '2'} in mul)
         self.assertFalse({'d'} in mul)
 
     def test_eq(self):
@@ -110,12 +109,31 @@ class TestCollection(unittest.TestCase):
 
     def test_reduce(self):
         mul = MutableList[int](0, 1, 2, 3)
-        self.assertEqual(mul.reduce(lambda x, y: x + y), 6)
+        sum_bin_op = lambda x, y: x + y
+        self.assertEqual(mul.reduce(sum_bin_op), 6)
 
         self.assertEqual(ImmutableList[int]().reduce(lambda x, y: x + y, 0), 0)
 
         str_lst = ImmutableList[str]('J', 'A', 'V', 'A')
         self.assertEqual(str_lst.reduce(lambda s1, s2: s1 + s2, '_'), '_JAVA')
+
+        with self.assertRaises(TypeError):
+            mul.reduce(sum_bin_op, unit='a')
+
+        mul = MutableList[list[int]]([0, 1], [1, 2])
+
+        self.assertEqual(mul.reduce(sum_bin_op), [0, 1, 1, 2])
+        self.assertEqual(mul.reduce(sum_bin_op, unit=[27]), [27, 0, 1, 1, 2])
+
+        with self.assertRaises(TypeError):
+            mul.reduce(sum_bin_op, unit=['a', 'b'])
+
+        iml = ImmutableList[int | None](0, None, 2, None)
+        op = lambda x, y : x+1 if y is None else y+1 if x is None else x + y  # Interprets Nones as ones
+        # Not specifying the unit will behave differently than setting it to None
+        self.assertEqual(iml.reduce(op), 4)
+        # Passing unit=None adds 1 to the result
+        self.assertEqual(iml.reduce(op, unit=None), 5)
 
     def test_for_each(self):
         acc = []
@@ -126,10 +144,12 @@ class TestCollection(unittest.TestCase):
     def test_max_min(self):
         lst = MutableList[int](1, 2, 5, 2)
         self.assertEqual(lst.max(), 5)
-        self.assertIsNone(MutableList[int]().max())
+        with self.assertRaises(ValueError):
+            self.assertIsNone(MutableList[int]().max())
 
         self.assertEqual(lst.min(), 1)
-        self.assertIsNone(MutableList[int]().min())
+        with self.assertRaises(ValueError):
+            self.assertIsNone(MutableList[int]().min())
 
         mus = MutableSet[float](-1, 0, 1.25)
         self.assertEqual(mus.max(), 1.25)
@@ -186,6 +206,12 @@ class TestCollection(unittest.TestCase):
             True : MutableList[TestClass](cosa_2, cosa_3, cosa_4),
             False : MutableList[TestClass](cosa_0, cosa_1)
         })
+
+        self.assertEqual(ImmutableList[int]().group_by(abs), {})
+
+        mus = MutableSet[int](-1, 1)
+        st_grouped = mus.group_by(abs)
+        self.assertEqual(st_grouped[1], mus)
 
     def test_map_thoroughly(self):
         mul = MutableList[int](1, 2, 3)
