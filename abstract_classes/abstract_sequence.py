@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections
 import typing
+from dataclasses import FrozenInstanceError
 from typing import ClassVar, Callable, Iterable, Any, Iterator
 
 from abstract_classes.abstract_set import AbstractSet
@@ -145,9 +146,10 @@ class AbstractSequence[T](Collection[T]):
             return NotImplemented
         if self.item_type != other.item_type:
             try:
-                from type_validation.type_validation import _validate_or_coerce_iterable
+                from type_validation.type_hierarchy import _get_supertype
                 # This allows to add together sequences with compatible types, such as str | int and int
-                return type(self)(self.values + _validate_or_coerce_iterable(other, self.item_type), _skip_validation=True)
+                supertype: type = _get_supertype(self.item_type, other.item_type)
+                return type(self)[supertype](self.values + other.values, _skip_validation=True)
             except TypeError:
                 raise TypeError(f"Can't add a sequence of type {type(other).__name__} to one of type {type(self).__name__}.")
         return type(self)(self.values + other.values, _skip_validation=True)
@@ -329,24 +331,28 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
 
     def __iadd__[S: AbstractMutableSequence](
         self: S,
-        other: AbstractSequence[T] | list[T] | tuple[T, ...]
+        other: AbstractSequence[T]
     ) -> S:
         """
         Appends the elements from `other` to this sequence in-place.
 
-        This method modifies `self.values` directly by extending it with the validated elements from `other`.
-
-        :param other: The sequence or iterable whose elements will be appended.
-        :type other: AbstractSequence[T] | list[T] | tuple[T]
+        :param other: The sequence whose elements will be appended.
+        :type other: AbstractSequence[T]
 
         :return: Self after appending the contents of `other`.
         :rtype: S
 
         :raises TypeError: If `other` contains elements of an incompatible type.
         """
-        if not isinstance(other, type(self)._get_allowed_ordered_types()):
+        if not isinstance(other, AbstractSequence):
             return NotImplemented
-        self.extend(other)
+
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            if not _is_subtype(other.item_type, self.item_type):
+                raise TypeError(f"Incompatible types between {type(self)} and {type(other)}.")
+
+        self.values.extend(other.values)
         return self
 
     def __imul__[S: AbstractMutableSequence](self: S, n: int) -> S:
