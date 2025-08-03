@@ -26,6 +26,9 @@ class AbstractSequence[T](Collection[T]):
         _finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting them as an
          attribute on Collection's init.
 
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting
+         them as an attribute on Collection's init when the parameter _skip_validation is True.
+
         _repr_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on the repr method to show
          the values contained on the sequence.
 
@@ -125,8 +128,6 @@ class AbstractSequence[T](Collection[T]):
     def __add__[R: AbstractSequence](
         self: R,
         other: R,
-        *,
-        _coerce: bool = False
     ) -> R:
         """
         Returns a new AbstractSequence concatenating the values of another AbstractSequence, list or tuple.
@@ -143,10 +144,11 @@ class AbstractSequence[T](Collection[T]):
         if not isinstance(other, AbstractSequence):
             return NotImplemented
         if self.item_type != other.item_type:
-            if _coerce:
+            try:
                 from type_validation.type_validation import _validate_or_coerce_iterable
-                return type(self)(self.values + _validate_or_coerce_iterable(other, self.item_type, _coerce=True), _skip_validation=True)
-            else:
+                # This allows to add together sequences with compatible types, such as str | int and int
+                return type(self)(self.values + _validate_or_coerce_iterable(other, self.item_type), _skip_validation=True)
+            except TypeError:
                 raise TypeError(f"Can't add a sequence of type {type(other).__name__} to one of type {type(self).__name__}.")
         return type(self)(self.values + other.values, _skip_validation=True)
 
