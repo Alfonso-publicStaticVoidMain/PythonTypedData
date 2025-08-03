@@ -2,8 +2,16 @@ from typing import get_origin, get_args, Union, Any
 from types import UnionType
 
 def _get_origin_args(tp: type) -> tuple[type, tuple[type, ...]]:
-    """Return (origin, args) for typing generics and custom Collection generics."""
-    origin = get_origin(tp)
+    """
+    Gets the origin and args of a type or TypeAlias, modified to work with Collections and AbstractDicts too.
+
+    :param tp: Type to get the origin and args of.
+    :type tp: type
+
+    :return: A tuple of a type and a tuple of types representing the origin class and the args it was called upon.
+    :rtype: tuple[type, tuple[type, ...]]
+    """
+    origin = type(None) if tp is None else get_origin(tp)
     args = get_args(tp)
 
     if origin is None and hasattr(tp, "_origin"):
@@ -15,13 +23,21 @@ def _get_origin_args(tp: type) -> tuple[type, tuple[type, ...]]:
 
 def _is_subtype(tp: type, other: type) -> bool:
     """
-    Returns True if tp is a subtype of other, considering origins, generics, and unions.
-    Works with both typing generics and custom generic classes (nested supported).
+    Checks if the first type is a subtype of the other or not, accounting for unions and generics.
+
+    :param tp: Type to check if it's a subtype.
+    :type tp: type
+
+    :param other: Type to check if it's a supertype.
+    :type other: type
+
+    :return: True if tp is a subtype of other, accounting for union of types and generics. False otherwise.
+    :rtype: bool
     """
     tp_origin, tp_args = _get_origin_args(tp)
     other_origin, other_args = _get_origin_args(other)
 
-    # Any is top type
+    # Any is supertype to everything and subtype only to itself
     if other is Any:
         return True
     if tp is Any:
@@ -32,26 +48,20 @@ def _is_subtype(tp: type, other: type) -> bool:
         if other_origin in (Union, UnionType):
             # Coverage rule: each arg in tp matches at least one arg in other
             return all(
-                any(
-                    _is_subtype(
-                        t_arg if t_arg is not None else type(None),
-                        o_arg if o_arg is not None else type(None)
-                    )
-                    for o_arg in other_args
-                )
+                any(_is_subtype(t_arg, o_arg) for o_arg in other_args)
                 for t_arg in tp_args
             )
         else:
             # Non-union other: all members of tp must be subtypes of other
             return all(
-                _is_subtype(t_arg if t_arg is not None else type(None), other)
+                _is_subtype(t_arg, other)
                 for t_arg in tp_args
             )
 
     # If "other" is a Union
     if other_origin in (Union, UnionType):
         return any(
-            _is_subtype(tp, o_arg if o_arg is not None else type(None))
+            _is_subtype(tp, o_arg)
             for o_arg in other_args
         )
 
@@ -86,7 +96,22 @@ def _is_subtype(tp: type, other: type) -> bool:
 
 
 def _get_supertype(t: type, other: type) -> type:
-    """Return the 'bigger' type between t and other, or raise TypeError if unrelated."""
+    """
+    Gets the type from among two types that is supertype to the other. If unable, raises an error.
+
+    Commutativity is expected of this function.
+
+    :param t: First type to check.
+    :type t: type
+
+    :param other: Second type to check.
+    :type other: type
+
+    :return: The type from among the two that the is supertype to the other.
+    :type: type
+
+    :raises TypeError: If none of the give types is supertype to the other.
+    """
     if _is_subtype(t, other):
         return other
     if _is_subtype(other, t):
