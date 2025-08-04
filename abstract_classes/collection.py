@@ -37,8 +37,6 @@ class Collection[T](GenericBase[T], Metadata):
             - Then, calling type(self)'s constructor correctly passes to Collection's __init__ the same values of the
               generic types that were used to construct `self`, as well as the same base subclass, ensuring then they
               have the same structure.
-            - Furthermore, calling type(self)[another_item_type] correctly creates a new dynamic subclass with the same
-              base class as self but with the new generic type.
         This makes behavior consistent across all subclasses of Collection: type(self)(...) guarantees the returned
         value matches the exact type and structure of self, unless otherwise explicitly overridden.
 
@@ -137,7 +135,7 @@ class Collection[T](GenericBase[T], Metadata):
             return None
 
     @classmethod
-    def of[C: Collection](cls: type[C], *values: Any) -> C:
+    def of_values[C: Collection](cls: type[C], *values: Any) -> C:
         """
         Creates a Collection object containing the given values, inferring their common type.
 
@@ -152,8 +150,11 @@ class Collection[T](GenericBase[T], Metadata):
 
         :raises ValueError: If no values are provided.
         """
-        if len(values) == 1 and isinstance(values[0], Iterable) and not isinstance(values[0], (str, bytes)):
-            values = tuple(values[0])
+        from type_validation.type_validation import _infer_type_contained_in_iterable
+        return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
+
+    @classmethod
+    def of_iterable[C: Collection](cls: type[C], values: Iterable) -> C:
         from type_validation.type_validation import _infer_type_contained_in_iterable
         return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
 
@@ -367,10 +368,12 @@ class Collection[T](GenericBase[T], Metadata):
          it is used as the item_type of the returned Collection, if not that is inferred from the mapped values.
         :rtype: C
         """
+        from abstract_classes.generic_base import base_class
         mapped_values = [f(value) for value in self.values]
+        collection_subclass = base_class(self)
         return (
-            type(self)[result_type](mapped_values, _coerce=_coerce) if result_type is not None
-            else type(self).of(mapped_values)
+            collection_subclass[result_type](mapped_values, _coerce=_coerce) if result_type is not None
+            else collection_subclass.of_iterable(mapped_values)
         )
 
     def flatmap[C: Collection](
@@ -398,15 +401,17 @@ class Collection[T](GenericBase[T], Metadata):
          it is used as the type of the returned Collection, if not that is inferred.
         :rtype: C
         """
+        from abstract_classes.generic_base import base_class
         flattened = []
         for value in self.values:
             result = f(value)
             if not isinstance(result, Iterable) or isinstance(result, (str, bytes)):
                 raise TypeError("flatmap function must return a non-string iterable")
             flattened.extend(result)
+        collection_subclass = base_class(self)
         return (
-            type(self)[result_type](flattened, _coerce=_coerce) if result_type is not None
-            else type(self).of(flattened)
+            collection_subclass[result_type](flattened, _coerce=_coerce) if result_type is not None
+            else collection_subclass.of_iterable(flattened)
         )
 
     def filter[C: Collection](self: C, predicate: Callable[[T], bool]) -> C:

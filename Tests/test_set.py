@@ -123,11 +123,11 @@ class TestSet(unittest.TestCase):
 
     def test_update(self):
         mus = MutableSet[int](0, 1)
-        mus.update([2, 3], MutableList.of(4, 5))
+        mus.update([2, 3], MutableList.of_values(4, 5))
 
         self.assertEqual(mus, MutableSet[int](0, 1, 2, 3, 4, 5))
 
-        mus_2 = MutableSet.of(0, 1, 2, 3, 4, 5, 6, 7, 8)
+        mus_2 = MutableSet.of_values(0, 1, 2, 3, 4, 5, 6, 7, 8)
         mus_2.difference_update([1, 3], {5, 27, 33}, MutableSet[int](-1, -3, 7))
         self.assertEqual(mus_2, MutableSet[int](0, 2, 4, 6, 8))
 
@@ -172,7 +172,7 @@ class TestSet(unittest.TestCase):
         st &= MutableSet[int](2, 3) # Intersection = {2, 3}
         self.assertEqual(st, MutableSet[int](2, 3))
 
-        st -= ImmutableSet.of(frozenset({3, 4})) # Difference = {2}
+        st -= ImmutableSet.of_iterable(frozenset({3, 4})) # Difference = {2}
         self.assertEqual(st, ImmutableSet[int](2))
 
         st ^= ImmutableSet[int]({2, 0}) # Symmetric Difference = {0}
@@ -181,24 +181,24 @@ class TestSet(unittest.TestCase):
     def test_replace(self):
         mus = MutableSet[int](0, 1, 2)
         mus.replace(0, -5)
-        self.assertEqual(mus, MutableSet.of(1, 2, -5))
+        self.assertEqual(mus, MutableSet.of_values(1, 2, -5))
 
         mus.replace(-5, 1)
-        self.assertEqual(mus, MutableSet.of(1, 2, -5))
+        self.assertEqual(mus, MutableSet.of_values(1, 2, -5))
 
         mus.replace(-5, 1, _remove_if_new_is_present=True)
-        self.assertEqual(mus, MutableSet.of(2, 1))
+        self.assertEqual(mus, MutableSet.of_values(2, 1))
 
         # 3 shouldn't get replaced to 7
         mus.replace_many({2 : 1, 1 : 3, 3 : 7})
-        self.assertEqual(mus, MutableSet.of(1, 3))
+        self.assertEqual(mus, MutableSet.of_values(1, 3))
 
     def test_or_and_xor_etc(self):
         mus = MutableSet[int](0, 1)
         mus_2 = MutableSet[int](1, 2)
         or_st = mus | mus_2
         self.assertEqual(or_st, MutableSet[int](0, 1, 2))
-        or_st = mus | MutableSet.of({1, 2})
+        or_st = mus | MutableSet.of_iterable({1, 2})
         self.assertEqual(or_st, MutableSet[int](0, 1, 2))
 
     def test_type_hierarchy(self):

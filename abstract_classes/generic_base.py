@@ -38,6 +38,9 @@ GenericBase[*Ts]
 Ts = TypeVarTuple("Ts")
 
 
+def base_class[T: GenericBase](obj: T) -> type[T]:
+    return type(obj)._origin if hasattr(type(obj), '_origin') else type(obj)
+
 def forbid_instantiation(cls):
     """
     Class decorator that forbids direct instantiation of the decorated class with or without generics.

@@ -119,13 +119,17 @@ class AbstractSet[T](Collection[T]):
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
+
         from type_validation.type_hierarchy import _resolve_type_priority
         set_type = _resolve_type_priority(type(self), type(other))
+
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _get_supertype
-            supertype = _get_supertype(self.item_type, other.item_type)
-            return set_type[supertype](self.values | other.values, _skip_validation=True)
-        return set_type(self.values | other.values, _skip_validation=True)
+            new_type = _get_supertype(self.item_type, other.item_type)
+        else:
+            new_type = self.item_type
+
+        return set_type[new_type](self.values | other.values, _skip_validation=True)
 
     def __and__[S: AbstractSet](self: S, other: S) -> S:
         """
@@ -139,13 +143,17 @@ class AbstractSet[T](Collection[T]):
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
+
         from type_validation.type_hierarchy import _resolve_type_priority
         set_type = _resolve_type_priority(type(self), type(other))
+
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _get_subtype
-            subtype = _get_subtype(self.item_type, other.item_type)
-            return set_type[subtype](self.values & other.values, _skip_validation=True)
-        return set_type(self.values & other.values, _skip_validation=True)
+            new_type = _get_subtype(self.item_type, other.item_type)
+        else:
+            new_type = self.item_type
+
+        return set_type[new_type](self.values & other.values, _skip_validation=True)
 
     def __add__[S: AbstractSet](self: S, other: S):
         """
@@ -188,13 +196,17 @@ class AbstractSet[T](Collection[T]):
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
+
         from type_validation.type_hierarchy import _resolve_type_priority
         set_type = _resolve_type_priority(type(self), type(other))
+
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _get_supertype
-            supertype = _get_supertype(self.item_type, other.item_type)
-            return set_type[supertype](self.values ^ other.values, _skip_validation=True)
-        return set_type(self.values ^ other.values, _skip_validation=True)
+            new_type = _get_supertype(self.item_type, other.item_type)
+        else:
+            new_type = self.item_type
+
+        return set_type[new_type](self.values ^ other.values, _skip_validation=True)
 
     def union[S: AbstractSet](
         self: S,
@@ -417,11 +429,6 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
-
-        if self.item_type != other.item_type:
-            from type_validation.type_hierarchy import _is_subtype
-            if not (_is_subtype(self.item_type, other.item_type) or _is_subtype(other.item_type, self.item_type)):
-                raise TypeError(f"Incompatible types between {type(self).__name__} and {type(other).__name__}.")
 
         self.intersection_update(other)
         return self

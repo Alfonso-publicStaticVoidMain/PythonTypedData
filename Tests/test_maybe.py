@@ -52,7 +52,7 @@ class TestMaybe(unittest.TestCase):
         mb = Maybe[list[int]]([0, 1, 2])
         self.assertIn('Maybe[list[int]]', repr(mb))
 
-        mb2 = Maybe.of(MutableList[MutableSet[int]](MutableSet.of(0, 1), MutableSet.of(0, -1)))
+        mb2 = Maybe.of(MutableList[MutableSet[int]](MutableSet.of_values(0, 1), MutableSet.of_values(0, -1)))
         self.assertIn('Maybe[MutableList[MutableSet[int]]]', repr(mb2))
 
     def test_getattr(self):

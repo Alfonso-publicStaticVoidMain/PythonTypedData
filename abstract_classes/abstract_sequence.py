@@ -45,6 +45,7 @@ class AbstractSequence[T](Collection[T]):
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
     _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
     _forbidden_iterable_types: ClassVar[tuple[type, ...]] = (set, frozenset, AbstractSet, typing.AbstractSet)
+    _priority: int = 0
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
         """
@@ -147,11 +148,14 @@ class AbstractSequence[T](Collection[T]):
 
         from type_validation.type_hierarchy import _resolve_type_priority
         sequence_type = _resolve_type_priority(type(self), type(other))
+
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _get_subtype
-            subtype = _get_subtype(self.item_type, other.item_type)
-            return sequence_type[subtype](self.values + other.values, _skip_validation=True)
-        return sequence_type(self.values + other.values, _skip_validation=True)
+            new_type = _get_subtype(self.item_type, other.item_type)
+        else:
+            new_type = self.item_type
+
+        return sequence_type[new_type](self.values + other.values, _skip_validation=True)
 
     def __mul__[S: AbstractSequence](
         self: S,
@@ -285,6 +289,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = list
     _allowed_ordered_types: ClassVar[tuple[type, ...]] = (list, tuple, AbstractSequence, range, collections.deque, collections.abc.Sequence)
     _mutable: ClassVar[bool] = True
+    _priority: int = 1
 
     def append(
         self: AbstractMutableSequence[T],

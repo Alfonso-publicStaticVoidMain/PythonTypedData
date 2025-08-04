@@ -195,10 +195,10 @@ class TestTypeValidation(unittest.TestCase):
         self.assertTrue(_validate_type(ImmutableList[int](1, 2), AbstractSequence[int]))
 
         self.assertTrue(_validate_type(MutableSet[str]({"a"}), AbstractSet[str]))
-        self.assertTrue(_validate_type(ImmutableSet[str].of("a", "b"), AbstractSet[str]))
+        self.assertTrue(_validate_type(ImmutableSet[str].of_values("a", "b"), AbstractSet[str]))
 
         self.assertTrue(_validate_type(MutableSet[str]({"a"}), AbstractMutableSet[str]))
-        self.assertFalse(_validate_type(ImmutableSet[str].of("a", "b"), AbstractMutableSet[str]))
+        self.assertFalse(_validate_type(ImmutableSet[str].of_values("a", "b"), AbstractMutableSet[str]))
 
         self.assertTrue(_validate_type(MutableDict[int, float]({1: 1.0}), AbstractDict[int, float]))
         self.assertTrue(_validate_type(ImmutableDict[int, float]({2: 3.0}), AbstractDict[int, float]))
@@ -212,7 +212,7 @@ class TestTypeValidation(unittest.TestCase):
 
         sets = [
             MutableSet[int]({1, 2}),
-            ImmutableSet[int].of(3, 4),
+            ImmutableSet[int].of_values(3, 4),
             MutableSet[int]({5})
         ]
         self.assertTrue(_validate_type(sets, list[AbstractSet[int]]))
@@ -246,7 +246,7 @@ class TestTypeValidation(unittest.TestCase):
 
         hybrid = [
             Maybe[MutableSet[int]](MutableSet[int]({1, 2})),
-            Maybe[ImmutableSet[int]](ImmutableSet.of(3, 4)),
+            Maybe[ImmutableSet[int]](ImmutableSet.of_values(3, 4)),
         ]
         self.assertTrue(_validate_type(hybrid, list[Maybe[MutableSet[int]] | Maybe[ImmutableSet[int]]]))
 
@@ -313,7 +313,7 @@ class TestTypeValidation(unittest.TestCase):
 
         data = [
             Maybe.of(MutableSet[int]({1})),
-            Maybe.of(ImmutableSet.of(2)),
+            Maybe.of(ImmutableSet.of_values(2)),
             Maybe[MutableSet[int]].empty()
         ]
         self.assertTrue(_validate_type(data, list[Maybe[MutableSet[int]] | Maybe[ImmutableSet[int]]]))

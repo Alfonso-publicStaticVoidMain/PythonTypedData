@@ -70,7 +70,7 @@ class TestCollection(unittest.TestCase):
         self.assertEqual(lst, new_lst)
         self.assertIsNot(lst, new_lst)
 
-        nested_lst = MutableList[ImmutableList[int]](ImmutableList.of(0, 1), ImmutableList.of(0, 0))
+        nested_lst = MutableList[ImmutableList[int]](ImmutableList.of_values(0, 1), ImmutableList.of_values(0, 0))
         new_nested_lst: MutableList[ImmutableList[int]] = nested_lst.copy(deep=True)
         self.assertEqual(nested_lst, new_nested_lst)
         self.assertEqual(nested_lst[0], new_nested_lst[0])
@@ -197,7 +197,7 @@ class TestCollection(unittest.TestCase):
         grouped = tml.group_by(lambda test : test.number)
         self.assertEqual(grouped, {
             0 : MutableList[TestClass](cosa_0, cosa_1),
-            1 : MutableList.of(cosa_2, cosa_3),
+            1 : MutableList.of_values(cosa_2, cosa_3),
             2 : MutableList[TestClass](cosa_4)
         })
 

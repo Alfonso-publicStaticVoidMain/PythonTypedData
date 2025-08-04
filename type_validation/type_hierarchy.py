@@ -152,7 +152,7 @@ def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G
 
     # If origins are the same, return either type
     if origin_t is origin_other:
-        return t
+        return origin_t
 
     # Origins must be comparable
     if not (
@@ -165,7 +165,7 @@ def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G
     mutable_t = getattr(t, "_mutable", False)
     mutable_other = getattr(other, "_mutable", False)
     if mutable_t != mutable_other:
-        return other if mutable_t else t  # prefer the one without _mutable
+        return origin_other if mutable_t else origin_t  # prefer the one without _mutable
 
     # Priority logic
     has_priority_t = hasattr(t, "_priority")
@@ -176,12 +176,12 @@ def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G
         priority_other = other._priority
         if priority_t == priority_other:
             raise TypeError(f"Both {origin_t.__name__} and {origin_other.__name__} have the same priority {priority_t}!")
-        return t if priority_t < priority_other else other
+        return origin_t if priority_t < priority_other else origin_other
 
     if has_priority_t:
-        return t
+        return origin_t
     if has_priority_other:
-        return other
+        return origin_other
 
     # Neither has _priority
     raise TypeError(f"Cannot resolve type priority between {origin_t.__name__} and {origin_other.__name__}: no _priority set for either.")
