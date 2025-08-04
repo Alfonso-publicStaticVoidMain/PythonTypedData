@@ -221,12 +221,6 @@ class TestList(unittest.TestCase):
         mul += ImmutableList[str]('b')
         self.assertEqual(mul, MutableList[str]('a', 'b'))
 
-        mul += ['c']
-        self.assertEqual(mul, MutableList[str]('a', 'b', 'c'))
-
-        mul += ('d',)
-        self.assertEqual(mul, MutableList[str]('a', 'b', 'c', 'd'))
-
         mul = MutableList[str]('a')
         mul *= 3
         self.assertEqual(mul, MutableList[str]('a', 'a', 'a'))

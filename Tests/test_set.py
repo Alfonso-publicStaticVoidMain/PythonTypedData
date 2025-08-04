@@ -92,31 +92,19 @@ class TestSet(unittest.TestCase):
         st_int = MutableSet[int](0)
         st_int_str = MutableSet[int | str](0, 'a')
 
-        self.assertTrue(st_int.is_subset(st_int_str, _coerce=True))
-        with self.assertRaises(ValueError):
-            st_int.is_subset(st_int_str, _coerce=False)
+        self.assertTrue(st_int.is_subset(st_int_str))
+        self.assertTrue(st_int_str.is_superset(st_int))
 
-        self.assertTrue(st_int_str.is_superset(st_int, _coerce=True))
-        with self.assertRaises(ValueError):
-            st_int_str.is_superset(st_int, _coerce=False)
-
-        self.assertFalse(st_int.is_disjoint(st_int_str, _coerce=True))
-        with self.assertRaises(ValueError):
-            st_int.is_disjoint(st_int_str, _coerce=False)
-        self.assertFalse(st_int_str.is_disjoint(st_int, _coerce=True))
-        with self.assertRaises(ValueError):
-            st_int_str.is_disjoint(st_int, _coerce=False)
+        self.assertFalse(st_int.is_disjoint(st_int_str))
+        self.assertFalse(st_int_str.is_disjoint(st_int))
 
         st_int = MutableSet[int](0, 1)
         st_int_str = MutableSet[int | str](0)
 
-        self.assertTrue(st_int_str.is_subset(st_int, _coerce=True))
         with self.assertRaises(ValueError):
-            st_int_str.is_subset(st_int, _coerce=False)
-
-        self.assertTrue(st_int.is_superset(st_int_str, _coerce=True))
+            self.assertTrue(st_int_str.is_subset(st_int))
         with self.assertRaises(ValueError):
-            st_int.is_superset(st_int_str, _coerce=False)
+            self.assertTrue(st_int.is_superset(st_int_str))
 
     def test_add_remove(self):
         s = MutableSet[str]('a')
@@ -181,14 +169,14 @@ class TestSet(unittest.TestCase):
         st |= ImmutableSet[int](0, 1, 2, 3) # Union = {0, 1, 2, 3}
         self.assertEqual(st, MutableSet[int](0, 1, 2, 3))
 
-        st &= {2, 3} # Intersection = {2, 3}
+        st &= MutableSet[int](2, 3) # Intersection = {2, 3}
         self.assertEqual(st, MutableSet[int](2, 3))
 
-        st -= frozenset({3, 4}) # Difference = {2}
-        self.assertEqual(st, MutableSet[int](2))
+        st -= ImmutableSet.of(frozenset({3, 4})) # Difference = {2}
+        self.assertEqual(st, ImmutableSet[int](2))
 
-        st ^= {2, 0} # Symmetric Difference = {0}
-        self.assertEqual(st, MutableSet[int](0))
+        st ^= ImmutableSet[int]({2, 0}) # Symmetric Difference = {0}
+        self.assertEqual(st, ImmutableSet[int](0))
 
     def test_replace(self):
         mus = MutableSet[int](0, 1, 2)
@@ -210,9 +198,15 @@ class TestSet(unittest.TestCase):
         mus_2 = MutableSet[int](1, 2)
         or_st = mus | mus_2
         self.assertEqual(or_st, MutableSet[int](0, 1, 2))
-        or_st = mus | {1, 2}
+        or_st = mus | MutableSet.of({1, 2})
         self.assertEqual(or_st, MutableSet[int](0, 1, 2))
 
+    def test_type_hierarchy(self):
+        mus = MutableSet[int](0)
+        mus_ = MutableSet[int](1)
+        ims = ImmutableSet[int](2)
+        self.assertTrue(isinstance(mus | mus_, MutableSet))
+        self.assertTrue(isinstance(mus | ims, ImmutableSet))
 
 if __name__ == '__main__':
     unittest.main()

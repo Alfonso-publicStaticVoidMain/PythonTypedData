@@ -1,7 +1,7 @@
 from typing import get_origin, get_args, Union, Any
 from types import UnionType
 
-from abstract_classes.generic_base import GenericBase
+from abstract_classes.generic_base import GenericBase, class_name
 
 
 def _get_origin_args(tp: type) -> tuple[type, tuple[type, ...]]:
@@ -155,8 +155,11 @@ def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G
         return t
 
     # Origins must be comparable
-    if not (_is_subtype(origin_t, origin_other) or _is_subtype(origin_other, origin_t)):
-        raise TypeError(f"Incompatible origins: {origin_t} and {origin_other}")
+    if not (
+        any(issubclass(origin_other, t_superclass) for t_superclass in origin_t.__mro__)
+        or any(issubclass(origin_t, other_superclass) for other_superclass in origin_other.__mro__)
+    ):
+        raise TypeError(f"Incompatible origins: {class_name(origin_t)} and {class_name(origin_other)}")
 
     # Mutability check
     mutable_t = getattr(t, "_mutable", False)

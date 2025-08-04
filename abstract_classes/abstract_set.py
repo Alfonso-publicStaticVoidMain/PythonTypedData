@@ -5,7 +5,7 @@ import typing
 from typing import ClassVar, Callable, Iterable, Any, Mapping
 
 from abstract_classes.collection import Collection, MutableCollection
-from abstract_classes.generic_base import forbid_instantiation, _convert_to
+from abstract_classes.generic_base import forbid_instantiation, _convert_to, class_name
 from abstract_classes.metadata import Metadata
 
 
@@ -310,7 +310,7 @@ class AbstractSet[T](Collection[T]):
         if other.item_type != self.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(self.item_type, other.item_type):
-                raise ValueError(f"Cannot compare sets of different types: {self.item_type.__name__} != {other.item_type.__name__}")
+                raise ValueError(f"Cannot compare sets of different types: {class_name(self.item_type)} != {class_name(other.item_type)}")
         return self.values.issubset(other.values)
 
     def is_superset(
@@ -331,7 +331,7 @@ class AbstractSet[T](Collection[T]):
         if other.item_type != self.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type):
-                raise ValueError(f"Cannot compare sets of different types: {self.item_type.__name__} != {other.item_type.__name__}")
+                raise ValueError(f"Cannot compare sets of different types: {class_name(self.item_type)} != {class_name(other.item_type)}")
         return self.values.issuperset(other.values)
 
     def is_disjoint(
@@ -530,7 +530,7 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
         _coerce: bool = False
     ) -> None:
         """
-        Update the set with elements from one or more iterables or Collections.
+        Update the set with elements from one or more iterables.
 
         :param others: One or more iterables or Collections whose elements will be added to this set.
         :type others: Iterable[T]
