@@ -30,6 +30,7 @@ class AbstractSet[T](Collection[T]):
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = frozenset
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
+    _priority: int = 0
 
     def __lt__(self: AbstractSet, other: AbstractSet) -> bool:
         """
@@ -43,7 +44,10 @@ class AbstractSet[T](Collection[T]):
         :rtype: bool
         """
         if isinstance(other, AbstractSet):
-            return self.item_type == other.item_type and self.values < other.values
+            if self.item_type != other.item_type:
+                from type_validation.type_hierarchy import _is_subtype
+                return _is_subtype(self.item_type, other.item_type) and self.values >= other.values
+            return self.values < other.values
         return NotImplemented
 
     def __le__(self: AbstractSet, other: AbstractSet) -> bool:
@@ -58,7 +62,10 @@ class AbstractSet[T](Collection[T]):
         :rtype: bool
         """
         if isinstance(other, AbstractSet):
-            return self.item_type == other.item_type and self.values <= other.values
+            if self.item_type != other.item_type:
+                from type_validation.type_hierarchy import _is_subtype
+                return _is_subtype(self.item_type, other.item_type) and self.values >= other.values
+            return self.values <= other.values
         return NotImplemented
 
     def __gt__(self: AbstractSet, other: AbstractSet) -> bool:
@@ -73,7 +80,10 @@ class AbstractSet[T](Collection[T]):
         :rtype: bool
         """
         if isinstance(other, AbstractSet):
-            return self.item_type == other.item_type and self.values > other.values
+            if self.item_type != other.item_type:
+                from type_validation.type_hierarchy import _is_subtype
+                return _is_subtype(other.item_type, self.item_type) and self.values >= other.values
+            return self.values > other.values
         return NotImplemented
 
     def __ge__(self: AbstractSet, other: AbstractSet) -> bool:
@@ -88,34 +98,69 @@ class AbstractSet[T](Collection[T]):
         :rtype: bool
         """
         if isinstance(other, AbstractSet):
-            return self.item_type == other.item_type and self.values >= other.values
+            if self.item_type != other.item_type:
+                from type_validation.type_hierarchy import _is_subtype
+                return _is_subtype(other.item_type, self.item_type) and self.values >= other.values
+            return self.values >= other.values
         return NotImplemented
 
-    def __or__[S: AbstractSet](self: S, other: Iterable) -> S:
+    def __or__[S: AbstractSet](self: S, other: S) -> S:
         """
         Computes the union of two AbstractSet instances.
 
-        :param other: The set to union with.
-        :type other: Iterable
+        In order to preserve the commutativity of the operator, the subclass of the return is determined by which of
+        the operands is immutable, and if both or none are, by the _priority class attribute of their type.
 
-        :return: A new AbstractSet of the same dynamic subclass as self containing all elements from both self and other.
+        :param other: The set to union with.
+        :type other: S
+
+        :return: A new AbstractSet containing all elements from both self and other.
         :rtype: S
         """
-        from type_validation.type_validation import _validate_or_coerce_iterable
-        return type(self)(self.values | _validate_or_coerce_iterable(other, self.item_type, _finisher=set), _skip_validation=True)
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
+        from type_validation.type_hierarchy import _resolve_type_priority
+        set_type = _resolve_type_priority(type(self), type(other))
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _get_supertype
+            supertype = _get_supertype(self.item_type, other.item_type)
+            return set_type[supertype](self.values | other.values, _skip_validation=True)
+        return set_type(self.values | other.values, _skip_validation=True)
 
-    def __and__[S: AbstractSet](self: S, other: Iterable) -> S:
+    def __and__[S: AbstractSet](self: S, other: S) -> S:
         """
         Computes the intersection of two AbstractSet instances.
 
         :param other: The set to intersect with.
-        :type other: Iterable
+        :type other: S
 
-        :return: A new AbstractSet of the same dynamic subclass as self containing all elements present in both sets.
+        :return: A new AbstractSet containing all elements present in both sets.
         :rtype: S
         """
-        from type_validation.type_validation import _validate_or_coerce_iterable
-        return type(self)(self.values & _validate_or_coerce_iterable(other, self.item_type, _finisher=set), _skip_validation=True)
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
+        from type_validation.type_hierarchy import _resolve_type_priority
+        set_type = _resolve_type_priority(type(self), type(other))
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _get_subtype
+            subtype = _get_subtype(self.item_type, other.item_type)
+            return set_type[subtype](self.values & other.values, _skip_validation=True)
+        return set_type(self.values & other.values, _skip_validation=True)
+
+    def __add__[S: AbstractSet](self: S, other: S):
+        """
+        Computes the union of two AbstractSet instances delegating to the __or__ method.
+
+        In order to preserve the commutativity of the operator, the subclass of the return is determined by which of
+        the operands is immutable, and if both or none are, by the _priority class attribute of their type.
+
+        :param other: The set to union with.
+        :type other: S
+
+        :return: A new AbstractSet containing all elements from both self and other.
+        :rtype: S
+        """
+        return self | other
 
     def __sub__[S: AbstractSet](self: S, other: Iterable) -> S:
         """
@@ -131,7 +176,7 @@ class AbstractSet[T](Collection[T]):
         from type_validation.type_validation import _validate_or_coerce_iterable
         return type(self)(self.values - _validate_or_coerce_iterable(other, self.item_type, _finisher=set), _skip_validation=True)
 
-    def __xor__[S: AbstractSet](self: S, other: Iterable) -> S:
+    def __xor__[S: AbstractSet](self: S, other: S) -> S:
         """
         Computes the symmetric difference between two AbstractSet instances.
 
@@ -141,22 +186,29 @@ class AbstractSet[T](Collection[T]):
         :return: A new AbstractSet of the same dynamic subclass as self containing all elements in either set but not both.
         :rtype: S
         """
-        from type_validation.type_validation import _validate_or_coerce_iterable
-        return type(self)(self.values ^ _validate_or_coerce_iterable(other, self.item_type, _finisher=set), _skip_validation=True)
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
+        from type_validation.type_hierarchy import _resolve_type_priority
+        set_type = _resolve_type_priority(type(self), type(other))
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _get_supertype
+            supertype = _get_supertype(self.item_type, other.item_type)
+            return set_type[supertype](self.values ^ other.values, _skip_validation=True)
+        return set_type(self.values ^ other.values, _skip_validation=True)
 
     def union[S: AbstractSet](
         self: S,
-        *others: Iterable[T],
+        *others: Iterable,
         _coerce: bool = False
     ) -> S:
         """
-        Returns the union of this set with one or more iterables or collections.
+        Returns the union of this set with one or more iterables, preserving self's item_type.
 
         The operation is delegated to the underlying container's union method, which should support passing multiple
         iterable arguments.
 
-        :param others: One or more iterables or collections to union with.
-        :type others: Iterable[T]
+        :param others: One or more iterables to union with.
+        :type others: Iterable
 
         :param _coerce: State parameter that, if True, attempts to coerce the incoming values.
         :type _coerce: bool
@@ -170,17 +222,17 @@ class AbstractSet[T](Collection[T]):
 
     def intersection[S: AbstractSet](
         self: S,
-        *others: Iterable[T] | Collection[T],
+        *others: Iterable,
         _coerce: bool = False
     ) -> S:
         """
-        Returns the intersection of this set with one or more iterables or collections.
+        Returns the intersection of this set with one or more iterables, preserving self's item_type.
 
         The operation is delegated to the underlying container's union method, which should support passing multiple
         iterable arguments.
 
-        :param others: One or more iterables or collections to intersect with.
-        :type others: Iterable[T] | Collection[T]
+        :param others: One or more iterables to intersect with.
+        :type others: Iterable
 
         :param _coerce: State parameter that, if True, attempts to coerce the incoming values.
         :type _coerce: bool
@@ -194,17 +246,17 @@ class AbstractSet[T](Collection[T]):
 
     def difference[S: AbstractSet](
         self: S,
-        *others: Iterable[T],
+        *others: Iterable,
         _coerce: bool = False
     ) -> S:
         """
-        Returns the difference between this set and one or more iterables or collections.
+        Returns the difference between this set and one or more iterables.
 
         The operation is delegated to the underlying container's union method, which should support passing multiple
         iterable arguments.
 
-        :param others: One or more iterables or collections to subtract.
-        :type others: Iterable[T]
+        :param others: One or more iterables to subtract.
+        :type others: Iterable
 
         :param _coerce: State parameter that, if True, attempts to coerce the incoming values.
         :type _coerce: bool
@@ -218,14 +270,14 @@ class AbstractSet[T](Collection[T]):
 
     def symmetric_difference[S: AbstractSet](
         self: S,
-        *others: Iterable[T],
+        *others: Iterable,
         _coerce: bool = False
     ) -> S:
         """
-        Returns the symmetric difference between this set and one or more iterables or collections.
+        Returns the symmetric difference between this set and one or more iterables, preserving self's item_type.
 
-        :param others: One or more iterables or collections to compare.
-        :type others: Iterable[T]
+        :param others: One or more iterables to compare.
+        :type others: Iterable
 
         :param _coerce: State parameter that, if True, attempts to coerce the incoming values.
         :type _coerce: bool
@@ -242,9 +294,7 @@ class AbstractSet[T](Collection[T]):
 
     def is_subset(
         self: AbstractSet,
-        other: AbstractSet,
-        *,
-        _coerce: bool = False
+        other: AbstractSet
     ) -> bool:
         """
         Checks if this set is a subset of another AbstractSet.
@@ -252,23 +302,20 @@ class AbstractSet[T](Collection[T]):
         :param other: The set to compare against.
         :type other: AbstractSet
 
-        :param _coerce: State parameter that, if True, performs the check even if item_types differ.
-        :type _coerce: bool
-
         :return: True if this set is a subset of `other`, False otherwise.
         :rtype: bool
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
-        if not _coerce and isinstance(other, AbstractSet) and other.item_type != self.item_type:
-            raise ValueError(f"Cannot compare sets of different types: {self.item_type} != {other.item_type}")
+        if other.item_type != self.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            if not _is_subtype(self.item_type, other.item_type):
+                raise ValueError(f"Cannot compare sets of different types: {self.item_type.__name__} != {other.item_type.__name__}")
         return self.values.issubset(other.values)
 
     def is_superset(
         self: AbstractSet,
-        other: AbstractSet,
-        *,
-        _coerce: bool = False
+        other: AbstractSet
     ) -> bool:
         """
         Checks if this set is a superset of another AbstractSet.
@@ -276,23 +323,20 @@ class AbstractSet[T](Collection[T]):
         :param other: The set to compare against.
         :type other: AbstractSet
 
-        :param _coerce: State parameter that, if True, performs the check even if item_types differ.
-        :type _coerce: bool
-
         :return: True if this set is a superset of `other`, False otherwise.
         :rtype: bool
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
-        if not _coerce and isinstance(other, AbstractSet) and other.item_type != self.item_type:
-            raise ValueError(f"Cannot compare sets of different types: {self.item_type} != {other.item_type}")
+        if other.item_type != self.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            if not _is_subtype(other.item_type, self.item_type):
+                raise ValueError(f"Cannot compare sets of different types: {self.item_type.__name__} != {other.item_type.__name__}")
         return self.values.issuperset(other.values)
 
     def is_disjoint(
         self: AbstractSet,
-        other: AbstractSet,
-        *,
-        _coerce: bool = False
+        other: AbstractSet
     ) -> bool:
         """
         Checks if this set is disjoint with another AbstractSet.
@@ -300,16 +344,15 @@ class AbstractSet[T](Collection[T]):
         :param other: The set to compare against.
         :type other: AbstractSet
 
-        :param _coerce: State parameter that, if True, performs the check even if item_types differ.
-        :type _coerce: bool
-
         :return: True if this set has no elements in common with `other`, False otherwise.
         :rtype: bool
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
-        if not _coerce and isinstance(other, AbstractSet) and other.item_type != self.item_type:
-            raise ValueError(f"Cannot compare sets of different types: {self.item_type} != {other.item_type}")
+        if other.item_type != self.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            if not _is_subtype(other.item_type, self.item_type) and not _is_subtype(self.item_type, other.item_type):
+                raise ValueError(f"Cannot compare sets of different types: {self.item_type.__name__} != {other.item_type.__name__}")
         return self.values.isdisjoint(other.values)
 
 
@@ -333,68 +376,96 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = set
     _mutable: ClassVar[bool] = True
+    _priority: int = 1
 
     def __ior__[S: AbstractMutableSet](
         self: S,
-        other: AbstractSet | set | frozenset | collections.abc.Set
+        other: AbstractSet
     ) -> S:
         """
         In-place union update with another AbstractSet with the operator |=.
 
         :param other: The set to union with.
-        :type other: AbstractSet | set | frozenset | collections.abc.Set
+        :type other: AbstractSet
 
         :return: This updated AbstractMutableSet.
         :rtype: S
         """
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
+
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            if not _is_subtype(other.item_type, self.item_type):
+                raise TypeError(f"Incompatible types between {type(self).__name__} and {type(other).__name__}.")
+
         self.update(other)
         return self
 
     def __iand__[S: AbstractMutableSet](
         self: S,
-        other: AbstractSet | set | frozenset | collections.abc.Set
+        other: AbstractSet
     ) -> S:
         """
         In-place intersection update with another AbstractSet with the operator &=.
 
         :param other: The set to intersect with.
-        :type other: AbstractSet | set | frozenset | collections.abc.Set
+        :type other: AbstractSet
 
         :return: This updated AbstractMutableSet.
         :rtype: S
         """
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
+
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            if not (_is_subtype(self.item_type, other.item_type) or _is_subtype(other.item_type, self.item_type)):
+                raise TypeError(f"Incompatible types between {type(self).__name__} and {type(other).__name__}.")
+
         self.intersection_update(other)
         return self
 
     def __isub__[S: AbstractMutableSet](
         self: S,
-        other: AbstractSet | set | frozenset | collections.abc.Set
+        other: AbstractSet
     ) -> S:
         """
         In-place difference update with another AbstractSet with the operator -=.
 
         :param other: The set whose elements should be removed from this set.
-        :type other: AbstractSet | set | frozenset | collections.abc.Set
+        :type other: AbstractSet
 
         :return: This updated AbstractMutableSet.
         :rtype: S
         """
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
+
         self.difference_update(other)
         return self
 
     def __ixor__[S: AbstractMutableSet](
         self: S,
-        other: AbstractSet | set | frozenset | collections.abc.Set
+        other: AbstractSet
     ) -> S:
         """
         In-place symmetric difference update with another AbstractSet with the operator ^=.
 
-        :param other: The set whose elements should be removed from this set.
-        :type other: AbstractSet | set | frozenset | collections.abc.Set
+        :param other: The set whose elements should be symmetrically removed from this set.
+        :type other: AbstractSet
 
         :return: This updated AbstractMutableSet.
         :rtype: S
         """
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
+
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            if not _is_subtype(other.item_type, self.item_type):
+                raise TypeError(f"Incompatible types between {type(self).__name__} and {type(other).__name__}.")
+
         self.symmetric_difference_update(other)
         return self
 

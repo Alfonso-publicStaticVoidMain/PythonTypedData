@@ -126,38 +126,37 @@ class AbstractSequence[T](Collection[T]):
         eq_finisher = type(self)._get_eq_finisher()
         return eq_finisher(self.values) >= eq_finisher(other.values)
 
-    def __add__[R: AbstractSequence](
-        self: R,
-        other: R,
-    ) -> R:
+    def __add__[S: AbstractSequence](
+        self: S,
+        other: S,
+    ) -> S:
         """
         Returns a new AbstractSequence concatenating the values of another AbstractSequence, list or tuple.
 
         :param other: The sequence to concatenate.
-        :type other: R
+        :type other: S
 
         :return: A new AbstractSequence of the same dynamic subclass as self containing the elements from `other` added
          right after the ones from self, as done by the __add__ method of the underlying container.
-        :rtype: R
+        :rtype: S
 
         :raises TypeError: If `other` has incompatible types.
         """
         if not isinstance(other, AbstractSequence):
             return NotImplemented
-        if self.item_type != other.item_type:
-            try:
-                from type_validation.type_hierarchy import _get_supertype
-                # This allows to add together sequences with compatible types, such as str | int and int
-                supertype: type = _get_supertype(self.item_type, other.item_type)
-                return type(self)[supertype](self.values + other.values, _skip_validation=True)
-            except TypeError:
-                raise TypeError(f"Can't add a sequence of type {type(other).__name__} to one of type {type(self).__name__}.")
-        return type(self)(self.values + other.values, _skip_validation=True)
 
-    def __mul__[R: AbstractSequence](
-        self: R,
+        from type_validation.type_hierarchy import _resolve_type_priority
+        sequence_type = _resolve_type_priority(type(self), type(other))
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _get_subtype
+            subtype = _get_subtype(self.item_type, other.item_type)
+            return sequence_type[subtype](self.values + other.values, _skip_validation=True)
+        return sequence_type(self.values + other.values, _skip_validation=True)
+
+    def __mul__[S: AbstractSequence](
+        self: S,
         n: int
-    ) -> R:
+    ) -> S:
         """
         Returns a new AbstractSequence with the values of this sequence concatenated n times.
 
@@ -165,7 +164,26 @@ class AbstractSequence[T](Collection[T]):
         :type n: int
 
         :return: A new AbstractSequence of the same dynamic subclass as self with its values concatenated n times.
-        :rtype: R
+        :rtype: S
+
+        :raises TypeError: If n is not an integer.
+        """
+        if not isinstance(n, int):
+            return NotImplemented
+        return type(self)(self.values * n, _skip_validation=True)
+
+    def __rmul__[S: AbstractSequence](
+        self: S,
+        n: int
+    ) -> S:
+        """
+        Returns a new AbstractSequence with the values of this sequence concatenated n times.
+
+        :param n: Number of times to repeat the sequence.
+        :type n: int
+
+        :return: A new AbstractSequence of the same dynamic subclass as self with its values concatenated n times.
+        :rtype: S
 
         :raises TypeError: If n is not an integer.
         """
@@ -182,13 +200,13 @@ class AbstractSequence[T](Collection[T]):
         """
         return reversed(self.values)
 
-    def reversed[R: AbstractSequence](self: R) -> R:
+    def reversed[S: AbstractSequence](self: S) -> S:
         """
         Returns a new AbstractSequence with its elements in reverse order.
 
         :return: A new reversed AbstractSequence of the same dynamic subclass as self containing its elements in
          reversed order.
-        :rtype: R
+        :rtype: S
         """
         return type(self)(reversed(self.values), _skip_validation=True)
 
@@ -224,12 +242,12 @@ class AbstractSequence[T](Collection[T]):
         except ValueError:
             return fallback
 
-    def sorted[R: AbstractSequence](
-        self: R,
+    def sorted[S: AbstractSequence](
+        self: S,
         *,
         key: Callable[[T], Any] | None = None,
         reverse: bool = False
-    ) -> R:
+    ) -> S:
         """
         Returns a new AbstractSequence with its elements sorted by an optional key.
 
@@ -241,7 +259,7 @@ class AbstractSequence[T](Collection[T]):
 
         :return: A new AbstractSequence of the same dynamic subclass as self with the same elements but sorted
          according to the key and reverse parameters.
-        :rtype: R
+        :rtype: S
         """
         return type(self)(sorted(self.values, key=key, reverse=reverse), _skip_validation=True)
 
@@ -350,7 +368,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type):
-                raise TypeError(f"Incompatible types between {type(self)} and {type(other)}.")
+                raise TypeError(f"Incompatible types between {type(self).__name__} and {type(other).__name__}.")
 
         self.values.extend(other.values)
         return self

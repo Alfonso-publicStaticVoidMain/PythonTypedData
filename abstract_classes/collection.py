@@ -648,10 +648,10 @@ class Collection[T](GenericBase[T], Metadata):
         :type accumulator: Callable[[A, T], None]
 
         :param finisher: Final transformation to obtain a result. Defaults to identity mapping.
-        :type finisher: Callable[[A], R]
+        :type finisher: Callable[[A], S]
 
         :return: The collected result.
-        :rtype: R
+        :rtype: S
         """
         acc = supplier()
         for item in self.values:
@@ -677,10 +677,10 @@ class Collection[T](GenericBase[T], Metadata):
         :type accumulator: Callable[[A, T], A]
 
         :param finisher: Final transformation to obtain a result. Defaults to identity mapping.
-        :type finisher: Callable[[A], R]
+        :type finisher: Callable[[A], S]
 
         :return: The collected result.
-        :rtype: R
+        :rtype: S
         """
         acc = supplier()
         for item in self.values:
@@ -719,10 +719,10 @@ class Collection[T](GenericBase[T], Metadata):
         :type accumulator: Callable[[A, S, T], None]
 
         :param finisher: Final transformation combining accumulator and state to a result.
-        :type finisher: Callable[[A, S], R]
+        :type finisher: Callable[[A, S], S]
 
         :return: The final collected result.
-        :rtype: R
+        :rtype: S
         """
         return self.collect(
             supplier=lambda: (supplier(), state_supplier()),
@@ -762,10 +762,10 @@ class Collection[T](GenericBase[T], Metadata):
         :type accumulator: Callable[[A, S, T], tuple[A, S]]
 
         :param finisher: Final transformation combining accumulator and state to a result.
-        :type finisher: Callable[[A, S], R]
+        :type finisher: Callable[[A, S], S]
 
         :return: The final collected result.
-        :rtype: R
+        :rtype: S
         """
         return self.collect_pure(
             supplier=lambda: (supplier(), state_supplier()),

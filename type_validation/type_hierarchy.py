@@ -1,6 +1,9 @@
 from typing import get_origin, get_args, Union, Any
 from types import UnionType
 
+from abstract_classes.generic_base import GenericBase
+
+
 def _get_origin_args(tp: type) -> tuple[type, tuple[type, ...]]:
     """
     Gets the origin and args of a type or TypeAlias, modified to work with Collections and AbstractDicts too.
@@ -119,4 +122,64 @@ def _get_supertype(t: type, other: type) -> type:
     raise TypeError(f"No supertype between {t.__name__} and {other.__name__}")
 
 
+def _get_subtype(t: type, other: type) -> type:
+    """
+    Gets the type from among two types that is subtype to the other. If unable, raises an error.
+
+    Commutativity is expected of this function.
+
+    :param t: First type to check.
+    :type t: type
+
+    :param other: Second type to check.
+    :type other: type
+
+    :return: The type from among the two that the is subtype to the other.
+    :type: type
+
+    :raises TypeError: If none of the give types is subtype to the other.
+    """
+    if _is_subtype(t, other):
+        return t
+    if _is_subtype(other, t):
+        return other
+    raise TypeError(f"No subtype between {t.__name__} and {other.__name__}")
+
+
+def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G]:
+    origin_t = getattr(t, "_origin", t)
+    origin_other = getattr(other, "_origin", other)
+
+    # If origins are the same, return either type
+    if origin_t is origin_other:
+        return t
+
+    # Origins must be comparable
+    if not (_is_subtype(origin_t, origin_other) or _is_subtype(origin_other, origin_t)):
+        raise TypeError(f"Incompatible origins: {origin_t} and {origin_other}")
+
+    # Mutability check
+    mutable_t = getattr(t, "_mutable", False)
+    mutable_other = getattr(other, "_mutable", False)
+    if mutable_t != mutable_other:
+        return other if mutable_t else t  # prefer the one without _mutable
+
+    # Priority logic
+    has_priority_t = hasattr(t, "_priority")
+    has_priority_other = hasattr(other, "_priority")
+
+    if has_priority_t and has_priority_other:
+        priority_t = t._priority
+        priority_other = other._priority
+        if priority_t == priority_other:
+            raise TypeError(f"Both {origin_t.__name__} and {origin_other.__name__} have the same priority {priority_t}!")
+        return t if priority_t < priority_other else other
+
+    if has_priority_t:
+        return t
+    if has_priority_other:
+        return other
+
+    # Neither has _priority
+    raise TypeError(f"Cannot resolve type priority between {origin_t.__name__} and {origin_other.__name__}: no _priority set for either.")
 
