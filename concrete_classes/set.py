@@ -52,7 +52,7 @@ class MutableSet[T](AbstractMutableSet[T]):
         Returns this set as an ImmutableSet.
 
         :return: A new ImmutableSet object with the same item_type as self and containing the same values. Validation is
-        skipped when creating this object.
+         skipped when creating this object.
         :type: ImmutableSet[T]
         """
         return ImmutableSet[self.item_type](self.values, _skip_validation=True)
@@ -72,7 +72,7 @@ class MutableSet[T](AbstractMutableSet[T]):
         :type value_mapper: Callable[[T], V]
 
         :return: A new MutableDict object containing the (key, value) pairs obtained by applying the key and value
-        mappings to the elements of this MutableList, inferring the dict types from them.
+         mappings to the elements of this MutableList, inferring the dict types from them.
         :rtype: MutableDict[K, V]
         """
         return MutableDict.of(self.to_dict(key_mapper, value_mapper))
@@ -92,7 +92,7 @@ class MutableSet[T](AbstractMutableSet[T]):
         :type value_mapper: Callable[[T], V]
 
         :return: A new ImmutableDict object containing the (key, value) pairs obtained by applying the key and value
-        mappings to the elements of this MutableList, inferring the dict types from them.
+         mappings to the elements of this MutableList, inferring the dict types from them.
         :rtype: ImmutableDict[K, V]
         """
         return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))
@@ -137,15 +137,12 @@ class ImmutableSet[T](AbstractSet[T]):
         """
         Collection.__init__(self, *values, _coerce=_coerce, _skip_validation=_skip_validation)
 
-    def __repr__(self: Collection[T]) -> str:
-        return f"{type(self).__name__}{set(self.values)}"
-
     def to_mutable_set(self: ImmutableSet[T]) -> MutableSet[T]:
         """
         Returns this set as a MutableSet.
 
         :return: A new MutableSet object with the same item_type as self and containing the same values. Validation is
-        skipped when creating this object.
+         skipped when creating this object.
         :type: MutableSet[T]
         """
         return MutableSet[self.item_type](self.values, _skip_validation=True)
@@ -185,7 +182,7 @@ class ImmutableSet[T](AbstractSet[T]):
         :type value_mapper: Callable[[T], V]
 
         :return: A new ImmutableDict object containing the (key, value) pairs obtained by applying the key and value
-        mappings to the elements of this MutableList, inferring the dict types from them.
+         mappings to the elements of this MutableList, inferring the dict types from them.
         :rtype: ImmutableDict[K, V]
         """
         return ImmutableDict.of(self.to_dict(key_mapper, value_mapper))

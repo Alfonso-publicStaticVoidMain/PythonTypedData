@@ -57,7 +57,7 @@ class MutableList[T](AbstractMutableSequence[T]):
         Returns this list as an ImmutableList.
 
         :return: A new ImmutableList object with the same item_type as self and containing the same values on the same
-        order. Validation is skipped when creating this object.
+         order. Validation is skipped when creating this object.
         :type: ImmutableList[T]
         """
         return ImmutableList[self.item_type](self.values, _skip_validation=True)
@@ -67,7 +67,7 @@ class MutableList[T](AbstractMutableSequence[T]):
         Returns this list as a MutableSet.
 
         :return: A new MutableSet object with the same item_type as self and containing the same values. Validation is
-        skipped when creating this object.
+         skipped when creating this object.
         :type: MutableSet[T]
         """
         from concrete_classes.set import MutableSet
@@ -78,7 +78,7 @@ class MutableList[T](AbstractMutableSequence[T]):
         Returns this list as an ImmutableSet.
 
         :return: A new ImmutableSet object with the same item_type as self and containing the same values. Validation is
-        skipped when creating this object.
+         skipped when creating this object.
         :type: ImmutableSet[T]
         """
         from concrete_classes.set import ImmutableSet
@@ -99,7 +99,7 @@ class MutableList[T](AbstractMutableSequence[T]):
         :type value_mapper: Callable[[T], V]
 
         :return: A new MutableDict object containing the (key, value) pairs obtained by applying the key and value
-        mappings to the elements of this MutableList, inferring the dict types from them.
+         mappings to the elements of this MutableList, inferring the dict types from them.
         :rtype: MutableDict[K, V]
         """
         from concrete_classes.dict import MutableDict
@@ -120,7 +120,7 @@ class MutableList[T](AbstractMutableSequence[T]):
         :type value_mapper: Callable[[T], V]
 
         :return: A new ImmutableDict object containing the (key, value) pairs obtained by applying the key and value
-        mappings to the elements of this MutableList, inferring the dict types from them.
+         mappings to the elements of this MutableList, inferring the dict types from them.
         :rtype: ImmutableDict[K, V]
         """
         from concrete_classes.dict import ImmutableDict
@@ -167,15 +167,12 @@ class ImmutableList[T](AbstractSequence[T]):
         """
         Collection.__init__(self, *values, _coerce=_coerce, _skip_validation=_skip_validation)
 
-    def __repr__(self: Collection[T]) -> str:
-        return f"{class_name(type(self))}{list(self.values)}"
-
     def to_mutable_list(self: ImmutableList[T]) -> MutableList[T]:
         """
         Returns this list as a MutableList.
 
         :return: A new MutableList object with the same item_type as self and containing the same values on the same
-        order. Validation is skipped when creating this object.
+         order. Validation is skipped when creating this object.
         :type: MutableList[T]
         """
         return MutableList[self.item_type](self.values, _skip_validation=True)
@@ -185,7 +182,7 @@ class ImmutableList[T](AbstractSequence[T]):
         Returns this list as a MutableSet.
 
         :return: A new MutableSet object with the same item_type as self and containing the same values. Validation is
-        skipped when creating this object.
+         skipped when creating this object.
         :type: MutableSet[T]
         """
         from concrete_classes.set import MutableSet
@@ -196,7 +193,7 @@ class ImmutableList[T](AbstractSequence[T]):
         Returns this list as an ImmutableSet.
 
         :return: A new ImmutableSet object with the same item_type as self and containing the same values. Validation is
-        skipped when creating this object.
+         skipped when creating this object.
         :type: ImmutableSet[T]
         """
         from concrete_classes.set import ImmutableSet
@@ -217,7 +214,7 @@ class ImmutableList[T](AbstractSequence[T]):
         :type value_mapper: Callable[[T], V]
 
         :return: A new MutableDict object containing the (key, value) pairs obtained by applying the key and value
-        mappings to the elements of this MutableList, inferring the dict types from them.
+         mappings to the elements of this MutableList, inferring the dict types from them.
         :rtype: MutableDict[K, V]
         """
         from concrete_classes.dict import MutableDict
@@ -238,7 +235,7 @@ class ImmutableList[T](AbstractSequence[T]):
         :type value_mapper: Callable[[T], V]
 
         :return: A new ImmutableDict object containing the (key, value) pairs obtained by applying the key and value
-        mappings to the elements of this MutableList, inferring the dict types from them.
+         mappings to the elements of this MutableList, inferring the dict types from them.
         :rtype: ImmutableDict[K, V]
         """
         from concrete_classes.dict import ImmutableDict

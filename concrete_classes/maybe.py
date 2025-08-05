@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Any, Iterator
 
 from abstract_classes.generic_base import GenericBase
 
@@ -69,7 +69,7 @@ class Maybe[T](GenericBase[T]):
         type from the _args attribute the class inherits from GenericBase which is set on its __class_getitem__ method.
 
         :return: The generic type T that this class was called upon, as stored on its attribute _args by the
-        __class_getitem__ method inherited from GenericBase. If unable to retrieve it, returns None.
+         __class_getitem__ method inherited from GenericBase. If unable to retrieve it, returns None.
         :rtype: type[T] | None
         """
         try:
@@ -105,7 +105,7 @@ class Maybe[T](GenericBase[T]):
         """
         if value is None:
             raise ValueError("Can't use Maybe.of with a None obj.")
-        from type_validation.type_validation import _infer_type
+        from type_validation.type_inference import _infer_type
         return Maybe[_infer_type(value)](value, _skip_validation=True)
 
     @classmethod
@@ -128,6 +128,162 @@ class Maybe[T](GenericBase[T]):
             raise ValueError("You must give a type when using Maybe.of_nullable")
         from type_validation.type_validation import _validate_or_coerce_value
         return Maybe[item_type](_validate_or_coerce_value(value, item_type)) if value is not None else Maybe[item_type]()
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Allows calling the methods of the type holt in a Maybe object directly, provided it's not empty.
+
+        :param name: Name of the attribute being called.
+        :type name: str
+
+        :return: The method being called, if it's present.
+        :rtype: Any
+
+        :raises AttributeError: If self is empty, or if its holt value doesn't have that attribute.
+        """
+        if self.value is None:
+            raise AttributeError(f"{self} is empty; cannot access attribute '{name}'")
+        return getattr(self.value, name)
+
+    def __bool__(self: Maybe[T]) -> bool:
+        """
+        Delegates the bool implementation to that of the value's.
+
+        :return: True if the value is evaluated to True by bool(), False otherwise or if it's None.
+        :rtype: bool
+        """
+        return bool(self.value)
+
+    def __eq__(self: Maybe[T], other: object) -> bool:
+        """
+        Checks equality between two Maybe objects, comparing their item_type and value.
+
+        :param other: Another Maybe object to compare.
+        :type other: object
+
+        :return: True if other is an instance of Maybe of the same item_type and holding the same value by the `==`
+        operator, False otherwise.
+        """
+        return (
+            isinstance(other, Maybe)
+            and self.item_type == other.item_type
+            and self.value == other.value
+        )
+
+    def __hash__(self: Maybe[T]) -> int:
+        """
+        Hashes the Maybe object by trying to hash the tuple of its item_type and value.
+        """
+        return hash((self.item_type, self.value))
+
+    def __repr__(self: Maybe[T]) -> str:
+        """
+        Gives a str representation of this Maybe object, displaying its wrapped value or indicating if it holds None.
+
+        :return: A str of the format Maybe[self.item_type].of(self.value), or Maybe[self.item_type].empty().
+        :rtype: str
+        """
+        from abstract_classes.generic_base import class_name
+        return f"{class_name(type(self))}.of({self.value!r})" if self.value is not None else f"{class_name(type(self))}.empty()"
+
+    def __call__(self, *args, **kwargs) -> Any:
+        """
+        Calls the contained value if it's callable and not None.
+
+        :param args: args to be called upon.
+        :param kwargs: kwargs to be called upon.
+
+        :return: Whatever the stored value shall return.
+        :rtype: Any
+
+        :raises ValueError: If the stored value is None.
+        :raises TypeError: If the stored value is not callable.
+        """
+        if self.value is None:
+            raise ValueError(f"Cannot call with {self}")
+        if not callable(self.value):
+            raise TypeError(f"Value of type {type(self.value).__name__} is not callable")
+        return self.value(*args, **kwargs)
+
+    def __getitem__(self, key: Any) -> Any:
+        """
+        Access a key of the stored value if it's not None, and it supports it.
+
+        :param key: Key to access.
+        :type key: Any
+
+        :return: Whatever shall be returned.
+        :rtype: Any
+
+        :raises ValueError: If the value is None.
+        :raises TypeError: If the value is not indexable.
+        :raises KeyError: If the key wasn't found in the value.
+        :raises IndexError: If the key is an index out of range for the value.
+        """
+        if self.value is None:
+            raise ValueError(f"Cannot access an index of {self}")
+        try:
+            return self.value[key]
+        except TypeError:
+            raise TypeError(f"Value of type {type(self.value).__name__} is not indexable")
+        except KeyError as e:
+            raise KeyError(f"Key {key!r} not found in value of type {type(self.value).__name__}") from e
+        except IndexError as e:
+            raise IndexError(f"Index {key!r} out of range for value of type {type(self.value).__name__}") from e
+
+    def __len__(self) -> int:
+        """
+        Gets the length of the subjacent value if it supports it and is not None.
+
+        :return: The length of the stored value, if able.
+        :rtype: int
+
+        :raises ValueError: If the value is None.
+        :raises TypeError: If the value doesn't implement __len__.
+        """
+        if self.value is None:
+            raise ValueError(f"Cannot get length of {self}")
+        try:
+            return len(self.value)
+        except TypeError:
+            raise TypeError(f"Value of type {type(self.value).__name__} has no len()")
+
+    def __iter__(self) -> Iterator:
+        """
+        Iterates over the value stored, if able.
+
+        :return: An Iterator over the stored value, if it's an Iterable.
+        :rtype: Iterator
+
+        :raises ValueError: If the value is None.
+        :raises TypeError: If the value is not iterable.
+        """
+        if self.value is None:
+            raise ValueError("Cannot iterate over an empty Maybe")
+        try:
+            return iter(self.value)
+        except TypeError:
+            raise TypeError(f"Value of type {type(self.value).__name__} is not iterable")
+
+    def __contains__(self, item: Any) -> bool:
+        """
+        Checks membership of the item to the stored value, if supported.
+
+        :param item: Item to check membership of.
+        :type item: Any
+
+        :return: True if the item is contained in the stored value, False otherwise.
+        :rtype: bool
+
+        :raises ValueError: If the value is None.
+        :raises TypeError: If the value's type doesn't implement __contains__.
+        """
+        if self.value is None:
+            raise ValueError("Cannot use 'in' on an empty Maybe")
+        try:
+            return item in self.value
+        except TypeError:
+            raise TypeError(f"Value of type {type(self.value).__name__} does not support 'in'")
 
     def is_present(self: Maybe[T]) -> bool:
         """
@@ -220,9 +376,9 @@ class Maybe[T](GenericBase[T]):
 
         :raises Exception: Of the type provided by the exception_supplier, if self was empty.
         """
-        if self.is_present():
-            return self.value
-        raise exception_supplier()
+        if self.value is None:
+            raise exception_supplier()
+        return self.value
 
     def if_present(self: Maybe[T], consumer: Callable[[T], None]) -> None:
         """
@@ -231,7 +387,7 @@ class Maybe[T](GenericBase[T]):
         :param consumer: Consumer function to apply to the value.
         :type consumer: Callable[[T], None]
         """
-        if self.is_present():
+        if self.value is not None:
             consumer(self.value)
 
     def map[U](
@@ -337,44 +493,3 @@ class Maybe[T](GenericBase[T]):
         :rtype: Maybe[T]
         """
         return self if self.is_present() and predicate(self.value) else type(self).empty()
-
-    def __bool__(self: Maybe[T]) -> bool:
-        """
-        Delegates the bool implementation to that of the value's.
-
-        :return: True if the value is evaluated to True by bool(), False otherwise or if it's None.
-        :rtype: bool
-        """
-        return bool(self.value)
-
-    def __eq__(self: Maybe[T], other: object) -> bool:
-        """
-        Checks equality between two Maybe objects, comparing their item_type and value.
-
-        :param other: Another Maybe object to compare.
-        :type other: object
-
-        :return: True if other is an instance of Maybe of the same item_type and holding the same value by the `==`
-        operator, False otherwise.
-        """
-        return (
-            isinstance(other, Maybe)
-            and self.item_type == other.item_type
-            and self.value == other.value
-        )
-
-    def __hash__(self: Maybe[T]) -> int:
-        """
-        Hashes the Maybe object by trying to hash the tuple of its item_type and value.
-        """
-        return hash((self.item_type, self.value))
-
-    def __repr__(self: Maybe[T]) -> str:
-        """
-        Gives a str representation of this Maybe object, displaying its wrapped value or indicating if it holds None.
-
-        :return: A str of the format Maybe[self.item_type].of(self.value), or Maybe[self.item_type].empty().
-        :rtype: str
-        """
-        from abstract_classes.generic_base import class_name
-        return f"{class_name(type(self))}.of({self.value!r})" if self.is_present() else f"{class_name(type(self))}.empty()"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import UnionType
-from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, Callable
+from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, Callable, TypeVar
 from weakref import WeakValueDictionary
 
 """
@@ -37,6 +37,9 @@ GenericBase[*Ts]
 
 Ts = TypeVarTuple("Ts")
 
+
+def base_class[T: GenericBase](obj: T) -> type[T]:
+    return type(obj)._origin if hasattr(type(obj), '_origin') else type(obj)
 
 def forbid_instantiation(cls):
     """
@@ -134,7 +137,7 @@ class GenericBase[*Ts]:
     _origin: ClassVar[type]
 
     @classmethod
-    def __class_getitem__(cls, item: type | tuple[type, ...]):
+    def __class_getitem__(cls, item: type | UnionType | tuple[type, ...]):
         """
         Extends the class cls to store the generic arguments it was called upon (item) and use them on runtime.
 
@@ -147,6 +150,9 @@ class GenericBase[*Ts]:
         """
         if not isinstance(item, tuple):
             item = (item,)
+
+        if any(isinstance(t, TypeVar) for t in item):
+            return cls
 
         cache_key = (cls, item)
         if cache_key in GenericBase._generic_type_registry:

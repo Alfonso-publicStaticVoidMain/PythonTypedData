@@ -1,4 +1,5 @@
 import unittest
+from typing import Callable, Any
 
 from concrete_classes.list import MutableList
 from concrete_classes.set import MutableSet
@@ -51,8 +52,51 @@ class TestMaybe(unittest.TestCase):
         mb = Maybe[list[int]]([0, 1, 2])
         self.assertIn('Maybe[list[int]]', repr(mb))
 
-        mb2 = Maybe.of(MutableList[MutableSet[int]](MutableSet.of(0, 1), MutableSet.of(0, -1)))
+        mb2 = Maybe.of(MutableList[MutableSet[int]](MutableSet.of_values(0, 1), MutableSet.of_values(0, -1)))
         self.assertIn('Maybe[MutableList[MutableSet[int]]]', repr(mb2))
+
+    def test_getattr(self):
+        class Dummy:
+            def __init__(self, num: int):
+                self.num = num
+
+            def get_double(self):
+                return self.num * 2
+
+        mb = Maybe.of(Dummy(2))
+        self.assertEqual(mb.get_double(), 4)
+        with self.assertRaises(TypeError):
+            len(mb)
+        with self.assertRaises(TypeError):
+            mb(1)
+        with self.assertRaises(TypeError):
+            2 in mb
+        with self.assertRaises(TypeError):
+            for x in mb: pass
+        with self.assertRaises(TypeError):
+            len(mb)
+
+        mb = Maybe.of([0, 1, 2])
+        mb.append(3)
+        self.assertEqual(mb, Maybe.of([0, 1, 2, 3]))
+        self.assertEqual(mb[0], 0)
+        self.assertTrue(3 in mb)
+        self.assertEqual(len(mb), 4)
+        with self.assertRaises(IndexError):
+            mb[4]
+
+        mb = Maybe[str].empty()
+        with self.assertRaises(AttributeError):
+            mb.startswith('_')
+        with self.assertRaises(ValueError):
+            len(mb)
+        with self.assertRaises(ValueError):
+            mb(1)
+        with self.assertRaises(ValueError):
+            for x in mb: pass
+
+        mb = Maybe.of(lambda x : x + 1)
+        self.assertEqual(mb(1), 2)
 
 if __name__ == '__main__':
     unittest.main()

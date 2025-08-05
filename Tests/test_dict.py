@@ -19,6 +19,7 @@ class DictionaryTest(unittest.TestCase):
         self.assertEqual(dic.data, imd.data)
         self.assertEqual(dic['a'], imd['a'])
         # The original dict and its "copy" are still considered equal
+        imd.__eq__(dic)
         self.assertEqual(imd, dic)
 
         # Converting back to a MutableDict preserves equality
@@ -117,11 +118,17 @@ class DictionaryTest(unittest.TestCase):
         self.assertEqual(filtered_values.data, {0:'abc', 2:'xyz'})
 
     def test_subdict(self):
+        # Basic subdict slicing
         d = ImmutableDict[str, int]({'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5})
-        self.assertEqual(d['b': 'd'], ImmutableDict[str, int]({'b': 2, 'c': 3, 'd': 4}))
+        self.assertEqual(d['b' : 'd'], ImmutableDict[str, int]({'b': 2, 'c': 3, 'd': 4}))
         self.assertEqual(d['d':], ImmutableDict[str, int]({'d': 4, 'e': 5}))
         self.assertEqual(d[:'c'], ImmutableDict[str, int]({'a': 1, 'b': 2, 'c': 3}))
 
+        # Using a step raises a TypeError
+        with self.assertRaises(TypeError):
+            d['a':'e':1]
+
+        # Subdict slicing on tuple keys
         tpl_dic = ImmutableDict[tuple[int, str], float]({
             (1, 'a') : 0,
             (1, 'b') : 1.1,
@@ -131,6 +138,59 @@ class DictionaryTest(unittest.TestCase):
         })
         tpl_subdic = tpl_dic[(1, 'j') : (3, 'a')]
         self.assertEqual(tpl_subdic.data, {(1, 'z') : 2.25, (2, 'a') : 3.1415})
+
+        class Dummy:
+            def __init__(self, n: int):
+                self.n = n
+
+        # Slicing non-orderable keys raises TypeError
+        dummy_dic = MutableDict[Dummy, int]({Dummy(1) : 1, Dummy(2) : 2, Dummy(3) : 3})
+        with self.assertRaises(TypeError):
+            dummy_dic[Dummy(1) : Dummy(3)]
+
+    def test_partially_ordered_slicing(self):
+        class PartiallyOrdered:
+            def __init__(self, n: int):
+                self.n = n
+            def __lt__(self, other):
+                if not isinstance(other, PartiallyOrdered):
+                    return NotImplemented
+                if abs(self.n - other.n) < 10:
+                    return self.n < other.n
+                else:
+                    raise ValueError(f"Can't compare {self} to {other}")
+            def __le__(self, other):
+                if not isinstance(other, PartiallyOrdered):
+                    return NotImplemented
+                if abs(self.n - other.n) < 10:
+                    return self.n <= other.n
+                else:
+                    raise ValueError(f"Can't compare {self} to {other}")
+
+        # --- Case 1: all keys are comparable ---
+        keys_all = [PartiallyOrdered(n) for n in (1, 5, 8)]
+        values_all = [str(k.n) for k in keys_all]
+        d_all = MutableDict[PartiallyOrdered, str](_keys=keys_all, _values=values_all)
+
+        sliced = d_all[PartiallyOrdered(0):PartiallyOrdered(9)]
+        self.assertEqual(list(sliced.values()), ["1", "5", "8"])
+
+        # --- Case 2: at least one key not comparable to bounds ---
+        keys_partial = [PartiallyOrdered(n) for n in (1, 5, 50)]
+        values_partial = [str(k.n) for k in keys_partial]
+        d_partial = MutableDict[PartiallyOrdered, str](_keys=keys_partial, _values=values_partial)
+
+        with self.assertRaises(TypeError) as cm:
+            _ = d_partial[PartiallyOrdered(0):PartiallyOrdered(9)]
+        self.assertIn("not comparable", str(cm.exception))
+
+
+    def test_independence_of_values(self):
+        dic = {1 : 'a', 2 : 'b'}
+        mud = MutableDict[int, str](dic)
+        mud[3] = 'c'
+        self.assertEqual(dic, {1 : 'a', 2 : 'b'})
+        self.assertNotEqual(dic, {1 : 'a', 2 : 'b', 3 : 'c'})
 
 
 if __name__ == '__main__':

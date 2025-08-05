@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import collections
 import typing
+from dataclasses import FrozenInstanceError
 from typing import ClassVar, Callable, Iterable, Any, Iterator
 
 from abstract_classes.abstract_set import AbstractSet
@@ -25,6 +27,9 @@ class AbstractSequence[T](Collection[T]):
         _finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting them as an
          attribute on Collection's init.
 
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting
+         them as an attribute on Collection's init when the parameter _skip_validation is True.
+
         _repr_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on the repr method to show
          the values contained on the sequence.
 
@@ -36,9 +41,11 @@ class AbstractSequence[T](Collection[T]):
     """
 
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
     _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
     _forbidden_iterable_types: ClassVar[tuple[type, ...]] = (set, frozenset, AbstractSet, typing.AbstractSet)
+    _priority: ClassVar[int] = 0
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
         """
@@ -60,87 +67,100 @@ class AbstractSequence[T](Collection[T]):
         else:
             raise TypeError("Invalid index type: must be an int or slice")
 
-    def __lt__(self: AbstractSequence[T], other: AbstractSequence[T] | list[T] | tuple[T, ...]) -> bool:
+    def __lt__(self: AbstractSequence[T], other: AbstractSequence[T]) -> bool:
         """
         Checks if this sequence is lexicographically less than another.
 
-        :param other: Another AbstractSequence, list or tuple to compare with.
-        :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
+        :param other: Another AbstractSequence to compare with.
+        :type other: AbstractSequence[T]
 
         :return: True if self is less than `other`.
         :rtype: bool
         """
-        if isinstance(other, (AbstractSequence, list, tuple)):
-            return tuple(self.values) < tuple(other.values if isinstance(other, AbstractSequence) else other)
-        return NotImplemented
+        if not isinstance(other, AbstractSequence):
+            return NotImplemented
+        eq_finisher = type(self)._get_eq_finisher()
+        return eq_finisher(self.values) < eq_finisher(other.values)
 
-    def __gt__(self: AbstractSequence[T], other: AbstractSequence[T] | list[T] | tuple[T, ...]) -> bool:
+    def __gt__(self: AbstractSequence[T], other: AbstractSequence[T]) -> bool:
         """
         Checks if this sequence is lexicographically greater than another.
 
-        :param other: Another AbstractSequence, list or tuple to compare with.
-        :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
+        :param other: Another AbstractSequence to compare with.
+        :type other: AbstractSequence[T]
 
         :return: True if self is greater than `other`.
         :rtype: bool
         """
-        if isinstance(other, (AbstractSequence, list, tuple)):
-            return tuple(self.values) > tuple(other.values if isinstance(other, AbstractSequence) else other)
-        return NotImplemented
+        if not isinstance(other, AbstractSequence):
+            return NotImplemented
+        eq_finisher = type(self)._get_eq_finisher()
+        return eq_finisher(self.values) > eq_finisher(other.values)
 
-    def __le__(self: AbstractSequence[T], other: AbstractSequence[T] | list[T] | tuple[T, ...]) -> bool:
+    def __le__(self: AbstractSequence[T], other: AbstractSequence[T]) -> bool:
         """
         Checks if this sequence is less than or equal to another.
 
-        :param other: Another AbstractSequence, list or tuple to compare with.
-        :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
+        :param other: Another AbstractSequence to compare with.
+        :type other: AbstractSequence[T]
 
         :return: True if self is less than or equal to `other`.
         :rtype: bool
         """
-        if isinstance(other, (AbstractSequence, list, tuple)):
-            return tuple(self.values) <= tuple(other.values if isinstance(other, AbstractSequence) else other)
-        return NotImplemented
+        if not isinstance(other, AbstractSequence):
+            return NotImplemented
+        eq_finisher = type(self)._get_eq_finisher()
+        return eq_finisher(self.values) <= eq_finisher(other.values)
 
-    def __ge__(self: AbstractSequence[T], other: AbstractSequence[T] | list[T] | tuple[T, ...]) -> bool:
+    def __ge__(self: AbstractSequence[T], other: AbstractSequence[T]) -> bool:
         """
         Checks if this sequence is greater than or equal to another.
 
-        :param other: Another AbstractSequence, list or tuple to compare with.
-        :type other: AbstractSequence[T] | list[T] | tuple[T, ...]
+        :param other: Another AbstractSequence to compare with.
+        :type other: AbstractSequence[T]
 
         :return: True if self is greater than or equal to `other`.
         :rtype: bool
         """
-        if isinstance(other, (AbstractSequence, list, tuple)):
-            return tuple(self.values) >= tuple(other.values if isinstance(other, AbstractSequence) else other)
-        return NotImplemented
+        if not isinstance(other, AbstractSequence):
+            return NotImplemented
+        eq_finisher = type(self)._get_eq_finisher()
+        return eq_finisher(self.values) >= eq_finisher(other.values)
 
-    def __add__(
-        self: AbstractSequence[T],
-        other: AbstractSequence[T] | list[T] | tuple[T, ...]
-    ) -> AbstractSequence[T]:
+    def __add__[S: AbstractSequence](
+        self: S,
+        other: S,
+    ) -> S:
         """
         Returns a new AbstractSequence concatenating the values of another AbstractSequence, list or tuple.
 
-        :param other: The sequence or iterable to concatenate.
-        :type other: AbstractSequence[T] | list[T] | tuple[T]
+        :param other: The sequence to concatenate.
+        :type other: S
 
         :return: A new AbstractSequence of the same dynamic subclass as self containing the elements from `other` added
          right after the ones from self, as done by the __add__ method of the underlying container.
-        :rtype: AbstractSequence[T]
+        :rtype: S
 
         :raises TypeError: If `other` has incompatible types.
         """
-        from type_validation.type_validation import _validate_collection_type_and_get_values
-        if not isinstance(other, (AbstractSequence, list, tuple)):
+        if not isinstance(other, AbstractSequence):
             return NotImplemented
-        return type(self)(self.values + _validate_collection_type_and_get_values(other, self.item_type))
 
-    def __mul__(
-        self: AbstractSequence[T],
+        from type_validation.type_hierarchy import _resolve_type_priority
+        sequence_type = _resolve_type_priority(type(self), type(other))
+
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _get_subtype
+            new_type = _get_subtype(self.item_type, other.item_type)
+        else:
+            new_type = self.item_type
+
+        return sequence_type[new_type](self.values + other.values, _skip_validation=True)
+
+    def __mul__[S: AbstractSequence](
+        self: S,
         n: int
-    ) -> AbstractSequence[T]:
+    ) -> S:
         """
         Returns a new AbstractSequence with the values of this sequence concatenated n times.
 
@@ -148,7 +168,7 @@ class AbstractSequence[T](Collection[T]):
         :type n: int
 
         :return: A new AbstractSequence of the same dynamic subclass as self with its values concatenated n times.
-        :rtype: AbstractSequence[T]
+        :rtype: S
 
         :raises TypeError: If n is not an integer.
         """
@@ -156,17 +176,24 @@ class AbstractSequence[T](Collection[T]):
             return NotImplemented
         return type(self)(self.values * n, _skip_validation=True)
 
-    def __sub__(self: AbstractSequence[T], other: Iterable[T]) -> AbstractSequence[T]:
+    def __rmul__[S: AbstractSequence](
+        self: S,
+        n: int
+    ) -> S:
         """
-        Returns a new AbstractSequence with the elements of `other` removed.
+        Returns a new AbstractSequence with the values of this sequence concatenated n times.
 
-        :param other: A collection of elements to exclude.
-        :type other: Iterable
+        :param n: Number of times to repeat the sequence.
+        :type n: int
 
-        :return: A new AbstractSequence of the same dynamic subclass as self with all elements present in `other` removed.
-        :rtype: AbstractSequence[T]
+        :return: A new AbstractSequence of the same dynamic subclass as self with its values concatenated n times.
+        :rtype: S
+
+        :raises TypeError: If n is not an integer.
         """
-        return self.filter(lambda item : item not in other)
+        if not isinstance(n, int):
+            return NotImplemented
+        return type(self)(self.values * n, _skip_validation=True)
 
     def __reversed__(self: AbstractSequence[T]) -> Iterator[T]:
         """
@@ -177,13 +204,13 @@ class AbstractSequence[T](Collection[T]):
         """
         return reversed(self.values)
 
-    def reversed(self) -> AbstractSequence[T]:
+    def reversed[S: AbstractSequence](self: S) -> S:
         """
         Returns a new AbstractSequence with its elements in reverse order.
 
         :return: A new reversed AbstractSequence of the same dynamic subclass as self containing its elements in
          reversed order.
-        :rtype: AbstractSequence[T]
+        :rtype: S
         """
         return type(self)(reversed(self.values), _skip_validation=True)
 
@@ -219,12 +246,12 @@ class AbstractSequence[T](Collection[T]):
         except ValueError:
             return fallback
 
-    def sorted(
-        self: AbstractSequence[T],
+    def sorted[S: AbstractSequence](
+        self: S,
         *,
         key: Callable[[T], Any] | None = None,
         reverse: bool = False
-    ) -> AbstractSequence[T]:
+    ) -> S:
         """
         Returns a new AbstractSequence with its elements sorted by an optional key.
 
@@ -235,8 +262,8 @@ class AbstractSequence[T](Collection[T]):
         :type reverse: bool
 
         :return: A new AbstractSequence of the same dynamic subclass as self with the same elements but sorted
-        according to the key and reverse parameters.
-        :rtype: AbstractSequence[T]
+         according to the key and reverse parameters.
+        :rtype: S
         """
         return type(self)(sorted(self.values, key=key, reverse=reverse), _skip_validation=True)
 
@@ -259,7 +286,10 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
     """
 
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = list
+    _allowed_ordered_types: ClassVar[tuple[type, ...]] = (list, tuple, AbstractSequence, range, collections.deque, collections.abc.Sequence)
     _mutable: ClassVar[bool] = True
+    _priority: ClassVar[int] = 1
 
     def append(
         self: AbstractMutableSequence[T],
@@ -300,10 +330,12 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
 
         :raises TypeError: If index is not int or slice.
         """
-        from type_validation.type_validation import _validate_collection_type_and_get_values, _validate_or_coerce_value
+        from type_validation.type_validation import _validate_or_coerce_iterable, _validate_or_coerce_value
 
         if isinstance(index, slice):
-            self.values[index] = _validate_collection_type_and_get_values(value, self.item_type)
+            if not isinstance(value, type(self)._get_allowed_ordered_types()):
+                raise ValueError("You can't assign a value that isn't a sequence to a slice!")
+            self.values[index] = _validate_or_coerce_iterable(value, self.item_type, _coerce=_coerce)
 
         elif isinstance(index, int):
             self.values[index] = _validate_or_coerce_value(value, self.item_type, _coerce=_coerce)
@@ -320,29 +352,33 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         """
         del self.values[index]
 
-    def __iadd__(
-        self: AbstractMutableSequence[T],
-        other: AbstractSequence[T] | list[T] | tuple[T, ...]
-    ) -> AbstractMutableSequence[T]:
+    def __iadd__[S: AbstractMutableSequence](
+        self: S,
+        other: AbstractSequence[T]
+    ) -> S:
         """
         Appends the elements from `other` to this sequence in-place.
 
-        This method modifies `self.values` directly by extending it with the validated elements from `other`.
-
-        :param other: The sequence or iterable whose elements will be appended.
-        :type other: AbstractSequence[T] | list[T] | tuple[T]
+        :param other: The sequence whose elements will be appended.
+        :type other: AbstractSequence[T]
 
         :return: Self after appending the contents of `other`.
-        :rtype: AbstractMutableSequence[T]
+        :rtype: S
 
         :raises TypeError: If `other` contains elements of an incompatible type.
         """
-        if not isinstance(other, (AbstractSequence, list, tuple)):
+        if not isinstance(other, AbstractSequence):
             return NotImplemented
-        self.extend(other)
+
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            if not _is_subtype(other.item_type, self.item_type):
+                raise TypeError(f"Incompatible types between {type(self).__name__} and {type(other).__name__}.")
+
+        self.values.extend(other.values)
         return self
 
-    def __imul__(self: AbstractMutableSequence[T], n: int) -> AbstractMutableSequence[T]:
+    def __imul__[S: AbstractMutableSequence](self: S, n: int) -> S:
         """
         Concatenates the contents of this sequence n times in-place.
 
@@ -350,28 +386,13 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         :type n: int
 
         :return: Self after concatenation.
-        :rtype: AbstractMutableSequence[T]
+        :rtype: S
 
         :raises TypeError: If `n` is not an integer.
         """
         if not isinstance(n, int):
             return NotImplemented
         self.values[:] = self.values * n
-        return self
-
-    def __isub__(self: AbstractMutableSequence[T], other: Iterable[T]) -> AbstractMutableSequence[T]:
-        """
-        Removes all elements in `other` from this sequence in-place.
-
-        Retains only elements that are not in `other`, preserving order.
-
-        :param other: An iterable of elements to remove.
-        :type other: Iterable[T]
-
-        :return: Self after removing all matching elements.
-        :rtype: AbstractMutableSequence[T]
-        """
-        self.values[:] = [item for item in self.values if item not in other]
         return self
 
     def sort(
