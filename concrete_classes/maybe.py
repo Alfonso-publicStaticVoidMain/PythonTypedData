@@ -69,7 +69,7 @@ class Maybe[T](GenericBase[T]):
         type from the _args attribute the class inherits from GenericBase which is set on its __class_getitem__ method.
 
         :return: The generic type T that this class was called upon, as stored on its attribute _args by the
-        __class_getitem__ method inherited from GenericBase. If unable to retrieve it, returns None.
+         __class_getitem__ method inherited from GenericBase. If unable to retrieve it, returns None.
         :rtype: type[T] | None
         """
         try:
