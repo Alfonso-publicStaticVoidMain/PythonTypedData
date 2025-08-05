@@ -32,6 +32,6 @@ GenericBase[*Ts]
 
 Where classes marked with (\*) are concrete, and everything else abstract, hence their direct instantiation forbidden.
 
-When calling a class `cls` extending from GenericBase with type parameters, like `MutableList\[int\]`, a new dynamic subclass of `cls` is generated, with an `_origin` attribute pointing to its original class, in this case `MutableList`, and an `_args` attribute storing in a tuple the generic types it was called upon, in this case, `(int,)`. If the type parameters included any TypeVar, no dynamic subclass is generated and the original `cls` is returned unmodified.
+When calling a class `cls` extending from GenericBase with type parameters, like `MutableList[int]`, a new dynamic subclass of `cls` is generated, with an `_origin` attribute pointing to its original class, in this case `MutableList`, and an `_args` attribute storing in a tuple the generic types it was called upon, in this case, `(int,)`. If the type parameters included any TypeVar, no dynamic subclass is generated and the original `cls` is returned unmodified.
 
 Classes along the inheritance tree have metadata attributes, codifying certain properties of them.
