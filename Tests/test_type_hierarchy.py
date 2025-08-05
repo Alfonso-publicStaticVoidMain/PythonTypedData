@@ -3,9 +3,9 @@ from typing import Any
 
 from abstract_classes.abstract_sequence import AbstractSequence
 from abstract_classes.abstract_set import AbstractSet
-from abstract_classes.collection import Collection
-from concrete_classes.list import MutableList
-from concrete_classes.set import ImmutableSet
+from abstract_classes.collection import Collection, MutableCollection
+from concrete_classes.list import MutableList, ImmutableList
+from concrete_classes.set import ImmutableSet, MutableSet
 from type_validation.type_hierarchy import _is_subtype, _get_supertype
 
 
@@ -68,7 +68,9 @@ class TestGetSupertype(unittest.TestCase):
         self.assertEqual(_get_supertype(int, Any), Any)
         self.assertEqual(_get_supertype(Any, int), Any)
         self.assertTrue(_is_subtype(int, Any))
-        self.assertFalse(_is_subtype(Any, int))  # invariant Any
+        self.assertFalse(_is_subtype(Any, int))
+        self.assertTrue(_is_subtype(Any, Any))
+        self.assertTrue(_is_subtype(None, Any))
 
         self.assertEqual(_get_supertype(int, int | Any), int | Any)
         self.assertTrue(_is_subtype(str, int | Any))
@@ -97,6 +99,8 @@ class TestGetSupertype(unittest.TestCase):
         # Collection[int | str] is supertype of List[int] -> should return Collection[int | str]
         self.assertEqual(_get_supertype(Collection[int | str], MutableList[int]), Collection[int | str])
         self.assertTrue(_is_subtype(MutableList[int], Collection[int | str]))
+        self.assertTrue(_is_subtype(MutableList[int] | MutableSet[int], MutableCollection[int]))
+        self.assertTrue(_is_subtype(MutableList[int] | MutableSet[float], MutableCollection[int | float]))
 
     def test_incompatible_collection_and_list(self):
         # Collection[int] and List[int | str] are incompatible
@@ -110,13 +114,21 @@ class TestGetSupertype(unittest.TestCase):
         self.assertTrue(_is_subtype(None, int | None))
         # str is not subtype of int | None
         self.assertFalse(_is_subtype(str, int | None))
-        self.assertEqual(
-            _get_supertype(int, int | None),
-            int | None
-        )
+        self.assertEqual(_get_supertype(int, int | None), int | None)
+
+        # None shouldn't be subtype of int, nor int of None
+        self.assertFalse(_is_subtype(None, int))
+        self.assertFalse(_is_subtype(int, None))
 
     def test_unparameterized_type_against_parameterized(self):
         self.assertFalse(_is_subtype(list, list[int]))
+        self.assertTrue(_is_subtype(list[str], list))
+        self.assertFalse(_is_subtype(list[complex], list[str]))
+
+        self.assertFalse(_is_subtype(MutableList, MutableList[int]))
+        self.assertTrue(_is_subtype(MutableList[str], MutableList))
+        self.assertTrue(_is_subtype(ImmutableList[int], AbstractSequence))
+        self.assertFalse(_is_subtype(MutableList[int], MutableList[float]))
 
     def test_nested_union_in_generics(self):
         self.assertEqual(_get_supertype(list[int], list[int | str]), list[int | str])

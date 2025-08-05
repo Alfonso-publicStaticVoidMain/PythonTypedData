@@ -50,7 +50,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = immutabledict
     _repr_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
     _eq_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
-    _priority: int = 0
+    _priority: ClassVar[int] = 0
 
     def __init__(
         self: AbstractDict[K, V],
@@ -171,7 +171,8 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         """
         if keys_values is None or not keys_values:
             raise ValueError(f"Can't create a {cls.__name__} object from empty iterable.")
-        from type_validation.type_validation import _infer_type_contained_in_iterable, _split_keys_values
+        from type_validation.type_validation import _split_keys_values
+        from type_validation.type_inference import _infer_type_contained_in_iterable
         keys, values, _ = _split_keys_values(keys_values)
         key_type = _infer_type_contained_in_iterable(keys)
         value_type = _infer_type_contained_in_iterable(values)
@@ -203,7 +204,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         if len(keys) != len(values):
             raise ValueError("Keys and iterable must be of the same length when using .of_keys_values")
 
-        from type_validation.type_validation import _infer_type_contained_in_iterable
+        from type_validation.type_inference import _infer_type_contained_in_iterable
         key_type = _infer_type_contained_in_iterable(keys)
         value_type = _infer_type_contained_in_iterable(values)
         return cls[key_type, value_type](_keys=keys, _values=values, _skip_validation=True)
@@ -543,7 +544,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         if result_type is not None:
             new_value_type = result_type
         else:
-            from type_validation.type_validation import _infer_type_contained_in_iterable
+            from type_validation.type_inference import _infer_type_contained_in_iterable
             new_value_type = _infer_type_contained_in_iterable(new_data.values())
 
         return dict_subclass[self.key_type, new_value_type](new_data, _skip_validation=True)
@@ -604,7 +605,7 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
     _finisher: ClassVar[Callable[[dict], Mapping]] = _convert_to(dict)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = immutabledict
     _mutable: bool = True
-    _priority: int = 1
+    _priority: ClassVar[int] = 1
 
     def __setitem__(
         self: AbstractMutableDict[K, V],

@@ -105,7 +105,7 @@ class Maybe[T](GenericBase[T]):
         """
         if value is None:
             raise ValueError("Can't use Maybe.of with a None obj.")
-        from type_validation.type_validation import _infer_type
+        from type_validation.type_inference import _infer_type
         return Maybe[_infer_type(value)](value, _skip_validation=True)
 
     @classmethod

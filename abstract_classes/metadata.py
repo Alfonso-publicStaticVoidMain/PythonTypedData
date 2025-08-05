@@ -123,3 +123,19 @@ class Metadata:
         :rtype: type | tuple[type, ...]
         """
         return getattr(cls, '_allowed_ordered_types', default)
+
+    @classmethod
+    def _get_priority(
+            cls: type[Metadata],
+            default: int = 100
+    ) -> type | tuple[type, ...]:
+        """
+        Gets the priority of the class when deciding a return type.
+
+        :param default: Default value if the class doesn't have a _priority attribute.
+        :type default: type | tuple[type, ...]
+
+        :return: The _priority attribute of the class, or a default if it doesn't have one.
+        :rtype: type | tuple[type, ...]
+        """
+        return getattr(cls, '_priority', default)

@@ -30,7 +30,7 @@ class AbstractSet[T](Collection[T]):
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = frozenset
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
-    _priority: int = 0
+    _priority: ClassVar[int] = 0
 
     def __lt__(self: AbstractSet, other: AbstractSet) -> bool:
         """
@@ -388,7 +388,7 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = set
     _mutable: ClassVar[bool] = True
-    _priority: int = 1
+    _priority: ClassVar[int] = 1
 
     def __ior__[S: AbstractMutableSet](
         self: S,

@@ -147,6 +147,23 @@ def _get_subtype(t: type, other: type) -> type:
 
 
 def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G]:
+    """
+    Determines which type will be used to create a new objects when two of the given types are combined.
+
+    :param t: First type combined.
+    :type t: type[G]
+
+    :param other: Second type combined.
+    :type other: type[G]
+
+    :return: The origin of the type which isn't mutable (assuming absence of a _mutable attribute as immutability) if
+     the other does, or the lowest _priority, if both are mutable or immutable. If only one has a priority
+     assigned, that one's origin is returned. If neither have priorities or they are equal, an error is raised.
+
+    :raises TypeError: If the types don't have a common supertype.
+    :raises TypeError: If the priority couldn't be resolved with the mutability check and both types either don't have
+     a priority set or they have the same priority.
+    """
     origin_t = getattr(t, "_origin", t)
     origin_other = getattr(other, "_origin", other)
 

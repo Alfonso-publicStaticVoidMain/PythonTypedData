@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import UnionType
-from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, Callable
+from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, Callable, TypeVar
 from weakref import WeakValueDictionary
 
 """
@@ -150,6 +150,9 @@ class GenericBase[*Ts]:
         """
         if not isinstance(item, tuple):
             item = (item,)
+
+        if any(isinstance(t, TypeVar) for t in item):
+            return cls
 
         cache_key = (cls, item)
         if cache_key in GenericBase._generic_type_registry:

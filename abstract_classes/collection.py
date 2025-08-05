@@ -150,12 +150,12 @@ class Collection[T](GenericBase[T], Metadata):
 
         :raises ValueError: If no values are provided.
         """
-        from type_validation.type_validation import _infer_type_contained_in_iterable
+        from type_validation.type_inference import _infer_type_contained_in_iterable
         return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
 
     @classmethod
     def of_iterable[C: Collection](cls: type[C], values: Iterable) -> C:
-        from type_validation.type_validation import _infer_type_contained_in_iterable
+        from type_validation.type_inference import _infer_type_contained_in_iterable
         return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
 
     @classmethod
