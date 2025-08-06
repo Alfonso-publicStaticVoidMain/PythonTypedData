@@ -39,9 +39,9 @@ Ts = TypeVarTuple("Ts")
 
 
 def base_class[T: GenericBase](obj: T) -> type[T]:
-    return type(obj)._origin if hasattr(type(obj), '_origin') else type(obj)
+    return getattr(type(obj), '_origin', type(obj))
 
-def forbid_instantiation(cls):
+def forbid_instantiation(cls: type) -> type:
     """
     Class decorator that forbids direct instantiation of the decorated class with or without generics.
 
@@ -89,12 +89,8 @@ def class_name(cls: type) -> str:
         args_str = ", ".join(class_name(arg) for arg in args)
         return f"{origin_name}[{args_str}]"
 
-    # Case 3: Simple class
-    if hasattr(cls, '__name__'):
-        return cls.__name__
-
-    # Fallback for things like typing.Any
-    return repr(cls)
+    # Fallback
+    return getattr(cls, '__name__', repr(cls))
 
 
 def _convert_to(tp: type) -> Callable[[Any], Any]:
@@ -104,8 +100,8 @@ def _convert_to(tp: type) -> Callable[[Any], Any]:
     :param tp: Type to convert into. Must also be a 1-parameter callable.
     :type tp: type
 
-    :return: A 1-parameter callable that, for its parameter x, if it is of type tp, returns it unmodified. Otherwise,
-     returns tp applied to x.
+    :return: A 1-parameter callable that, when applied to its parameter, if it is of type tp, returns it unmodified.
+     Otherwise, returns tp applied to it.
     :rtype: Callable[[Any], Any
     """
     return lambda x : x if isinstance(x, tp) else tp(x)
