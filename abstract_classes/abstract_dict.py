@@ -104,7 +104,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         object.__setattr__(self, "key_type", key_type)
         object.__setattr__(self, "value_type", value_type)
 
-        finisher = _finisher or type(self)._get_finisher()
+        finisher = _finisher or getattr(type(self), '_finisher', lambda x : x)
 
         if keys_values is None and (_keys is None or _values is None):
             object.__setattr__(self, "data", finisher({}))
@@ -130,7 +130,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
             _validate_duplicates_and_hash(actual_keys)
 
         if _skip_validation:
-            skip_validation_finisher = type(self)._get_skip_validation_finisher() or finisher
+            skip_validation_finisher = getattr(type(self), '_skip_validation_finisher', lambda x : x) or finisher
             object.__setattr__(self, "data", skip_validation_finisher(dict(zip(actual_keys, actual_values))))
         else:
             object.__setattr__(self, "data", finisher(dict(zip(actual_keys, actual_values))))
@@ -315,8 +315,8 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         :return: True if `other` is an AbstractDict with the same key and values types and contents, False otherwise.
         :rtype: bool
         """
-        eq_finisher: Callable[[Iterable], Iterable] = type(self)._get_eq_finisher()
-        comparable_types: type[AbstractDict] | tuple[type[AbstractDict], ...] = type(self)._get_comparable_types(default=AbstractDict)
+        eq_finisher: Callable[[Iterable], Iterable] = getattr(type(self), '_eq_finisher', lambda x : x)
+        comparable_types: type[AbstractDict] = getattr(type(self), '_comparable_types', AbstractDict)
         return (
             isinstance(other, comparable_types)
             and self.key_type == other.key_type
@@ -331,7 +331,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         :return: A string representation of this AbstractDict.
         :rtype: str
         """
-        repr_finisher: Callable[[Iterable], Iterable] = type(self)._get_repr_finisher()
+        repr_finisher: Callable[[Iterable], Iterable] = getattr(type(self), '_repr_finisher', lambda x : x)
         return f"{class_name(type(self))}{repr_finisher(self.data)}"
 
     def __or__[D: AbstractDict](self: D, other: D) -> D:
@@ -339,11 +339,11 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         Returns the union of this AbstractDict and another mapping.
 
         :param other: The other mapping to merge.
-        :type other: AbstractDict[K, V] | Mapping[K, V]
+        :type other: D
 
         :return: A new AbstractDict of the same dynamic subclass as self containing all key-value pairs from both, with
          `other` overriding duplicate keys.
-        :rtype: AbstractDict[K, V]
+        :rtype: D
         """
         if not isinstance(other, AbstractDict):
             return NotImplemented
@@ -363,15 +363,15 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
 
         return dict_type[new_key_type, new_value_type](self.data | other.data, _skip_validation=True)
 
-    def __and__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
+    def __and__[D: AbstractDict](self: D, other: D) -> D:
         """
         Returns the intersection of this AbstractDict with another mapping.
 
         :param other: The other mapping.
-        :type other: AbstractDict[K, V] | Mapping[K, V]
+        :type other: D
 
         :return: A new AbstractDict of the same dynamic subclass as self with only keys present in both mappings.
-        :rtype: AbstractDict[K, V]
+        :rtype: D
         """
         if not isinstance(other, AbstractDict):
             return NotImplemented
@@ -394,27 +394,27 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
             _skip_validation=True
         )
 
-    def __sub__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
+    def __sub__[D: AbstractDict](self: D, other: D) -> D:
         """
         Returns a new dictionary with the keys that are not in `other`.
 
         :param other: The mapping to subtract from this one.
-        :type other: AbstractDict[K, V] | Mapping[K, V]
+        :type other: D
 
         :return: A new AbstractDict of the same dynamic subclass as self without the keys found in `other`.
-        :rtype: AbstractDict[K, V]
+        :rtype: D
         """
         return type(self)({key : value for key, value in self.data.items() if key not in other})
 
-    def __xor__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
+    def __xor__[D: AbstractDict](self: D, other: D) -> D:
         """
         Returns the symmetric difference between this AbstractDict and another mapping.
 
         :param other: The other mapping.
-        :type other: AbstractDict[K, V] | Mapping[K, V]
+        :type other: D
 
         :return: A new AbstractDict of the same dynamic subclass as self containing keys only in one of the two mappings.
-        :rtype: AbstractDict[K, V]
+        :rtype: D
         """
         if not isinstance(other, AbstractDict):
             return NotImplemented
@@ -685,12 +685,12 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
             del self.data[key]
         return self
 
-    def __isub__(self: AbstractMutableDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractMutableDict[K, V]:
+    def __isub__(self: AbstractMutableDict[K, V], other: AbstractDict[K, V]) -> AbstractMutableDict[K, V]:
         """
         In-place difference by removing keys found in `other`.
 
         :param other: The mapping whose keys will be removed.
-        :type other: AbstractDict[K, V] | Mapping[K, V]
+        :type other: AbstractDict[K, V]
 
         :return: The updated AbstractMutableDict.
         :rtype: AbstractMutableDict[K, V]

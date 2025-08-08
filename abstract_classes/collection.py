@@ -103,15 +103,15 @@ class Collection[T](GenericBase[T], Metadata):
         ):
             values = values[0]  # Then, the values are unpacked.
 
-        forbidden_iterable_types = _forbidden_iterable_types or type(self)._get_forbidden_iterable_types()
+        forbidden_iterable_types = _forbidden_iterable_types or getattr(type(self), '_forbidden_iterable_types', ())
 
         if isinstance(values, forbidden_iterable_types):
             raise TypeError(f"Invalid type {type(values).__name__} for class {type(self).__name__}.")
 
         object.__setattr__(self, 'item_type', generic_item_type)
 
-        finisher = _finisher or type(self)._get_finisher()
-        skip_validation_finisher = type(self)._get_skip_validation_finisher() or finisher
+        finisher = _finisher or getattr(type(self), '_finisher', lambda x : x)
+        skip_validation_finisher = getattr(type(self), '_skip_validation_finisher', lambda x : x) or finisher
 
         final_values = skip_validation_finisher(values) if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce, _finisher=finisher)
 
@@ -210,8 +210,8 @@ class Collection[T](GenericBase[T], Metadata):
          after applying the class's _eq_finisher callable attribute to them.
         :rtype: bool
         """
-        eq_finisher: Callable[[Iterable], Iterable] = type(self)._get_eq_finisher()
-        comparable_types: type[Collection] | tuple[type[Collection], ...] = type(self)._get_comparable_types(default=Collection)
+        eq_finisher: Callable[[Iterable], Iterable] = getattr(type(self), '_eq_finisher', lambda x : x)
+        comparable_types: type[Collection] | tuple[type[Collection], ...] = getattr(type(self), '_comparable_types', Collection)
         return (
             isinstance(other, comparable_types)
             and self.item_type == other.item_type
@@ -226,7 +226,7 @@ class Collection[T](GenericBase[T], Metadata):
          to the values before showing them.
         :rtype: str
         """
-        repr_finisher: Callable[[Iterable], Iterable] = type(self)._get_repr_finisher()
+        repr_finisher: Callable[[Iterable], Iterable] = getattr(type(self), '_repr_finisher', lambda x : x)
         return f"{class_name(type(self))}{repr_finisher(self.values)}"
 
     def __bool__(self) -> bool:
