@@ -9,7 +9,7 @@ from abstract_classes.metadata import Metadata
 
 
 @forbid_instantiation
-class Collection[T](GenericBase[T], Metadata):
+class Collection[T](GenericBase[T]):
     """
     Abstract base class representing a collection of items of type T, wrapping an underlying container and an item type.
 

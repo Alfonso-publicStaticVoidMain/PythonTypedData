@@ -40,6 +40,9 @@ class AbstractSequence[T](Collection[T]):
          Collection's init, setting it to (set, frozenset, AbstractSet, typing.AbstractSet).
     """
 
+    item_type: type[T]
+    values: tuple[T, ...]
+
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
@@ -79,7 +82,7 @@ class AbstractSequence[T](Collection[T]):
         """
         if not isinstance(other, AbstractSequence):
             return NotImplemented
-        eq_finisher = type(self)._get_eq_finisher()
+        eq_finisher = getattr(type(self), '_eq_finisher', lambda x : x)
         return eq_finisher(self.values) < eq_finisher(other.values)
 
     def __gt__(self: AbstractSequence[T], other: AbstractSequence[T]) -> bool:
@@ -94,7 +97,7 @@ class AbstractSequence[T](Collection[T]):
         """
         if not isinstance(other, AbstractSequence):
             return NotImplemented
-        eq_finisher = type(self)._get_eq_finisher()
+        eq_finisher = getattr(type(self), '_eq_finisher', lambda x : x)
         return eq_finisher(self.values) > eq_finisher(other.values)
 
     def __le__(self: AbstractSequence[T], other: AbstractSequence[T]) -> bool:
@@ -109,7 +112,7 @@ class AbstractSequence[T](Collection[T]):
         """
         if not isinstance(other, AbstractSequence):
             return NotImplemented
-        eq_finisher = type(self)._get_eq_finisher()
+        eq_finisher = getattr(type(self), '_eq_finisher', lambda x : x)
         return eq_finisher(self.values) <= eq_finisher(other.values)
 
     def __ge__(self: AbstractSequence[T], other: AbstractSequence[T]) -> bool:
@@ -124,7 +127,7 @@ class AbstractSequence[T](Collection[T]):
         """
         if not isinstance(other, AbstractSequence):
             return NotImplemented
-        eq_finisher = type(self)._get_eq_finisher()
+        eq_finisher = getattr(type(self), '_eq_finisher', lambda x : x)
         return eq_finisher(self.values) >= eq_finisher(other.values)
 
     def __add__[S: AbstractSequence](
@@ -285,6 +288,9 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
     """
 
+    item_type: type[T]
+    values: list[T]
+
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = list
     _allowed_ordered_types: ClassVar[tuple[type, ...]] = (list, tuple, AbstractSequence, range, collections.deque, collections.abc.Sequence)
@@ -333,7 +339,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         from type_validation.type_validation import _validate_or_coerce_iterable, _validate_or_coerce_value
 
         if isinstance(index, slice):
-            if not isinstance(value, type(self)._get_allowed_ordered_types()):
+            if not isinstance(value, getattr(type(self), '_allowed_ordered_types', ())):
                 raise ValueError("You can't assign a value that isn't a sequence to a slice!")
             self.values[index] = _validate_or_coerce_iterable(value, self.item_type, _coerce=_coerce)
 

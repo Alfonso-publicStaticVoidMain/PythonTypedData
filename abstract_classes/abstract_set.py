@@ -26,6 +26,9 @@ class AbstractSet[T](Collection[T]):
          by its value, setting it to frozenset.
     """
 
+    item_type: type[T]
+    values: frozenset[T]
+
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(frozenset)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = frozenset
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
@@ -384,6 +387,9 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
 
         _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
     """
+
+    item_type: type[T]
+    values: set[T]
 
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = set

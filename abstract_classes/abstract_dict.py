@@ -9,7 +9,7 @@ from abstract_classes.metadata import Metadata
 
 
 @forbid_instantiation
-class AbstractDict[K, V](GenericBase[K, V], Metadata):
+class AbstractDict[K, V](GenericBase[K, V]):
     """
     Abstract base class representing a dictionary with type enforced keys and values given by generic types.
 
@@ -43,7 +43,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
 
     key_type: type[K]
     value_type: type[V]
-    data: dict[K, V]
+    data: immutabledict[K, V]
 
     # Metadata class attributes
     _finisher: ClassVar[Callable[[dict], immutabledict]] = _convert_to(immutabledict)
@@ -602,8 +602,12 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
     """
 
+    key_type: type[K]
+    value_type: type[V]
+    data: dict[K, V]
+
     _finisher: ClassVar[Callable[[dict], Mapping]] = _convert_to(dict)
-    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = immutabledict
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = dict
     _mutable: bool = True
     _priority: ClassVar[int] = 1
 
