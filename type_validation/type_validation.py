@@ -4,7 +4,6 @@ from types import UnionType
 from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Literal, Mapping, Sequence, Callable
 
 from abstract_classes.abstract_dict import AbstractDict
-from abstract_classes.abstract_sequence import AbstractSequence
 from abstract_classes.collection import Collection
 from concrete_classes.maybe import Maybe
 
@@ -226,6 +225,12 @@ def _validate_or_coerce_iterable[T](
     :param iterable: Iterable object to _coerce its elements into.
     :type iterable: Iterable[Any] | None
 
+    :param _coerce: If True, attempts to coerce each value in the iterable to the expected type.
+    :type _coerce: bool
+
+    :param _finisher: Callable to be applied to the validated or coerced values before returning them.
+    :type _finisher: Callable[[Iterable[T]], Iterable[T]] | Callable[[], Iterable[T]]
+
     :return: A list containing all elements after performing validation and optionally coercion.
     :rtype: list[T]
 
@@ -234,20 +239,6 @@ def _validate_or_coerce_iterable[T](
     if iterable is None:
         return _finisher()
     return _finisher(_validate_or_coerce_value(value, expected_type, _coerce=_coerce) for value in iterable)
-
-def _validate_or_coerce_tuple(
-    tpl: tuple,
-    item_types: tuple[type, ...],
-    *,
-    _coerce: bool = False
-):
-    if not isinstance(tpl, (tuple, list, Sequence, AbstractSequence)):
-        raise ValueError(f"Object of type {type(tpl).__name__} isn't an ordered iterable.")
-    if len(item_types) == 2 and item_types[1] is Ellipsis:
-        return tuple(_validate_or_coerce_value(value, item_types[0], _coerce=_coerce) for value in tpl)
-    if len(tpl) != len(item_types):
-        raise ValueError(f"Types given for the tuple don't match the length of the values.")
-    return tuple(_validate_or_coerce_value(value, tp, _coerce=_coerce) for value, tp in zip(tpl, item_types))
 
 
 def _validate_or_coerce_iterable_of_iterables[T](

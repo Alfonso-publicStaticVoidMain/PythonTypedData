@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import collections
 import typing
-from dataclasses import FrozenInstanceError
 from typing import ClassVar, Callable, Iterable, Any, Iterator
 
 from abstract_classes.abstract_set import AbstractSet

@@ -4,8 +4,7 @@ from functools import reduce as reduce
 from typing import Iterable, Any, Callable, TypeVar, ClassVar, Iterator
 from collections import defaultdict
 
-from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation
-from abstract_classes.metadata import Metadata
+from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation, _convert_to
 
 
 @forbid_instantiation
@@ -90,10 +89,10 @@ class Collection[T](GenericBase[T]):
 
         # If the generic item type is None or a TypeVar, raises a TypeError.
         if generic_item_type is None:
-            raise TypeError(f"{type(self).__name__} must be instantiated with a generic type, e.g., {type(self).__name__}[int](...) or infer the type with {type(self).__name__}.of().")
+            raise TypeError(f"{class_name(type(self))} must be instantiated with a generic type, e.g., {class_name(type(self))}[int](...) or infer the type with {class_name(type(self))}.of_iterable().")
 
         if isinstance(generic_item_type, TypeVar):
-            raise TypeError(f"{type(self).__name__} was instantiated without a proper generic type, somehow {generic_item_type} was a TypeVar.")
+            raise TypeError(f"{class_name(type(self))} was instantiated without a proper generic type, somehow {class_name(generic_item_type)} was a TypeVar.")
 
         if (
             len(values) == 1
@@ -106,12 +105,12 @@ class Collection[T](GenericBase[T]):
         forbidden_iterable_types = _forbidden_iterable_types or getattr(type(self), '_forbidden_iterable_types', ())
 
         if isinstance(values, forbidden_iterable_types):
-            raise TypeError(f"Invalid type {type(values).__name__} for class {type(self).__name__}.")
+            raise TypeError(f"Invalid type {class_name(type(values))} for class {class_name(type(self))}.")
 
         object.__setattr__(self, 'item_type', generic_item_type)
 
         finisher = _finisher or getattr(type(self), '_finisher', lambda x : x)
-        skip_validation_finisher = getattr(type(self), '_skip_validation_finisher', lambda x : x) or finisher
+        skip_validation_finisher = getattr(type(self), '_skip_validation_finisher', None) or finisher
 
         final_values = skip_validation_finisher(values) if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce, _finisher=finisher)
 
@@ -172,7 +171,7 @@ class Collection[T](GenericBase[T]):
         :raises ValueError: If the class calling this method has no generic type on its _args attribute.
         """
         if cls._inferred_item_type() is None:
-            raise ValueError(f"Trying to call {cls.__name__}.empty() without a generic type.")
+            raise ValueError(f"Trying to call {class_name(cls)}.empty() without a generic type.")
         return cls()
 
     def __len__(self) -> int:
@@ -253,10 +252,10 @@ class Collection[T](GenericBase[T]):
         """
         if deep:
             from copy import deepcopy
-            values = deepcopy(self.values)
+            copied_values = deepcopy(self.values)
         else:
-            values = self.values.copy() if hasattr(self.values, 'copy') else self.values
-        return type(self)(values, _skip_validation=True)
+            copied_values = self.values.copy() if hasattr(self.values, 'copy') else self.values
+        return type(self)(copied_values, _skip_validation=True)
 
     def to_list(self: Collection[T]) -> list[T]:
         """
@@ -325,7 +324,7 @@ class Collection[T](GenericBase[T]):
         :type value: T
 
         :return: The number of appearances of the value in the Collection. If the underlying container supports
-        `.count`, it uses that method; otherwise, falls back to manual equality counting.
+         .count, it uses that method; otherwise, falls back to manual equality counting.
         :rtype: int
         """
         try:
@@ -341,7 +340,7 @@ class Collection[T](GenericBase[T]):
         :rtype: T
         """
         from random import choice
-        return choice(tuple(self.values))
+        return choice(_convert_to(tuple)(self.values))
 
     # Functional Methods:
 
@@ -372,7 +371,8 @@ class Collection[T](GenericBase[T]):
         mapped_values = [f(value) for value in self.values]
         collection_subclass = base_class(self)
         return (
-            collection_subclass[result_type](mapped_values, _coerce=_coerce) if result_type is not None
+            collection_subclass[result_type](mapped_values, _coerce=_coerce)
+            if result_type is not None
             else collection_subclass.of_iterable(mapped_values)
         )
 
@@ -410,7 +410,8 @@ class Collection[T](GenericBase[T]):
             flattened.extend(result)
         collection_subclass = base_class(self)
         return (
-            collection_subclass[result_type](flattened, _coerce=_coerce) if result_type is not None
+            collection_subclass[result_type](flattened, _coerce=_coerce)
+            if result_type is not None
             else collection_subclass.of_iterable(flattened)
         )
 

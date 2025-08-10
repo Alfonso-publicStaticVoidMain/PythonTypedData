@@ -257,8 +257,15 @@ class TestCollection(unittest.TestCase):
         lst = [0, 1, 2]
         mul = MutableList[int](lst, _skip_validation=True)
         mul.append(3)
+        # Adding a new element to the MutableList shouldn't alter the list it got its values from.
         self.assertEqual(lst, [0, 1, 2])
         self.assertNotEqual(lst, [0, 1, 2, 3])
+
+        # Adding a new element to the MutableList shouldn't alter the MutableList it got its values from.
+        mul_2 = MutableList.of_iterable(mul)
+        mul_2.append(4)
+        self.assertEqual(lst, [0, 1, 2])
+        self.assertEqual(mul, MutableList[int](0, 1, 2, 3))
 
         st = {'a', 'b'}
         mus = MutableSet[str](st, _skip_validation=True)

@@ -3,7 +3,6 @@ from types import UnionType
 
 from abstract_classes.collection import Collection
 from abstract_classes.generic_base import GenericBase, class_name
-from abstract_classes.metadata import Metadata
 
 
 def _get_origin_args(tp: type) -> tuple[type, tuple[type, ...]]:
@@ -160,7 +159,7 @@ def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G
 
     :return: The origin of the type which isn't mutable (assuming absence of a _mutable attribute as immutability) if
      the other does, or the lowest _priority, if both are mutable or immutable. If only one has a priority
-     assigned, that one's origin is returned. If neither have priorities or they are equal, an error is raised.
+     assigned, that one's origin is returned. If neither have priorities, or if they are equal, an error is raised.
 
     :raises TypeError: If the types don't have a common supertype.
     :raises TypeError: If the priority couldn't be resolved with the mutability check and both types either don't have
@@ -173,17 +172,17 @@ def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G
     if origin_t is origin_other:
         return origin_t
 
-    # Origins must be comparable and have a common superclass that isn't GenericBase, Collection or Metadata
+    # Origins must be comparable and have a common superclass that isn't GenericBase or Collection
     if not (
         any(
             issubclass(origin_other, t_superclass)
             for t_superclass in origin_t.__mro__
-            if t_superclass not in (GenericBase, Collection, Metadata)
+            if t_superclass not in (GenericBase, Collection)
         )
         or any(
             issubclass(origin_t, other_superclass)
             for other_superclass in origin_other.__mro__
-            if other_superclass not in (GenericBase, Collection, Metadata)
+            if other_superclass not in (GenericBase, Collection)
         )
     ):
         raise TypeError(f"Incompatible origins: {class_name(origin_t)} and {class_name(origin_other)}")

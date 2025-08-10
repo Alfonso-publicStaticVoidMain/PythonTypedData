@@ -6,7 +6,6 @@ from typing import ClassVar, Callable, Iterable, Any, Mapping
 
 from abstract_classes.collection import Collection, MutableCollection
 from abstract_classes.generic_base import forbid_instantiation, _convert_to, class_name
-from abstract_classes.metadata import Metadata
 
 
 @forbid_instantiation
