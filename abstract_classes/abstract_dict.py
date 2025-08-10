@@ -155,19 +155,19 @@ class AbstractDict[K, V](GenericBase[K, V]):
         return key_type, value_type
 
     @classmethod
-    def of(
-        cls: type[AbstractDict[K, V]],
-        keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]
-    ) -> AbstractDict[K, V]:
+    def of[D: AbstractDict](
+        cls: type[D],
+        keys_values: dict | Mapping | Iterable[tuple[Any, Any]] | AbstractDict
+    ) -> D:
         """
         Infer key/value types from the input and construct an AbstractDict containing them.
 
         :param keys_values: The data to infer types from and use to initialize the dictionary.
-        :type keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]
+        :type keys_values: dict | Mapping | Iterable[tuple[Any, Any]] | AbstractDict
 
         :return: A new AbstractDict with inferred generic types and properly validated contents (hashable and not
          duplicated keys).
-        :rtype: AbstractDict[K, V]
+        :rtype: D
         """
         if keys_values is None or not keys_values:
             raise ValueError(f"Can't create a {cls.__name__} object from empty iterable.")
@@ -179,22 +179,22 @@ class AbstractDict[K, V](GenericBase[K, V]):
         return cls[key_type, value_type](_keys=keys, _values=values, _skip_validation=True)
 
     @classmethod
-    def of_keys_values(
-        cls: type[AbstractDict[K, V]],
-        keys: Iterable[K],
-        values: Iterable[V]
-    ) -> AbstractDict[K, V]:
+    def of_keys_values[D: AbstractDict](
+        cls: type[D],
+        keys: Iterable,
+        values: Iterable
+    ) -> D:
         """
         Constructs an AbstractDict from separate keys and values iterables, inferring their types.
 
         :param keys: An iterable of keys.
-        :type keys: Iterable[K]
+        :type keys: Iterable
 
         :param values: An iterable of values, matching the length of `keys`.
-        :type values: Iterable[V]
+        :type values: Iterable
 
         :return: A new AbstractDict initialized from the given key-value pairs.
-        :rtype: AbstractDict[K, V]
+        :rtype: D
 
         :raises ValueError: If `keys` and `values` do not have the same length.
         """

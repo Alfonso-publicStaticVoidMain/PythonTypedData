@@ -341,6 +341,7 @@ def _split_keys_values[K, V](keys_values: dict[K, V] | Mapping[K, V] | Iterable[
             values.append(value)
     else:
         raise TypeError(f"The keys_values argument must be a dict, Mapping, AbstractDict, or iterable of (key, obj) tuples.")
+
     if len(keys) != len(values):
         raise ValueError("The number of keys and values aren't equal.")
     return keys, values, keys_from_iterable
