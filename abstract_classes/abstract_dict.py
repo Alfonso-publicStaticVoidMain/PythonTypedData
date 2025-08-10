@@ -8,7 +8,7 @@ from abstract_classes.generic_base import GenericBase, class_name, forbid_instan
 
 
 @forbid_instantiation
-class AbstractDict[K, V](GenericBase[K, V]):
+class AbstractDict[K, V](GenericBase):
     """
     Abstract base class representing a dictionary with type enforced keys and values given by generic types.
 
@@ -604,7 +604,7 @@ class AbstractDict[K, V](GenericBase[K, V]):
 
 
 @forbid_instantiation
-class AbstractMutableDict[K, V](AbstractDict[K, V]):
+class AbstractMutableDict[K, V](AbstractDict):
     """
     Abstract base class for mutable dictionaries with type enforced keys and values.
 

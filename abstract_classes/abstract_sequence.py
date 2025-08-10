@@ -10,7 +10,7 @@ from abstract_classes.generic_base import forbid_instantiation, _convert_to
 
 
 @forbid_instantiation
-class AbstractSequence[T](Collection[T]):
+class AbstractSequence[T](Collection):
     """
     Abstract base class for sequence-like Collections of a type T, with ordering and indexing capabilities.
 
@@ -42,6 +42,7 @@ class AbstractSequence[T](Collection[T]):
     item_type: type[T]
     values: tuple[T, ...]
 
+    # Metadata class attributes
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
@@ -271,7 +272,7 @@ class AbstractSequence[T](Collection[T]):
 
 
 @forbid_instantiation
-class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
+class AbstractMutableSequence[T](AbstractSequence, MutableCollection):
     """
     Abstract base class for mutable and ordered sequences containing values of a type T.
 
@@ -290,6 +291,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
     item_type: type[T]
     values: list[T]
 
+    # Metadata class attributes
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = list
     _allowed_ordered_types: ClassVar[tuple[type, ...]] = (list, tuple, AbstractSequence, range, collections.deque, collections.abc.Sequence)

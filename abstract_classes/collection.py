@@ -8,7 +8,7 @@ from abstract_classes.generic_base import GenericBase, class_name, forbid_instan
 
 
 @forbid_instantiation
-class Collection[T](GenericBase[T]):
+class Collection[T](GenericBase):
     """
     Abstract base class representing a collection of items of type T, wrapping an underlying container and an item type.
 
@@ -41,12 +41,11 @@ class Collection[T](GenericBase[T]):
 
     Attributes:
         item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
-
-        values (Any): The internal container of stored values, usually of one of Python's built-in Iterables.
+        values (Iterable[T]): The internal container of stored values, usually of one of Python's built-in Iterables.
     """
 
     item_type: type[T]
-    values: Any
+    values: Iterable[T]
 
     def __init__(
         self: Collection[T],
@@ -781,7 +780,21 @@ class Collection[T](GenericBase[T]):
 
 
 @forbid_instantiation
-class MutableCollection[T](Collection[T]):
+class MutableCollection[T](Collection):
+    """
+    Abstract class representing a mutale collection of items of type T.
+
+    It adds methods allowing for mutation of the collection without relying on additional structure like an order on
+    lists or hashing on sets. Because of that, it's a shallow class containing few methods that can safely be
+    implemented this way, and many of those are overridden on its child classes too.
+
+    Attributes:
+        item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
+        values (Iterable[T]): The internal container of stored values, usually of one of Python's built-in Iterables.
+    """
+
+    item_type: type[T]
+    values: Iterable[T]
 
     def remove(
         self: MutableCollection[T],

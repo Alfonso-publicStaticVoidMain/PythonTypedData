@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import UnionType
-from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, Callable, TypeVar
+from typing import Any, get_args, get_origin, Union, ClassVar, Callable, TypeVar
 from weakref import WeakValueDictionary
 
 """
@@ -34,8 +34,6 @@ GenericBase[*Ts]
 
 (*) := Concrete class implementations. Everything else should be impossible to directly instantiate.
 """
-
-Ts = TypeVarTuple("Ts")
 
 
 def base_class[T: GenericBase](obj: T) -> type[T]:
@@ -108,7 +106,7 @@ def _convert_to(tp: type) -> Callable[[Any], Any]:
 
 
 @forbid_instantiation
-class GenericBase[*Ts]:
+class GenericBase:
     """
     Top-most class in the inheritance tree, that encodes the behaviour of the classes storing their generic parameters
     received at their instantiation and storing them as a tuple in an _args attribute, as well as an _origin attribute

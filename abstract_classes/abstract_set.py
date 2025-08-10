@@ -9,7 +9,7 @@ from abstract_classes.generic_base import forbid_instantiation, _convert_to, cla
 
 
 @forbid_instantiation
-class AbstractSet[T](Collection[T]):
+class AbstractSet[T](Collection):
     """
     Abstract base class for hashable Collections of type T supporting set operations.
 
@@ -28,6 +28,7 @@ class AbstractSet[T](Collection[T]):
     item_type: type[T]
     values: frozenset[T]
 
+    # Metadata class attributes
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(frozenset)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = frozenset
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
@@ -371,7 +372,7 @@ class AbstractSet[T](Collection[T]):
 
 
 @forbid_instantiation
-class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
+class AbstractMutableSet[T](AbstractSet, MutableCollection):
     """
     Abstract base class for mutable, hashable Collections of type T.
 
@@ -390,6 +391,7 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     item_type: type[T]
     values: set[T]
 
+    # Metadata class attributes
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = set
     _mutable: ClassVar[bool] = True
