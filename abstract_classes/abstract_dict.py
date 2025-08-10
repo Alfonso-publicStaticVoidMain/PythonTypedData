@@ -209,45 +209,58 @@ class AbstractDict[K, V](GenericBase[K, V]):
         value_type = _infer_type_contained_in_iterable(values)
         return cls[key_type, value_type](_keys=keys, _values=values, _skip_validation=True)
 
-    def __getitem__(self: AbstractDict[K, V], key: K | slice) -> V | AbstractDict[K, V]:
+    def subdict[D: AbstractDict](self: D, slc: slice) -> D:
+        """
+        Returns a new AbstractDict with the keys contained in the given slice.
+
+        :param slc: Slice to filter the keys by.
+        :type slc: slice
+
+        :return: A new AbstractDict object whose keys fall within the given slice.
+        :rtype: D
+        """
+        if slc.step is not None:
+            raise TypeError("Step is not supported in dict slicing.")
+
+        start, stop = slc.start, slc.stop
+
+        sample_key: K | None = next(iter(self.data), None)
+        if sample_key is None:
+            return type(self)({})
+
+        def predicate(k):
+            try:
+                if start is not None and not (start <= k):
+                    return False
+                if stop is not None and not (k <= stop):
+                    return False
+                return True
+            except (TypeError, ValueError):
+                raise TypeError(f"Key {k!r} is not comparable with given bounds" + (
+                    f" start={start}" if start is not None else "") + (f" stop={stop}" if stop is not None else ""))
+
+        return self.filter_keys(predicate)
+
+    def __getitem__[D: AbstractDict](self: D, key: K | slice) -> V | D:
         """
         Returns a value for a given key, or a sliced subdictionary for a slice of keys.
 
         - If a single key is passed, returns its associated value.
-        - If a `slice` is passed (e.g., `dict[start:stop]`), returns a new `AbstractDict[K, V]`
-          with all keys within that range. Step is not supported.
+        - If a slice is passed (e.g., [start:stop]), returns a new AbstractDict object with all keys within that
+         range. Step is not supported.
 
         :param key: A key of type K or a slice over the key space.
         :type key: K | slice
 
         :return: The value associated with the key, or a sliced subdictionary.
-        :rtype: V | AbstractDict[K, V]
+        :rtype: V | D
 
         :raises TypeError: If the keys are not orderable for slicing or if the slice step is not None.
         :raises KeyError: If the key is not found.
         """
         if isinstance(key, slice):
             # Subdict slicing
-            if key.step is not None:
-                raise TypeError("Step is not supported in dict slicing.")
-
-            start, stop = key.start, key.stop
-
-            sample_key: K | None = next(iter(self.data), None)
-            if sample_key is None:
-                return type(self)({})
-
-            def predicate(k):
-                try:
-                    if start is not None and not (start <= k):
-                        return False
-                    if stop is not None and not (k <= stop):
-                        return False
-                    return True
-                except (TypeError, ValueError):
-                    raise TypeError(f"Key {k!r} is not comparable with given bounds" + (f" start={start}" if start is not None else "") + (f" stop={stop}" if stop is not None else ""))
-
-            return self.filter_keys(predicate)
+            return self.subdict(key)
         else:
             # Regular key access
             return self.data[key]
