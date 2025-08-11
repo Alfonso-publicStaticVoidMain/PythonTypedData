@@ -153,6 +153,18 @@ class Collection[T](GenericBase):
 
     @classmethod
     def of_iterable[C: Collection](cls: type[C], values: Iterable) -> C:
+        """
+        Creates a Collection object containing the values of the given iterable, inferring their common type.
+
+        Acts as a type-safe factory method for constructing properly parameterized collections when the type is not
+        known beforehand.
+
+        :param values: Iterable containing the desired values.
+        :type values: Iterable
+
+        :return: A new Collection that is an instance of cls containing the values of the iterable, inferring its type.
+        :rtype: C
+        """
         from type_validation.type_inference import _infer_type_contained_in_iterable
         return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
 

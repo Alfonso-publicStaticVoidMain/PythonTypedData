@@ -88,6 +88,32 @@ class TestSet(unittest.TestCase):
         self.assertTrue(s4.is_disjoint(s3))
         self.assertEqual(s4.is_disjoint(s3), s3.is_disjoint(s4))
 
+    def test_or_and(self):
+        mus_a = MutableSet[int](0)
+        ims_a = ImmutableSet[int](0)
+        mus_b = MutableSet[int](1)
+        ims_b = ImmutableSet[int](1)
+        mus_sum_a_b = MutableSet[int](0, 1)
+        ims_sum_a_b = ImmutableSet[int](0, 1)
+
+        self.assertEqual(mus_a | mus_b, mus_sum_a_b)
+        self.assertEqual(mus_a | ims_b, mus_sum_a_b)
+        self.assertEqual(ims_a | mus_b, ims_a | ims_b)
+
+        self.assertTrue(isinstance(mus_a | mus_b, MutableSet))
+        self.assertTrue(isinstance(mus_a | ims_b, ImmutableSet))
+        self.assertTrue(isinstance(ims_a | mus_b, ImmutableSet))
+        self.assertTrue(isinstance(ims_a | ims_b, ImmutableSet))
+
+        self.assertTrue(isinstance(mus_a & mus_b, MutableSet))
+        self.assertTrue(isinstance(mus_a & ims_b, ImmutableSet))
+        self.assertTrue(isinstance(ims_a & mus_b, ImmutableSet))
+        self.assertTrue(isinstance(ims_a & ims_b, ImmutableSet))
+
+        mus_c = MutableSet[int | str](2)
+        self.assertEqual(mus_c | ims_a, ImmutableSet[int | str](0, 2))
+        self.assertEqual(mus_c & ims_b, ImmutableSet[int]())
+
     def test_sub_super_set_disjoint_coercion(self):
         st_int = MutableSet[int](0)
         st_int_str = MutableSet[int | str](0, 'a')
@@ -107,19 +133,19 @@ class TestSet(unittest.TestCase):
             self.assertTrue(st_int.is_superset(st_int_str))
 
     def test_add_remove(self):
-        s = MutableSet[str]('a')
-        s.add('b')
-        self.assertIn('a', s)
-        self.assertIn('b', s)
-        s.remove('a')
-        self.assertNotIn('a', s)
-        self.assertNotIn(1, s)
+        mus = MutableSet[str]('a')
+        mus.add('b')
+        self.assertIn('a', mus)
+        self.assertIn('b', mus)
+        mus.remove('a')
+        self.assertNotIn('a', mus)
+        self.assertNotIn(1, mus)
 
         with self.assertRaises(KeyError):
-            s.remove('c')
+            mus.remove('c')
 
-        s.discard('c')
-        self.assertEqual(s, MutableSet[str]('b'))
+        mus.discard('c')
+        self.assertEqual(mus, MutableSet[str]('b'))
 
     def test_update(self):
         mus = MutableSet[int](0, 1)

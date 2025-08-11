@@ -158,7 +158,8 @@ class AbstractSequence[T](Collection):
         else:
             new_type = self.item_type
 
-        return sequence_type[new_type](self.values + other.values, _skip_validation=True)
+        finisher = getattr(sequence_type, '_finisher', list)
+        return sequence_type[new_type](finisher(self.values) + finisher(other.values), _skip_validation=True)
 
     def __mul__[S: AbstractSequence](
         self: S,

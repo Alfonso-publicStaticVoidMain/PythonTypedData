@@ -126,7 +126,7 @@ class DictionaryTest(unittest.TestCase):
 
         # Using a step raises a TypeError
         with self.assertRaises(TypeError):
-            d['a':'e':1]
+            _ = d['a':'e':1]
 
         # Subdict slicing on tuple keys
         tpl_dic = ImmutableDict[tuple[int, str], float]({
@@ -146,9 +146,10 @@ class DictionaryTest(unittest.TestCase):
         # Slicing non-orderable keys raises TypeError
         dummy_dic = MutableDict[Dummy, int]({Dummy(1) : 1, Dummy(2) : 2, Dummy(3) : 3})
         with self.assertRaises(TypeError):
-            dummy_dic[Dummy(1) : Dummy(3)]
+            _ = dummy_dic[Dummy(1) : Dummy(3)]
 
     def test_partially_ordered_slicing(self):
+        # In this class, not all values are comparable, only those whose `n` attribute differs on at most 10.
         class PartiallyOrdered:
             def __init__(self, n: int):
                 self.n = n
@@ -191,6 +192,10 @@ class DictionaryTest(unittest.TestCase):
         mud[3] = 'c'
         self.assertEqual(dic, {1 : 'a', 2 : 'b'})
         self.assertNotEqual(dic, {1 : 'a', 2 : 'b', 3 : 'c'})
+
+        mud_2 = MutableDict[int, str](mud)
+        mud_2[4] = 'd'
+        self.assertEqual(mud, MutableDict[int, str]({1 : 'a', 2 : 'b', 3 : 'c'}))
 
 
 if __name__ == '__main__':

@@ -158,21 +158,6 @@ class AbstractSet[T](Collection):
 
         return set_type[new_type](self.values & other.values, _skip_validation=True)
 
-    def __add__[S: AbstractSet](self: S, other: S):
-        """
-        Computes the union of two AbstractSet instances delegating to the __or__ method.
-
-        In order to preserve the commutativity of the operator, the subclass of the return is determined by which of
-        the operands is immutable, and if both or none are, by the _priority class attribute of their type.
-
-        :param other: The set to union with.
-        :type other: S
-
-        :return: A new AbstractSet containing all elements from both self and other.
-        :rtype: S
-        """
-        return self | other
-
     def __sub__[S: AbstractSet](self: S, other: Iterable) -> S:
         """
         Computes the difference between two AbstractSet instances.
@@ -404,6 +389,10 @@ class AbstractMutableSet[T](AbstractSet, MutableCollection):
         """
         In-place union update with another AbstractSet with the operator |=.
 
+        Contrary to the binary operator |, which, to preserve commutativity chooses the greater subtype of its operands
+        as the item type of its return, |= needs not to preserve commutativity, since the item type of self cannot
+        under any circumstance be altered.
+
         :param other: The set to union with.
         :type other: AbstractSet
 
@@ -427,6 +416,10 @@ class AbstractMutableSet[T](AbstractSet, MutableCollection):
     ) -> S:
         """
         In-place intersection update with another AbstractSet with the operator &=.
+
+        Contrary to the binary operator &, which, to preserve commutativity chooses the lesser subtype of its operands
+        as the item type of its return, &= needs not to preserve commutativity, since the item type of self cannot
+        under any circumstance be altered.
 
         :param other: The set to intersect with.
         :type other: AbstractSet
