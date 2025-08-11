@@ -136,7 +136,7 @@ class MutableDict[K, V](AbstractMutableDict):
 
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
-class ImmutableDict[K, V](AbstractDict[K, V]):
+class ImmutableDict[K, V](AbstractDict):
     """
     Concrete immutable implementation of AbstractDict, with an immutabledict as its underlying container.
 
