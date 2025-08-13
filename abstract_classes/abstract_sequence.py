@@ -4,6 +4,8 @@ import collections
 import typing
 from typing import ClassVar, Callable, Iterable, Any, Iterator
 
+from zstandard.backend_cffi import new_nonzero
+
 from abstract_classes.abstract_set import AbstractSet
 from abstract_classes.collection import Collection, MutableCollection
 from abstract_classes.generic_base import forbid_instantiation, _convert_to
@@ -150,16 +152,16 @@ class AbstractSequence[T](Collection):
             return NotImplemented
 
         from type_validation.type_hierarchy import _resolve_type_priority
-        sequence_type = _resolve_type_priority(type(self), type(other))
+        new_sequence_type = _resolve_type_priority(type(self), type(other))
 
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _get_subtype
-            new_type = _get_subtype(self.item_type, other.item_type)
+            new_item_type = _get_subtype(self.item_type, other.item_type)
         else:
-            new_type = self.item_type
+            new_item_type = self.item_type
 
-        finisher = getattr(sequence_type, '_finisher', list)
-        return sequence_type[new_type](finisher(self.values) + finisher(other.values), _skip_validation=True)
+        finisher = getattr(new_sequence_type, '_finisher', list)
+        return new_sequence_type[new_item_type](finisher(self.values) + finisher(other.values), _skip_validation=True)
 
     def __mul__[S: AbstractSequence](
         self: S,

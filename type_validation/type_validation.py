@@ -5,6 +5,7 @@ from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Litera
 
 from abstract_classes.abstract_dict import AbstractDict
 from abstract_classes.collection import Collection
+from abstract_classes.generic_base import class_name
 from concrete_classes.maybe import Maybe
 
 
@@ -190,7 +191,7 @@ def _validate_or_coerce_value[T](
     if expected_type is str and isinstance(obj, (int, float, complex, bool)):
         return str(obj)  # int | float | complex | bool -> str
 
-    # *********** str-based coercions ***********
+    # *********** Parameter-controlled coercions ***********
     if _coerce:
         if isinstance(obj, str):
             try:
@@ -204,9 +205,9 @@ def _validate_or_coerce_value[T](
                     return complex(obj)  # str -> complex
 
             except ValueError:
-                raise TypeError(f"Value {obj!r} is not of type {expected_type.__name__} and cannot be converted safely to it.")
+                raise TypeError(f"Value {obj!r} is not of type {class_name(expected_type)} and cannot be converted safely to it.")
 
-    raise TypeError(f"Value {obj!r} is not of type {expected_type.__name__}.")
+    raise TypeError(f"Value {obj!r} is not of type {class_name(expected_type)}.")
 
 
 def _validate_or_coerce_iterable[T](
@@ -330,8 +331,6 @@ def _split_keys_values[K, V](keys_values: dict[K, V] | Mapping[K, V] | Iterable[
             key, value = pair
             keys.append(key)
             values.append(value)
-    else:
-        raise TypeError(f"The keys_values argument must be a dict, Mapping, AbstractDict, or iterable of (key, obj) tuples.")
 
     if len(keys) != len(values):
         raise ValueError("The number of keys and values aren't equal.")

@@ -4,6 +4,8 @@ import collections
 import typing
 from typing import ClassVar, Callable, Iterable, Any, Mapping
 
+from zstandard.backend_cffi import new_nonzero
+
 from abstract_classes.collection import Collection, MutableCollection
 from abstract_classes.generic_base import forbid_instantiation, _convert_to, class_name
 
@@ -37,7 +39,7 @@ class AbstractSet[T](Collection):
 
     def __lt__(self: AbstractSet, other: AbstractSet) -> bool:
         """
-        Checks whether this set is a proper subset of another AbstractSet, set or frozenset.
+        Checks whether this set is a proper subset of another AbstractSet.
 
         :param other: The set to compare against.
         :type other: AbstractSet
@@ -55,7 +57,7 @@ class AbstractSet[T](Collection):
 
     def __le__(self: AbstractSet, other: AbstractSet) -> bool:
         """
-        Checks whether this set is a subset (or equal to) another AbstractSet, set or frozenset.
+        Checks whether this set is a subset (or equal to) another AbstractSet.
 
         :param other: The set to compare against.
         :type other: AbstractSet
@@ -73,10 +75,10 @@ class AbstractSet[T](Collection):
 
     def __gt__(self: AbstractSet, other: AbstractSet) -> bool:
         """
-        Checks whether this set is a proper superset of another AbstractSet, set or frozenset.
+        Checks whether this set is a proper superset of another AbstractSet.
 
         :param other: The set to compare against.
-        :type other: Any
+        :type other: AbstractSet
 
         :return: True if this set is a proper superset of `other`, False otherwise. When comparing with another
          AbstractSet, their item_type must match exactly.
@@ -91,7 +93,7 @@ class AbstractSet[T](Collection):
 
     def __ge__(self: AbstractSet, other: AbstractSet) -> bool:
         """
-        Checks whether this set is a superset (or equal to) another AbstractSet, set or frozenset.
+        Checks whether this set is a superset (or equal to) another AbstractSet.
 
         :param other: The set to compare against.
         :type other: AbstractSet
@@ -124,15 +126,15 @@ class AbstractSet[T](Collection):
             return NotImplemented
 
         from type_validation.type_hierarchy import _resolve_type_priority
-        set_type = _resolve_type_priority(type(self), type(other))
+        new_set_type = _resolve_type_priority(type(self), type(other))
 
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _get_supertype
-            new_type = _get_supertype(self.item_type, other.item_type)
+            new_item_type = _get_supertype(self.item_type, other.item_type)
         else:
-            new_type = self.item_type
+            new_item_type = self.item_type
 
-        return set_type[new_type](self.values | other.values, _skip_validation=True)
+        return new_set_type[new_item_type](self.values | other.values, _skip_validation=True)
 
     def __and__[S: AbstractSet](self: S, other: S) -> S:
         """
@@ -331,7 +333,7 @@ class AbstractSet[T](Collection):
         if other.item_type != self.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type):
-                raise ValueError(f"Cannot compare sets of different types: {class_name(self.item_type)} != {class_name(other.item_type)}")
+                raise ValueError(f"Cannot compare sets of incompatible types: {class_name(self.item_type)} != {class_name(other.item_type)}")
         return self.values.issuperset(other.values)
 
     def is_disjoint(
@@ -352,7 +354,7 @@ class AbstractSet[T](Collection):
         if other.item_type != self.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type) and not _is_subtype(self.item_type, other.item_type):
-                raise ValueError(f"Cannot compare sets of different types: {self.item_type.__name__} != {other.item_type.__name__}")
+                raise ValueError(f"Cannot compare sets of incompatible types: {class_name(self.item_type)} != {class_name(other.item_type)}")
         return self.values.isdisjoint(other.values)
 
 
@@ -405,7 +407,7 @@ class AbstractMutableSet[T](AbstractSet, MutableCollection):
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type):
-                raise TypeError(f"Incompatible types between {type(self).__name__} and {type(other).__name__}.")
+                raise TypeError(f"Incompatible types between {class_name(type(self))} and {class_name(type(other))}.")
 
         self.update(other)
         return self
@@ -471,7 +473,7 @@ class AbstractMutableSet[T](AbstractSet, MutableCollection):
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type):
-                raise TypeError(f"Incompatible types between {type(self).__name__} and {type(other).__name__}.")
+                raise TypeError(f"Incompatible types between {class_name(type(self))} and {class_name(type(other))}.")
 
         self.symmetric_difference_update(other)
         return self
