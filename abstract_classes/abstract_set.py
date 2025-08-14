@@ -23,8 +23,17 @@ class AbstractSet[T](Collection):
     This class will be further extended by AbstractMutableSet, adding mutability capabilities to it.
 
     Attributes:
-        _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of Collection's init
-         by its value, setting it to frozenset.
+        _finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting them as an
+         attribute on Collection's init.
+
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting
+         them as an attribute on Collection's init when the parameter _skip_validation is True.
+
+        _repr_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on the repr method to show
+         the values contained on the sequence.
+
+        _eq_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on both self and other's
+         values on the eq method to check for equality.
     """
 
     item_type: type[T]
@@ -35,7 +44,6 @@ class AbstractSet[T](Collection):
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = frozenset
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
-    _priority: ClassVar[int] = 0
 
     def __lt__(self: AbstractSet, other: AbstractSet) -> bool:
         """
@@ -369,10 +377,17 @@ class AbstractMutableSet[T](AbstractSet, MutableCollection):
     It is still an abstract class, so it must be subclassed to create concrete implementations.
 
     Attributes:
+        item_type (type[T]): The type of elements stored in the set, derived from the generic type.
+
+        values (Iterable[T]): The internal container of stored values, usually of one of Python's built-in Iterables.
+
         _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of Collection's init
          by its value, setting it to set to ensure mutability of the underlying container.
 
-        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting
+         them as an attribute on Collection's init when the parameter _skip_validation is True.
+
+        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class.
     """
 
     item_type: type[T]
@@ -382,7 +397,6 @@ class AbstractMutableSet[T](AbstractSet, MutableCollection):
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = set
     _mutable: ClassVar[bool] = True
-    _priority: ClassVar[int] = 1
 
     def __ior__[S: AbstractMutableSet](
         self: S,

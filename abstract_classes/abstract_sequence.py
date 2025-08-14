@@ -8,7 +8,7 @@ from zstandard.backend_cffi import new_nonzero
 
 from abstract_classes.abstract_set import AbstractSet
 from abstract_classes.collection import Collection, MutableCollection
-from abstract_classes.generic_base import forbid_instantiation, _convert_to
+from abstract_classes.generic_base import forbid_instantiation, _convert_to, class_name
 
 
 @forbid_instantiation
@@ -50,7 +50,6 @@ class AbstractSequence[T](Collection):
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
     _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
     _forbidden_iterable_types: ClassVar[tuple[type, ...]] = (set, frozenset, AbstractSet, typing.AbstractSet)
-    _priority: ClassVar[int] = 0
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
         """
@@ -285,10 +284,19 @@ class AbstractMutableSequence[T](AbstractSequence, MutableCollection):
     It is still an abstract class, so it must be subclassed to create concrete implementations.
 
     Attributes:
+        item_type (type[T]): The type of elements stored in the sequence, derived from the generic type.
+
+        values (Iterable[T]): The internal container of stored values, usually of one of Python's built-in Iterables.
+
         _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of Collection's init
          by its value, setting it to list to ensure mutability of the underlying container.
 
-        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting
+         them as an attribute on Collection's init when the parameter _skip_validation is True.
+
+        _allowed_ordered_types (ClassVar[tuple[type, ...]]): Tuple of types accepted on this class's setitem method.
+
+        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class.
     """
 
     item_type: type[T]
@@ -299,7 +307,6 @@ class AbstractMutableSequence[T](AbstractSequence, MutableCollection):
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = list
     _allowed_ordered_types: ClassVar[tuple[type, ...]] = (list, tuple, AbstractSequence, range, collections.deque, collections.abc.Sequence)
     _mutable: ClassVar[bool] = True
-    _priority: ClassVar[int] = 1
 
     def append(
         self: AbstractMutableSequence[T],
@@ -343,15 +350,13 @@ class AbstractMutableSequence[T](AbstractSequence, MutableCollection):
         from type_validation.type_validation import _validate_or_coerce_iterable, _validate_or_coerce_value
 
         if isinstance(index, slice):
-            if not isinstance(value, getattr(type(self), '_allowed_ordered_types', ())):
-                raise ValueError("You can't assign a value that isn't a sequence to a slice!")
+            allowed_ordered_types = getattr(type(self), '_allowed_ordered_types', ())
+            if not isinstance(value, allowed_ordered_types):
+                raise ValueError(f"Values of type {class_name(type(value))} attempted to be assigned to a slice.")
             self.values[index] = _validate_or_coerce_iterable(value, self.item_type, _coerce=_coerce)
 
         elif isinstance(index, int):
             self.values[index] = _validate_or_coerce_value(value, self.item_type, _coerce=_coerce)
-
-        else:
-            raise TypeError("Invalid index type: must be int or slice")
 
     def __delitem__(self: AbstractMutableSequence[T], index: int | slice) -> None:
         """

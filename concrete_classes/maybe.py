@@ -7,7 +7,7 @@ from abstract_classes.generic_base import GenericBase
 
 
 @dataclass(frozen=True, slots=True, repr=False)
-class Maybe[T](GenericBase[T]):
+class Maybe[T](GenericBase):
     """
     A container object which may or may not contain a non-None value.
 
@@ -104,7 +104,7 @@ class Maybe[T](GenericBase[T]):
         :rtype: Maybe[T]
         """
         if value is None:
-            raise ValueError("Can't use Maybe.of with a None obj.")
+            raise ValueError("Can't use Maybe.of with a None object.")
         from type_validation.type_inference import _infer_type
         return Maybe[_infer_type(value)](value, _skip_validation=True)
 

@@ -19,18 +19,6 @@ class AbstractDict[K, V](GenericBase):
     and coercion of elements during construction and transformations. It cannot be directly instantiated and must be
     parameterized by two concrete types when the constructor is called (e.g., MutableDict[int, str]).
 
-    Attributes:
-        key_type (type[K]): The type of the keys.
-        value_type (type[V]): The type of the values.
-        data (dict[K, V]): The underlying dictionary data container.
-
-        _finisher (ClassVar[Callable[[dict], Any]]): It's applied to the data on init before being set as attribute.
-        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It's applied to the data on init before
-         being set as attribute, only if init is called with _skip_validation=True.
-        _repr_finisher (ClassVar[Callable[[Mapping], dict]]): It's applied to the data when printing the object on the
-         repr method.
-        _eq_finisher (ClassVar[Callable[[Mapping], dict]]): It's applied to the data when comparing two objects.
-
     Note:
         Any method that returns a new AbstractDict instance (e.g., filter, map, etc.) constructs the returned
         value using type(self)(...). This ensures that:
@@ -43,6 +31,23 @@ class AbstractDict[K, V](GenericBase):
         matches the exact type and structure of self, unless otherwise explicitly overridden. Also, calling
         type(self)[new_key_type, new_value_type] correctly creates a new dynamic subclass with the same base class as
         self but with the new generic types.
+
+        Attributes:
+        key_type (type[K]): The type of the keys.
+
+        value_type (type[V]): The type of the values.
+
+        data (dict[K, V]): The underlying dictionary data container.
+
+        _finisher (ClassVar[Callable[[dict], Any]]): It's applied to the data on init before being set as attribute.
+
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It's applied to the data on init before
+         being set as attribute, only if init is called with _skip_validation=True.
+
+        _repr_finisher (ClassVar[Callable[[Mapping], dict]]): It's applied to the data when printing the object on the
+         repr method.
+
+        _eq_finisher (ClassVar[Callable[[Mapping], dict]]): It's applied to the data when comparing two objects.
     """
 
     key_type: type[K]
@@ -54,7 +59,6 @@ class AbstractDict[K, V](GenericBase):
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = immutabledict
     _repr_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
     _eq_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
-    _priority: ClassVar[int] = 0
 
     def __init__(
         self: AbstractDict[K, V],
@@ -614,16 +618,17 @@ class AbstractMutableDict[K, V](AbstractDict):
 
     Attributes:
         key_type (type[K]): The type of the keys.
+
         value_type (type[V]): The type of the values.
+
         data (dict[K, V]): The underlying dictionary data container.
 
         _finisher (ClassVar[Callable[[dict], Any]]): It's applied to the data on init before being set as attribute.
+
         _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It's applied to the data on init before
          being set as attribute, only if init is called with _skip_validation=True.
-        _repr_finisher (ClassVar[Callable[[Mapping], dict]]): It's applied to the data when printing the object on the
-         repr method.
-        _eq_finisher (ClassVar[Callable[[Mapping], dict]]): It's applied to the data when comparing two objects.
-        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
+
+        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class.
     """
 
     key_type: type[K]
@@ -634,7 +639,6 @@ class AbstractMutableDict[K, V](AbstractDict):
     _finisher: ClassVar[Callable[[dict], Mapping]] = _convert_to(dict)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = dict
     _mutable: bool = True
-    _priority: ClassVar[int] = 1
 
     def __setitem__(
         self: AbstractMutableDict[K, V],
@@ -693,7 +697,7 @@ class AbstractMutableDict[K, V](AbstractDict):
             return NotImplemented
 
         from type_validation.type_hierarchy import _is_subtype
-        if not _is_subtype(other.key_type, self.key_type) or not _is_subtype(other.value_type, self.value_type):
+        if not _is_subtype(other.key_type, self.key_type) and not _is_subtype(other.value_type, self.value_type):
             raise TypeError(f"Incompatible key and/or value types between {class_name(type(self))} and {class_name(type(other))}.")
 
         self.update(other)

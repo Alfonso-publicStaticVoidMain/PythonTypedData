@@ -41,6 +41,7 @@ class Collection[T](GenericBase):
 
     Attributes:
         item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
+
         values (Iterable[T]): The internal container of stored values, usually of one of Python's built-in Iterables.
     """
 
@@ -802,6 +803,7 @@ class MutableCollection[T](Collection):
 
     Attributes:
         item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
+
         values (Iterable[T]): The internal container of stored values, usually of one of Python's built-in Iterables.
     """
 
