@@ -4,8 +4,6 @@ import collections
 import typing
 from typing import ClassVar, Callable, Iterable, Any, Iterator
 
-from zstandard.backend_cffi import new_nonzero
-
 from abstract_classes.abstract_set import AbstractSet
 from abstract_classes.collection import Collection, MutableCollection
 from abstract_classes.generic_base import forbid_instantiation, _convert_to, class_name
