@@ -79,8 +79,8 @@ class Collection[T](GenericBase):
          known that the values received will match the generic type.
         :type _skip_validation: bool
 
-        :raises TypeError: If the generic type wasn't provided or was a TypeVar.
-        :raises TypeError: If the values iterable parameter is of one of the forbidden iterable types.
+        :raises TypeError: If the generic type wasn't provided or was a TypeVar, or if the values iterable parameter is
+         of one of the forbidden iterable types.
         """
         from type_validation.type_validation import _validate_or_coerce_iterable, _validate_type
 
@@ -92,7 +92,7 @@ class Collection[T](GenericBase):
             raise TypeError(f"{class_name(type(self))} must be instantiated with a generic type, e.g., {class_name(type(self))}[int](...) or infer the type with {class_name(type(self))}.of_iterable().")
 
         if isinstance(generic_item_type, TypeVar):
-            raise TypeError(f"{class_name(type(self))} was instantiated without a proper generic type, somehow {class_name(generic_item_type)} was a TypeVar.")
+            raise TypeError(f"{class_name(type(self))} was instantiated without a proper generic type, somehow {generic_item_type.__name__} was a TypeVar.")
 
         if (
             len(values) == 1
@@ -107,13 +107,12 @@ class Collection[T](GenericBase):
         if isinstance(values, forbidden_iterable_types):
             raise TypeError(f"Invalid type {class_name(type(values))} for class {class_name(type(self))}.")
 
-        object.__setattr__(self, 'item_type', generic_item_type)
-
         finisher = _finisher or getattr(type(self), '_finisher', lambda x : x)
         skip_validation_finisher = getattr(type(self), '_skip_validation_finisher', None) or finisher
 
         final_values = skip_validation_finisher(values) if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce, _finisher=finisher)
 
+        object.__setattr__(self, 'item_type', generic_item_type)
         object.__setattr__(self, 'values', final_values)
 
     @classmethod
