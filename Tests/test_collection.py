@@ -8,6 +8,16 @@ from concrete_classes.set import MutableSet, ImmutableSet
 
 class TestCollection(unittest.TestCase):
 
+    def test_factory_constructors(self):
+        lst = MutableList.of_iterable([0, 1, 2])
+        self.assertEqual(lst, MutableList[int](0, 1, 2))
+
+        lst = MutableList.of_values([0, 1, 2])
+        self.assertEqual(lst, MutableList[list[int]]([0, 1, 2]))
+
+        lst = MutableList.of_values([0], (1, 2), {3})
+        self.assertEqual(lst, MutableList[list[int] | tuple[int, int] | set[int]]([0], (1, 2), {3}))
+
     def test_repr_and_bool(self):
         mul = MutableList[str]('a', 'b')
         self.assertTrue(mul)

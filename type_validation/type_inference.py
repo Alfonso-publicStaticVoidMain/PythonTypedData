@@ -4,6 +4,7 @@ from typing import Mapping, Iterable
 
 from abstract_classes.abstract_dict import AbstractDict
 from abstract_classes.collection import Collection
+from abstract_classes.generic_base import base_class
 
 
 def _infer_type[T](obj: T) -> type[T]:
@@ -40,8 +41,8 @@ def _infer_iterable_type[T](iterable: Iterable[T]) -> type[Iterable[T]]:
     """
     if isinstance(iterable, Collection):
         if hasattr(type(iterable), '_args'):
-            return type(iterable)
-        return type(iterable)[iterable.item_type]
+            return base_class(iterable)
+        return base_class(iterable)[iterable.item_type]
 
     if not iterable:
         raise ValueError("Cannot infer type from empty iterable")

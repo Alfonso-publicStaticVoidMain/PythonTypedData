@@ -107,12 +107,13 @@ class Collection[T](GenericBase):
         if isinstance(values, forbidden_iterable_types):
             raise TypeError(f"Invalid type {class_name(type(values))} for class {class_name(type(self))}.")
 
+        object.__setattr__(self, 'item_type', generic_item_type)
+
         finisher = _finisher or getattr(type(self), '_finisher', lambda x : x)
         skip_validation_finisher = getattr(type(self), '_skip_validation_finisher', None) or finisher
 
         final_values = skip_validation_finisher(values) if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce, _finisher=finisher)
 
-        object.__setattr__(self, 'item_type', generic_item_type)
         object.__setattr__(self, 'values', final_values)
 
     @classmethod
