@@ -5,6 +5,12 @@ from typing import Mapping, Iterable
 from abstract_classes.abstract_dict import AbstractDict
 from abstract_classes.collection import Collection
 
+from collections import OrderedDict, defaultdict
+
+
+MAPPING_TYPES = (dict, Mapping, OrderedDict, defaultdict)
+ATOMIC_ITERABLES = (str, bytes, bytearray, memoryview, range)
+
 
 def _infer_type[T](obj: T) -> type[T]:
     """
@@ -16,14 +22,12 @@ def _infer_type[T](obj: T) -> type[T]:
     :return: The type of the object, including its generics.
     :rtype: type
     """
-    if isinstance(obj, (list, set, frozenset)):
-        return _infer_iterable_type(obj)
-
-    elif isinstance(obj, (dict, Mapping)):
-        return _infer_mapping_type(obj)
-
-    elif isinstance(obj, tuple):
+    if isinstance(obj, tuple):
         return _infer_tuple_type(obj)
+    if isinstance(obj, MAPPING_TYPES):
+        return _infer_mapping_type(obj)
+    if isinstance(obj, Iterable) and not isinstance(obj, ATOMIC_ITERABLES):
+        return _infer_iterable_type(obj)
 
     return type(obj)
 
@@ -46,11 +50,14 @@ def _infer_iterable_type[T](iterable: Iterable[T]) -> type[Iterable[T]]:
     if not iterable:
         raise ValueError("Cannot infer type from empty iterable")
 
+    if isinstance(iterable, (str, bytes)):
+        raise ValueError("Iterable is a string or bytes.")
+
     inner_type: type[T] = _infer_type_contained_in_iterable(iterable)
 
-    if isinstance(iterable, (list, set, frozenset)):
+    try:
         return type(iterable)[inner_type]
-    else:
+    except (TypeError, AttributeError):
         return Iterable[inner_type]
 
 
@@ -93,7 +100,7 @@ def _infer_tuple_type(tpl: tuple) -> type[tuple]:
 
 def _infer_type_contained_in_tuple(tpl: tuple) -> tuple[type, ...]:
     if not tpl:
-        return ()
+        raise ValueError(f"Tuple object {tpl} was empty.")
     return tuple(_infer_type(element) for element in tpl)
 
 

@@ -120,7 +120,7 @@ def _get_supertype(t: type, other: type) -> type:
         return other
     if _is_subtype(other, t):
         return t
-    raise TypeError(f"No supertype between {t.__name__} and {other.__name__}")
+    raise TypeError(f"No supertype between {class_name(t)} and {class_name(other)}")
 
 
 def _get_subtype(t: type, other: type) -> type:
@@ -144,7 +144,7 @@ def _get_subtype(t: type, other: type) -> type:
         return t
     if _is_subtype(other, t):
         return other
-    raise TypeError(f"No subtype between {t.__name__} and {other.__name__}")
+    raise TypeError(f"No subtype between {class_name(t)} and {class_name(other)}")
 
 
 def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G]:
@@ -191,7 +191,7 @@ def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G
     mutable_t = getattr(t, "_mutable", False)
     mutable_other = getattr(other, "_mutable", False)
     if mutable_t != mutable_other:
-        return origin_other if mutable_t else origin_t
+        return origin_other if not mutable_other else origin_t
 
     # Priority logic -> Prefer the origin with lowest _priority.
     has_priority_t = hasattr(t, "_priority")
@@ -201,7 +201,7 @@ def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G
         priority_t = t._priority
         priority_other = other._priority
         if priority_t == priority_other:
-            raise TypeError(f"Both {origin_t.__name__} and {origin_other.__name__} have the same priority {priority_t}!")
+            raise TypeError(f"Both {class_name(origin_t)} and {class_name(origin_other)} have the same priority {priority_t}!")
         return origin_t if priority_t < priority_other else origin_other
 
     # If only one has _priority, return that one.
