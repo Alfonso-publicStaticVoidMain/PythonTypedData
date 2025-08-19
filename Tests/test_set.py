@@ -19,7 +19,7 @@ class TestSet(unittest.TestCase):
 
         self.assertEqual(ImmutableSet[int]('1', 2, _coerce=True).values, {1, 2})
         self.assertEqual(MutableSet[str](2, '3', _coerce=True).values, {'2', '3'})
-        self.assertEqual(MutableSet[str](2, '3', _coerce=False).values, {'2', '3'})
+        self.assertEqual(MutableSet[str](2, '3', _coerce=True).values, {'2', '3'})
 
     def test_immutability(self):
         ims = ImmutableSet[str]('a', 'b')
@@ -66,10 +66,10 @@ class TestSet(unittest.TestCase):
         )
 
     def test_sub_super_set_disjoint(self):
-        s1 = MutableSet[str]("a", 2, 3, "b")
+        s1 = MutableSet[str]("a", 2, 3, "b", _coerce=True)
         s2 = MutableSet[str]("a", "1")
         s3 = MutableSet[str]("a", "b")
-        s4 = ImmutableSet[str](2, 3)
+        s4 = ImmutableSet[str](2, 3, _coerce=True)
         s5 = ImmutableSet[int]("2", "3", _coerce=True)
 
         self.assertFalse(s2.is_subset(s1))
@@ -81,7 +81,7 @@ class TestSet(unittest.TestCase):
         with self.assertRaises(ValueError):
             s5.is_subset(s1)
 
-        s6 = ImmutableSet[str]("b", 2, 3, 4, "c")
+        s6 = ImmutableSet[str]("b", 2, 3, 4, "c", _coerce=True)
         self.assertFalse(s1.is_disjoint(s6))
         self.assertEqual(s1.is_disjoint(s6), s6.is_disjoint(s1))
 
@@ -177,9 +177,9 @@ class TestSet(unittest.TestCase):
         self.assertEqual(mus.values, {1, 3, 4, 5, 7})
 
     def test_length(self):
-        s = MutableSet[str](1, '1', 0, 0, 2)
+        s = MutableSet[str](1, '1', 0, 0, 2, _coerce=True)
         self.assertEqual(len(s), 3)
-        s.add(1)
+        s.add(1, _coerce=True)
         self.assertEqual(len(s), 3)
         s.add('a')
         self.assertEqual(len(s), 4)

@@ -53,7 +53,7 @@ class TestCollection(unittest.TestCase):
         self.assertTrue(1 in mus)
         self.assertFalse(3 in mus)
 
-        mul = MutableList[str]('a', 'b', 'c', 2)
+        mul = MutableList[str]('a', 'b', 'c', 2, _coerce=True)
         self.assertTrue('a' in mul)
         self.assertTrue('2' in mul)
         self.assertFalse(2 in mul)
@@ -161,7 +161,7 @@ class TestCollection(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.assertIsNone(MutableList[int]().min())
 
-        mus = MutableSet[float](-1, 0, 1.25)
+        mus = MutableSet[float](-1, 0, 1.25, _coerce=True)
         self.assertEqual(mus.max(), 1.25)
         self.assertEqual(mus.min(), -1)
         self.assertEqual(mus.min(), -1.0)
@@ -234,7 +234,7 @@ class TestCollection(unittest.TestCase):
         mapped_to_str = mul.map(lambda x : 'a' * x)
         self.assertEqual(mapped_to_str, MutableList[str]('a', 'aa', 'aaa'))
 
-        mapped_to_str_coerced = mul.map(lambda x : 1j + x, str)
+        mapped_to_str_coerced = mul.map(lambda x : 1j + x, str, _coerce=True)
         self.assertEqual(mapped_to_str_coerced, MutableList[str]('(1+1j)', '(2+1j)', '(3+1j)'))
 
     def test_to_dict(self):

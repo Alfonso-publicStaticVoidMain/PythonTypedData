@@ -215,7 +215,7 @@ class TestList(unittest.TestCase):
         # 0 and 1 will be coerced to str no matter if _coerce is set to True or not.
         str_lst = MutableList[str]()
         str_lst.append(0, _coerce=True)
-        str_lst.append(1, _coerce=False)
+        str_lst.append(1, _coerce=True)
         self.assertEqual(str_lst[0], '0')
         self.assertEqual(str_lst[1], '1')
 
@@ -249,14 +249,14 @@ class TestList(unittest.TestCase):
         mul.filter_inplace(lambda s : s.startswith('a'))
         self.assertEqual(mul, MutableList[str]('a', 'abc'))
 
-        mul.replace('abc', 123)
+        mul.replace('abc', 123, _coerce=True)
         self.assertEqual(mul, MutableList.of_values('a', '123'))
         self.assertNotEqual(mul, MutableList.of_values('a', 123))
 
         mul.map_inplace(lambda s : s[0])
         self.assertEqual(mul, MutableList.of_values('a', '1'))
 
-        mul.replace_many({'a' : 'b', '1' : 2})
+        mul.replace_many({'a' : 'b', '1' : 2}, _coerce=True)
         self.assertEqual(mul, MutableList.of_values('b', '2'))
 
 if __name__ == '__main__':

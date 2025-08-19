@@ -8,6 +8,11 @@ from abstract_classes.collection import Collection
 from abstract_classes.generic_base import class_name
 from concrete_classes.maybe import Maybe
 
+import sys
+
+
+MAX_EXACT_INT_FLOAT = 2**sys.float_info.mant_dig
+
 
 def _validate_type(obj: Any, expected_type: type) -> bool:
     """
@@ -73,7 +78,7 @@ def _validate_iterable[T](obj: Any, iterable_type: type[Iterable[T]], item_type:
     Iterable.
     :rtype: bool
     """
-    if not isinstance(obj, iterable_type) or isinstance(obj, str):
+    if not isinstance(obj, iterable_type) or isinstance(obj, (str, bytes)):
         return False
     return all(_validate_type(item, item_type) for item in obj)
 
@@ -153,12 +158,11 @@ def _validate_or_coerce_value[T](
     """
     Validates or coerces an object to match a given type, then returns it.
 
-    Always allows safe conversions:
+    And if _coerce=True:
         - int -> float
         - int, float -> complex
         - bool -> int, float
         - bool, int, float, complex -> str
-    And if _coerce=True:
         - str -> int, float, complex
 
     :param obj: Value to validate or coerce.
@@ -167,42 +171,35 @@ def _validate_or_coerce_value[T](
     :param expected_type: Type to validate the obj for, or _coerce iterable into.
     :type expected_type: type[T]
 
-    :param _coerce: True if you want "unsafe" coercions to happen. Defaulted to False.
+    :param _coerce: True if you want type coercions to happen. Defaulted to False.
     :type _coerce: bool
 
     :returns: The obj itself if it's of the expected type, or its coercion to that type if it's valid.
     :rtype: T
 
-    :raises TypeError: if obj doesn't match item_type and cannot be safely coerced.
+    :raises TypeError: If obj doesn't match item_type and cannot be safely coerced.
     """
     if _validate_type(obj, expected_type):
         return obj
 
-    # *********** Always-safe coercions ***********
-    if expected_type is float and isinstance(obj, (int, bool)):
-        return float(obj)  # int | bool -> float
+    # *********** Safe coercions ***********
+    if expected_type in (float, complex) and isinstance(obj, (int, bool)):
+        if abs(obj) > MAX_EXACT_INT_FLOAT:
+            raise TypeError(f"Number {obj} exceeded the bound of valid int -> float conversions.")
+        return expected_type(obj)  # int | bool -> float | complex
 
-    if expected_type is int and isinstance(obj, bool):
-        return int(obj)  # bool -> int
+    if expected_type is complex and isinstance(obj, float):
+        return complex(obj)  # float -> complex
 
-    if expected_type is complex and isinstance(obj, (int, float, bool)):
-        return complex(obj)  # int | float | bool -> complex
-
-    if expected_type is str and isinstance(obj, (int, float, complex, bool)):
-        return str(obj)  # int | float | complex | bool -> str
-
-    # *********** Parameter-controlled coercions ***********
+    # *********** _coerce=True coercions ***********
     if _coerce:
-        if isinstance(obj, str):
+
+        if expected_type is str and isinstance(obj, (int, float, complex, bool)):
+            return str(obj)  # int | float | complex | bool -> str
+
+        if expected_type in (int, float, complex) and isinstance(obj, str):
             try:
-                if expected_type is int:
-                    return int(obj)  # str -> int
-
-                elif expected_type is float:
-                    return float(obj)  # str -> float
-
-                elif expected_type is complex:
-                    return complex(obj)  # str -> complex
+                return expected_type(obj)  # str -> int | float | complex
 
             except ValueError:
                 raise TypeError(f"Value {obj!r} is not of type {class_name(expected_type)} and cannot be converted safely to it.")
