@@ -9,7 +9,7 @@ from abstract_classes.generic_base import forbid_instantiation, _convert_to, cla
 
 
 @forbid_instantiation
-class AbstractSet[T](Collection):
+class AbstractSet[T](Collection[T]):
     """
     Abstract base class for hashable Collections of type T supporting set operations.
 
@@ -365,7 +365,7 @@ class AbstractSet[T](Collection):
 
 
 @forbid_instantiation
-class AbstractMutableSet[T](AbstractSet, MutableCollection):
+class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     """
     Abstract base class for mutable, hashable Collections of type T.
 

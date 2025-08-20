@@ -289,7 +289,7 @@ class TestTypeValidation(unittest.TestCase):
 
         nested = MutableList[Maybe[MutableDict[str, int]]]([
             Maybe.of(MutableDict[str, int]({"x": 1})),
-            Maybe[MutableDict[str, int]].empty()  # None present
+            Maybe[MutableDict[str, int]].empty()
         ])
         self.assertTrue(_validate_type(nested, MutableList[Maybe[MutableDict[str, int]]]))
 

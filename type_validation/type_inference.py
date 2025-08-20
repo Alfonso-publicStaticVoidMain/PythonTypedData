@@ -8,7 +8,7 @@ from abstract_classes.collection import Collection
 from collections import OrderedDict, defaultdict
 
 
-MAPPING_TYPES = (dict, Mapping, OrderedDict, defaultdict)
+MAPPING_TYPES = (dict, Mapping, OrderedDict, defaultdict, AbstractDict)
 ATOMIC_ITERABLES = (str, bytes, bytearray, memoryview, range)
 
 
@@ -42,7 +42,7 @@ def _infer_iterable_type[T](iterable: Iterable[T]) -> type[Iterable[T]]:
     :return: The type of the iterable.
     :rtype: type[T]
     """
-    if isinstance(iterable, Collection):
+    if callable(getattr(iterable, '_inferred_item_type', None)):
         item_type = type(iterable)._inferred_item_type()
         if item_type is not None:
             return type(iterable)

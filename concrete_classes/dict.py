@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
-class MutableDict[K, V](AbstractMutableDict):
+class MutableDict[K, V](AbstractMutableDict[K, V]):
     """
     Concrete mutable implementation of AbstractMutableDict, with a dict as its underlying container.
 
@@ -136,7 +136,7 @@ class MutableDict[K, V](AbstractMutableDict):
 
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False)
-class ImmutableDict[K, V](AbstractDict):
+class ImmutableDict[K, V](AbstractDict[K, V]):
     """
     Concrete immutable implementation of AbstractDict, with an immutabledict as its underlying container.
 

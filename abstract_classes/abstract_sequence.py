@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import collections
 import typing
+from collections import deque
+from collections.abc import Sequence
 from typing import ClassVar, Callable, Iterable, Any, Iterator
 
 from abstract_classes.abstract_set import AbstractSet
@@ -10,7 +11,7 @@ from abstract_classes.generic_base import forbid_instantiation, _convert_to, cla
 
 
 @forbid_instantiation
-class AbstractSequence[T](Collection):
+class AbstractSequence[T](Collection[T]):
     """
     Abstract base class for sequence-like Collections of a type T, with ordering and indexing capabilities.
 
@@ -272,7 +273,7 @@ class AbstractSequence[T](Collection):
 
 
 @forbid_instantiation
-class AbstractMutableSequence[T](AbstractSequence, MutableCollection):
+class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
     """
     Abstract base class for mutable and ordered sequences containing values of a type T.
 
@@ -303,7 +304,7 @@ class AbstractMutableSequence[T](AbstractSequence, MutableCollection):
     # Metadata class attributes
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = list
-    _allowed_ordered_types: ClassVar[tuple[type, ...]] = (list, tuple, AbstractSequence, range, collections.deque, collections.abc.Sequence)
+    _allowed_ordered_types: ClassVar[tuple[type, ...]] = (list, tuple, AbstractSequence, range, deque, Sequence)
     _mutable: ClassVar[bool] = True
 
     def append(
@@ -348,7 +349,7 @@ class AbstractMutableSequence[T](AbstractSequence, MutableCollection):
         from type_validation.type_validation import _validate_or_coerce_iterable, _validate_or_coerce_value
 
         if isinstance(index, slice):
-            allowed_ordered_types = getattr(type(self), '_allowed_ordered_types', ())
+            allowed_ordered_types = getattr(type(self), '_allowed_ordered_types', (AbstractSequence, list, tuple))
             if not isinstance(value, allowed_ordered_types):
                 raise ValueError(f"Values of type {class_name(type(value))} attempted to be assigned to a slice.")
             self.values[index] = _validate_or_coerce_iterable(value, self.item_type, _coerce=_coerce)

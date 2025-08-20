@@ -608,7 +608,7 @@ class AbstractDict[K, V](GenericBase):
 
 
 @forbid_instantiation
-class AbstractMutableDict[K, V](AbstractDict):
+class AbstractMutableDict[K, V](AbstractDict[K, V]):
     """
     Abstract base class for mutable dictionaries with type enforced keys and values.
 
