@@ -716,7 +716,7 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         if not isinstance(other, AbstractDict):
             return NotImplemented
 
-        keys_to_remove = set(self.data) - set(other)
+        keys_to_remove = set(self.data) - set(other.data)
         for key in keys_to_remove:
             del self.data[key]
         return self
@@ -763,8 +763,8 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         self: AbstractMutableDict[K, V],
         other: dict[K, V] | Mapping[K, V] | AbstractDict[K, V],
         *,
-        _coerce_keys: bool = True,
-        _coerce_values: bool = True
+        _coerce_keys: bool = False,
+        _coerce_values: bool = False
     ) -> None:
         """
         Updates this AbstractMutableDict with the contents of another mapping.
@@ -794,8 +794,8 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         key: K,
         fallback: V | None = None,
         *,
-        _coerce_keys: bool = None,
-        _coerce_values: bool = None
+        _coerce_keys: bool = False,
+        _coerce_values: bool = False
     ) -> V:
         """
         Removes and returns the value associated with a key, or a fallback if not found.
