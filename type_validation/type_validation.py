@@ -11,7 +11,7 @@ from concrete_classes.maybe import Maybe
 import sys
 
 
-MAX_EXACT_INT_FLOAT = 2**sys.float_info.mant_dig
+MAX_EXACT_INT_FLOAT: int = 2**sys.float_info.mant_dig
 
 
 def _validate_type(obj: Any, expected_type: type) -> bool:
@@ -101,8 +101,10 @@ def _validate_mapping(obj: Any, mapping_type: type, key_value_types: tuple[type,
     """
     if not isinstance(obj, mapping_type):
         return False
+
     if len(key_value_types) != 2:
         raise ValueError(f"_validate_mapping_type method called with a tuple argument {key_value_types} of length {len(key_value_types)} != 2.")
+
     key_type, val_type = key_value_types
     return all(_validate_type(key, key_type) and _validate_type(value, val_type) for key, value in obj.items())
 
@@ -123,10 +125,14 @@ def _validate_tuple(obj: Any, args: tuple) -> bool:
     """
     if not isinstance(obj, tuple):
         return False
+
+    # Case tuple[type, ...]
     if len(args) == 2 and args[1] is Ellipsis:
         return all(_validate_type(v, args[0]) for v in obj)
+
     if len(obj) != len(args):
         return False
+
     return all(_validate_type(v, t) for v, t in zip(obj, args))
 
 
@@ -158,12 +164,13 @@ def _validate_or_coerce_value[T](
     """
     Validates or coerces an object to match a given type, then returns it.
 
-    And if _coerce=True:
-        - int -> float
-        - int, float -> complex
-        - bool -> int, float
+    Always performs the following type coercions:
+        - int -> float, complex: If abs(obj) < MAX_EXACT_INT_FLOAT, the upper bound for which that conversion is fine.
+        - float -> complex
+
+    If _coerce=True:
         - bool, int, float, complex -> str
-        - str -> int, float, complex
+        - str -> int, float, complex: If the str represents such a type.
 
     :param obj: Value to validate or coerce.
     :type obj: object
@@ -171,10 +178,10 @@ def _validate_or_coerce_value[T](
     :param expected_type: Type to validate the obj for, or _coerce iterable into.
     :type expected_type: type[T]
 
-    :param _coerce: True if you want type coercions to happen. Defaulted to False.
+    :param _coerce: True if you want additional type coercions to happen. Defaulted to False.
     :type _coerce: bool
 
-    :returns: The obj itself if it's of the expected type, or its coercion to that type if it's valid.
+    :returns: The obj itself if it's of the expected type, or its coercion to that type if enabled and if it's valid.
     :rtype: T
 
     :raises TypeError: If obj doesn't match item_type and cannot be safely coerced.
@@ -200,11 +207,12 @@ def _validate_or_coerce_value[T](
         if expected_type in (int, float, complex) and isinstance(obj, str):
             try:
                 return expected_type(obj)  # str -> int | float | complex
-
             except ValueError:
-                raise TypeError(f"Value {obj!r} is not of type {class_name(expected_type)} and cannot be converted safely to it.")
+                raise TypeError(f"String {obj!r} does not represent a {class_name(expected_type)}.")
 
-    raise TypeError(f"Value {obj!r} is not of type {class_name(expected_type)}.")
+        raise TypeError(f"Value {obj!r} is not of type {class_name(expected_type)} and couldn't be coerced to it.")
+
+    raise TypeError(f"Value {obj!r} is not of type {class_name(expected_type)} and couldn't be safely coerced to it.")
 
 
 def _validate_or_coerce_iterable[T](
@@ -229,8 +237,9 @@ def _validate_or_coerce_iterable[T](
     :param _finisher: Callable to be applied to the validated or coerced values before returning them.
     :type _finisher: Callable[[Iterable[T]], Iterable[T]] | Callable[[], Iterable[T]]
 
-    :return: A list containing all elements after performing validation and optionally coercion.
-    :rtype: list[T]
+    :return: An iterable containing all elements after performing validation and optionally coercion, whose type is
+     determined by the return type of the _finisher parameter.
+    :rtype: Iterable[T]
 
     :raises TypeError: If any value isn't of the expected type and coercion isn't possible or wasn't enabled.
     """
@@ -245,7 +254,7 @@ def _validate_or_coerce_iterable_of_iterables[T](
     *,
     _coerce: bool = False,
     _inner_finisher: Callable[[Iterable[T]], Iterable[T]] = set,
-    _outer_finisher: Callable[[Iterable[T]], Iterable[T]] = tuple
+    _outer_finisher: Callable[[list[Iterable[T]]], Iterable[T]] = tuple
 ) -> Iterable[Iterable[T]]:
     """
     Validates and optionally coerces each iterable inside an iterable and returns them as a list of lists.
@@ -265,8 +274,9 @@ def _validate_or_coerce_iterable_of_iterables[T](
     :param _outer_finisher: Callable to apply to the returned final Iterable of Iterables.
     :type _outer_finisher: Callable[[Iterable[T]], Iterable[T]]
 
-    :return: A list of lists containing the validated and optionally coerced iterables.
-    :rtype: list[list[T]]
+    :return: An Iterable containing the validated and optionally coerced iterables. The outer type is determined by the
+     return type of _outer_finisher, and the inner type by _inner_finisher.
+    :rtype: Iterable[Iterable[T]]
     """
     other_iterables: list = []
     for iterable in iterables:
@@ -281,8 +291,8 @@ def _validate_duplicates_and_hash(iterable: Iterable) -> None:
     :param iterable: Iterable object to validate.
     :type iterable: Iterable
 
-    :raises TypeError: If the iterable contains a key that isn't hashable.
-    :raises ValueError: If the iterable contains duplicate elements, and displays those.
+    :raises TypeError: If the iterable contains a key that isn't hashable, raising the error as soon as one is found, or
+     if the iterable contains duplicates, showing all of them in the error message.
     """
     seen = set()
     duplicates = set()
@@ -295,7 +305,7 @@ def _validate_duplicates_and_hash(iterable: Iterable) -> None:
             except TypeError:
                 raise TypeError(f"Key {key!r} is not hashable and cannot be used as a dictionary key.")
     if duplicates:
-        raise ValueError(f"Duplicate keys detected: {duplicates}")
+        raise TypeError(f"Duplicate keys detected: {duplicates}")
 
 
 def _split_keys_values[K, V](keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]) -> tuple[list[K], list[V], bool]:
@@ -314,21 +324,14 @@ def _split_keys_values[K, V](keys_values: dict[K, V] | Mapping[K, V] | Iterable[
     :raises TypeError: If the keys_values parameter isn't of the allowed types.
     :raises ValueError: If the number of keys and values differ.
     """
-    keys_from_iterable = False
     if isinstance(keys_values, (dict, Mapping, AbstractDict)):
+        keys_from_iterable = False
         keys = keys_values.keys()
         values = keys_values.values()
     elif isinstance(keys_values, Iterable):
-        keys = []
-        values = []
         keys_from_iterable = True
-        for pair in keys_values:
-            if not (isinstance(pair, tuple) and len(pair) == 2):
-                raise TypeError(f"Expected iterable of (key, obj) tuples, got: {pair!r}")
-            key, value = pair
-            keys.append(key)
-            values.append(value)
+        keys, values = zip(*keys_values)
+        if len(keys) != len(values):
+            raise ValueError("The number of keys and values aren't equal.")
 
-    if len(keys) != len(values):
-        raise ValueError("The number of keys and values aren't equal.")
     return keys, values, keys_from_iterable
