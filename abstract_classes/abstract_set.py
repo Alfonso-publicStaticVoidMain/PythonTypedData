@@ -21,6 +21,10 @@ class AbstractSet[T](Collection[T]):
     This class will be further extended by AbstractMutableSet, adding mutability capabilities to it.
 
     Attributes:
+        item_type (type[T]): The type of elements stored in the set, derived from the generic type.
+
+        values (Iterable[T]): The internal container of stored values, by default a frozenset.
+
         _finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting them as an
          attribute on Collection's init.
 
@@ -377,7 +381,7 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     Attributes:
         item_type (type[T]): The type of elements stored in the set, derived from the generic type.
 
-        values (Iterable[T]): The internal container of stored values, usually of one of Python's built-in Iterables.
+        values (Iterable[T]): The internal container of stored values, by default a set.
 
         _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of Collection's init
          by its value, setting it to set to ensure mutability of the underlying container.

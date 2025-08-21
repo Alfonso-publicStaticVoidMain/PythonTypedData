@@ -90,22 +90,21 @@ class Collection[T](GenericBase):
         # If the generic item type is None or a TypeVar, raises a TypeError.
         if generic_item_type is None:
             raise TypeError(f"{class_name(type(self))} must be instantiated with a generic type, e.g., {class_name(type(self))}[int](...) or infer the type with {class_name(type(self))}.of_iterable().")
-
         if isinstance(generic_item_type, TypeVar):
             raise TypeError(f"{class_name(type(self))} was instantiated without a proper generic type, somehow {generic_item_type.__name__} was a TypeVar.")
 
         if (
-            len(values) == 1
-            and not _validate_type(values[0], generic_item_type)
-            and isinstance(values[0], Iterable)
-            and not isinstance(values[0], (str, bytes))
+            len(values) == 1 # If the values are a length 1 tuple
+            and not _validate_type(values[0], generic_item_type) # Whose only element doesn't validate the expected type
+            and isinstance(values[0], Iterable) # While that element being an Iterable
+            and not isinstance(values[0], (str, bytes)) # But not a str or bytes iterable
         ):
             values = values[0]  # Then, the values are unpacked.
 
         forbidden_iterable_types = _forbidden_iterable_types or getattr(type(self), '_forbidden_iterable_types', ())
 
         if isinstance(values, forbidden_iterable_types):
-            raise TypeError(f"Invalid type {class_name(type(values))} for class {class_name(type(self))}.")
+            raise TypeError(f"Invalid values type: {class_name(type(values))} for class {class_name(type(self))}.")
 
         object.__setattr__(self, 'item_type', generic_item_type)
 

@@ -24,6 +24,10 @@ class AbstractSequence[T](Collection[T]):
     container of the class.
 
     Attributes:
+        item_type (type[T]): The type of elements stored in the sequence, derived from the generic type.
+
+        values (Iterable[T]): The internal container of stored values, by default a tuple.
+
         _finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting them as an
          attribute on Collection's init.
 
@@ -65,10 +69,9 @@ class AbstractSequence[T](Collection[T]):
         """
         if isinstance(index, slice):
             return type(self)(self.values[index])
-        elif isinstance(index, int):
+
+        if isinstance(index, int):
             return self.values[index]
-        else:
-            raise TypeError("Invalid index type: must be an int or slice")
 
     def __lt__(self: AbstractSequence[T], other: AbstractSequence[T]) -> bool:
         """
