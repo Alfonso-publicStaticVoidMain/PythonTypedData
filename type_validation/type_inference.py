@@ -4,6 +4,7 @@ from typing import Mapping, Iterable
 
 from abstract_classes.abstract_dict import AbstractDict
 from abstract_classes.collection import Collection
+from type_validation.type_hierarchy import _is_subtype
 
 from collections import OrderedDict, defaultdict
 
@@ -24,8 +25,10 @@ def _infer_type[T](obj: T) -> type[T]:
     """
     if isinstance(obj, tuple):
         return _infer_tuple_type(obj)
+
     if isinstance(obj, MAPPING_TYPES):
         return _infer_mapping_type(obj)
+
     if isinstance(obj, Iterable) and not isinstance(obj, ATOMIC_ITERABLES):
         return _infer_iterable_type(obj)
 
@@ -104,25 +107,27 @@ def _infer_type_contained_in_tuple(tpl: tuple) -> tuple[type, ...]:
     return tuple(_infer_type(element) for element in tpl)
 
 
-def _combine_types[T](type_set: set[type[T]]) -> type[T]:
+def _combine_types[T](types: set[type[T]]) -> type[T]:
     """
     Combines all types contained in a set of types into a single one using the union pipe operator |.
 
-    :param type_set: Set of types to combine.
-    :type type_set: set[type[T]]
+    :param types: Set of types to combine.
+    :type types: set[type[T]]
 
     :return: The union of all types found within the set.
     :rtype: type[T]
     """
-    if not type_set:
-        raise ValueError("Cannot combine an empty type set")
-    elif len(type_set) == 1:
-        return next(iter(type_set))
-    else:
-        result_type = None
-        for t in type_set:
+    if not types:
+        raise ValueError("Cannot combine an empty type set.")
+
+    if len(types) == 1:
+        return next(iter(types))
+
+    result_type = None
+    for t in types:
+        if not _is_subtype(t, result_type):
             result_type = t if result_type is None else result_type | t
-        return result_type
+    return result_type
 
 
 def _infer_type_contained_in_iterable[T](iterable: Iterable[T]) -> type[T]:
