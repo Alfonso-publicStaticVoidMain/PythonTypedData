@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from functools import reduce as reduce
+from functools import reduce
 from typing import Iterable, Any, Callable, TypeVar, ClassVar, Iterator
 from collections import defaultdict
 
 from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation, _convert_to
+
+_MISSING = object()
 
 
 @forbid_instantiation
@@ -473,7 +475,7 @@ class Collection[T](GenericBase):
         """
         return not any(predicate(value) for value in self.values)
 
-    def reduce(self: Collection[T], f: Callable[[T, T], T], unit: T = object()) -> T:
+    def reduce(self: Collection[T], f: Callable[[T, T], T], unit: T = _MISSING) -> T:
         """
         Reduces the Collection to a single value using a binary operator function and an optional initial unit.
 
@@ -489,7 +491,7 @@ class Collection[T](GenericBase):
         """
         from type_validation.type_validation import _validate_type
 
-        if unit is self.reduce.__defaults__[0]:  # unit not passed
+        if unit is _MISSING:  # unit not passed
             return reduce(f, self.values)
 
         if not _validate_type(unit, self.item_type):
@@ -524,7 +526,7 @@ class Collection[T](GenericBase):
             consumer(item)
         return self
 
-    def distinct[K, C: Collection](self: C, key: Callable[[T], K] = object()) -> C:
+    def distinct[K, C: Collection](self: C, key: Callable[[T], K] = _MISSING) -> C:
         """
         Returns a new Collection with only distinct elements, determined by a key function.
 
@@ -534,7 +536,7 @@ class Collection[T](GenericBase):
         :return: A Collection of the same dynamic subclass as self with duplicates removed based on the key.
         :rtype: C
         """
-        if key is self.distinct.__defaults__[0]:
+        if key is _MISSING:
             if isinstance(self.values, (set, frozenset)):
                 return type(self)(self.values, _skip_validation=True)
             key = lambda x : x
@@ -567,7 +569,7 @@ class Collection[T](GenericBase):
     def max(
         self: Collection[T],
         *,
-        default: T = object(),
+        default: T = _MISSING,
         key: Callable[[T], Any] = None
     ) -> T | None:
         """
@@ -582,14 +584,14 @@ class Collection[T](GenericBase):
         :return: The maximum element, or default if provided and self is empty.
         :rtype: T | None
         """
-        if default is not self.max.__kwdefaults__['default']:
+        if default is not _MISSING:
             return max(self.values, default=default, key=key)
         return max(self.values, key=key)
 
     def min(
         self: Collection[T],
         *,
-        default: T = object(),
+        default: T = _MISSING,
         key: Callable[[T], Any] = None
     ) -> T | None:
         """
@@ -604,7 +606,7 @@ class Collection[T](GenericBase):
         :return: The minimum element, or default if provided and self is empty.
         :rtype: T | None
         """
-        if default is not self.min.__kwdefaults__['default']:
+        if default is not _MISSING:
             return min(self.values, default=default, key=key)
         return min(self.values, key=key)
 
@@ -665,10 +667,10 @@ class Collection[T](GenericBase):
         :type accumulator: Callable[[A, T], None]
 
         :param finisher: Final transformation to obtain a result. Defaults to identity mapping.
-        :type finisher: Callable[[A], S]
+        :type finisher: Callable[[A], R]
 
         :return: The collected result.
-        :rtype: S
+        :rtype: R
         """
         acc = supplier()
         for item in self.values:
@@ -697,7 +699,7 @@ class Collection[T](GenericBase):
         :type finisher: Callable[[A], S]
 
         :return: The collected result.
-        :rtype: S
+        :rtype: R
         """
         acc = supplier()
         for item in self.values:
@@ -732,14 +734,14 @@ class Collection[T](GenericBase):
         :param state_supplier: Provides the initial state object.
         :type state_supplier: Callable[[], S]
 
-        :param accumulator: Accepts (accumulator, item, state) to process each item via secondary effects.
+        :param accumulator: Accepts (accumulator, state, item) to process each item via secondary effects.
         :type accumulator: Callable[[A, S, T], None]
 
         :param finisher: Final transformation combining accumulator and state to a result.
-        :type finisher: Callable[[A, S], S]
+        :type finisher: Callable[[A, S], R]
 
         :return: The final collected result.
-        :rtype: S
+        :rtype: R
         """
         return self.collect(
             supplier=lambda: (supplier(), state_supplier()),
@@ -779,10 +781,10 @@ class Collection[T](GenericBase):
         :type accumulator: Callable[[A, S, T], tuple[A, S]]
 
         :param finisher: Final transformation combining accumulator and state to a result.
-        :type finisher: Callable[[A, S], S]
+        :type finisher: Callable[[A, S], R]
 
         :return: The final collected result.
-        :rtype: S
+        :rtype: R
         """
         return self.collect_pure(
             supplier=lambda: (supplier(), state_supplier()),
