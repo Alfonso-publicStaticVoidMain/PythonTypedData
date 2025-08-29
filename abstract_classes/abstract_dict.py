@@ -157,7 +157,7 @@ class AbstractDict[K, V](GenericBase):
         try:
             key_type = cls._args[0]
             value_type = cls._args[1]
-        except (TypeError, ValueError, IndexError, KeyError):
+        except (TypeError, ValueError, IndexError, KeyError, AttributeError):
             key_type = None
             value_type = None
         return key_type, value_type
@@ -176,21 +176,25 @@ class AbstractDict[K, V](GenericBase):
         :return: A new AbstractDict with inferred generic types and properly validated contents (hashable and not
          duplicated keys).
         :rtype: D
+
+        :raises TypeError: If the keys or values are empty.
         """
-        if keys_values is None or not keys_values:
-            raise ValueError(f"Can't create a {class_name(cls)} object from empty iterable.")
-        from type_validation.type_validation import _split_keys_values
-        from type_validation.type_inference import _infer_type_contained_in_iterable
-        keys, values, _ = _split_keys_values(keys_values)
-        inferred_key_type = _infer_type_contained_in_iterable(keys)
-        inferred_value_type = _infer_type_contained_in_iterable(values)
-        if hasattr(cls, '_args'):
-            from type_validation.type_hierarchy import _is_subtype
-            key_type, value_type = cls._inferred_key_value_types()
-            if not _is_subtype(inferred_key_type, key_type) or not _is_subtype(inferred_value_type, value_type):
-                raise TypeError(f"Tried applying .of method to with a parametrized class but the inferred types are incompatible.")
-            return cls(_keys=keys, _values=values, _skip_validation=True)
-        return cls[inferred_key_type, inferred_value_type](_keys=keys, _values=values, _skip_validation=True)
+        generic_key_type, generic_value_type = cls._inferred_key_value_types()
+
+        # Called like MutableDict[int, str].of(...) -> keys_values can be empty since the generic types are given.
+        if generic_key_type is not None and generic_value_type is not None:
+            return cls[generic_key_type, generic_value_type](keys_values)
+
+        # Called like MutableDict.of(...) -> keys_values mustn't be empty for the type to be inferred.
+        else:
+            from type_validation.type_validation import _split_keys_values
+            from type_validation.type_inference import _infer_type_contained_in_iterable
+            if not keys_values:
+                raise TypeError(f"The keys or values were empty, thus unfit to infer a type from them.")
+            keys, values, _ = _split_keys_values(keys_values)
+            inferred_key_type = _infer_type_contained_in_iterable(keys)
+            inferred_value_type = _infer_type_contained_in_iterable(values)
+            return cls[inferred_key_type, inferred_value_type](_keys=keys, _values=values, _skip_validation=True)
 
     @classmethod
     def of_keys_values[D: AbstractDict](
@@ -210,24 +214,29 @@ class AbstractDict[K, V](GenericBase):
         :return: A new AbstractDict initialized from the given key-value pairs.
         :rtype: D
 
-        :raises ValueError: If `keys` and `values` do not have the same length.
+        :raises ValueError: If `keys` and `values` do not have the same length, or if any of them is empty.
         """
-        keys = list(keys)
-        values = list(values)
+        keys = list(keys) if not isinstance(keys, list) else keys
+        values = list(values) if not isinstance(values, list) else values
 
         if len(keys) != len(values):
             raise ValueError("Keys and iterable must be of the same length when using .of_keys_values")
 
-        from type_validation.type_inference import _infer_type_contained_in_iterable
-        inferred_key_type = _infer_type_contained_in_iterable(keys)
-        inferred_value_type = _infer_type_contained_in_iterable(values)
-        if hasattr(cls, '_args'):
-            from type_validation.type_hierarchy import _is_subtype
-            key_type, value_type = cls._inferred_key_value_types()
-            if not _is_subtype(inferred_key_type, key_type) or not _is_subtype(inferred_value_type, value_type):
-                raise TypeError(f"Tried applying .of method to with a parametrized class but the inferred types are incompatible.")
-            return cls(_keys=keys, _values=values, _skip_validation=True)
-        return cls[inferred_key_type, inferred_value_type](_keys=keys, _values=values, _skip_validation=True)
+        generic_key_type, generic_value_type = cls._inferred_key_value_types()
+
+        # Called like MutableDict[int, str].of(...) -> keys_values can be empty since the generic types are given.
+        if generic_key_type is not None and generic_value_type is not None:
+            return cls[generic_key_type, generic_value_type](_keys=keys, _values=values)
+
+        # Called like MutableDict.of(...) -> both keys and values must be provided to infer the generic types.
+        else:
+            from type_validation.type_validation import _split_keys_values
+            from type_validation.type_inference import _infer_type_contained_in_iterable
+            if not keys or not values:
+                raise TypeError(f"The keys or values were empty, thus unfit to infer a type from them.")
+            inferred_key_type = _infer_type_contained_in_iterable(keys)
+            inferred_value_type = _infer_type_contained_in_iterable(values)
+            return cls[inferred_key_type, inferred_value_type](_keys=keys, _values=values, _skip_validation=True)
 
     def subdict[D: AbstractDict](self: D, slc: slice) -> D:
         """

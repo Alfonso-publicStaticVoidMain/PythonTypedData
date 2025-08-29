@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Any, Iterator
 
-from abstract_classes.generic_base import GenericBase
+from abstract_classes.generic_base import GenericBase, class_name
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -109,25 +109,32 @@ class Maybe[T](GenericBase):
         return Maybe[_infer_type(value)](value, _skip_validation=True)
 
     @classmethod
-    def of_nullable(cls, value: T | None, item_type: type[T]) -> Maybe[T]:
+    def of_nullable(cls, value: T | None) -> Maybe[T]:
         """
         Creates and returns a Maybe object of the given type containing the given value, which may be None.
 
         :param value: Value for the Maybe object to contain. Can be None.
         :type value: T
 
-        :param item_type: Type for the Maybe object to hold. It must always be provided.
-        :type: type[T]
-
         :return: A Maybe object of the given type containing the value.
         :rtype: Maybe[T]
 
-        :raises ValueError: If item_type is None, as then a Maybe object with no type nor value may be attempted.
+        :raises TypeError: If a non parametrized Maybe is used on a None value.
         """
-        if item_type is None:
-            raise ValueError("You must give a type when using Maybe.of_nullable")
-        from type_validation.type_validation import _validate_or_coerce_value
-        return Maybe[item_type](_validate_or_coerce_value(value, item_type)) if value is not None else Maybe[item_type]()
+        class_generic_type: type | None = cls._inferred_item_type()
+
+        # Called like Maybe[int].of_nullable(...) -> Value can be None since the type is given.
+        if class_generic_type is not None:
+            return Maybe[class_generic_type](value)
+
+        # Called like Maybe.of_nullable(...) -> Type will be inferred from the value, which mustn't be None.
+        else:
+            if value is None:
+                raise TypeError(f"You must use a parametrized Maybe to construct an empty Maybe with of_nullable")
+            from type_validation.type_inference import _infer_type
+            from type_validation.type_validation import _validate_or_coerce_value
+            inferred_item_type: type = _infer_type(value)
+            return Maybe[inferred_item_type](_validate_or_coerce_value(value, inferred_item_type), _skip_validation=True)
 
     def __getattr__(self, name: str) -> Any:
         """

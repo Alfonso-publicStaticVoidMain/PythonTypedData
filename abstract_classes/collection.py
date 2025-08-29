@@ -137,7 +137,7 @@ class Collection[T](GenericBase):
     @classmethod
     def of_values[C: Collection](cls: type[C], *values: Any) -> C:
         """
-        Creates a Collection object containing the given values, inferring their common type.
+        Creates a Collection object containing the given values, inferring their common type if needed.
 
         Acts as a type-safe factory method for constructing properly parameterized collections when the type is not
         known beforehand.
@@ -148,39 +148,47 @@ class Collection[T](GenericBase):
         :return: A new Collection that is an instance of cls containing the passed values, inferring its item type.
         :rtype: C
 
-        :raises ValueError: If no values are provided.
+        :raises TypeError: If no values are provided.
         """
-        from type_validation.type_inference import _infer_type_contained_in_iterable
-        inferred_generic_type = _infer_type_contained_in_iterable(values)
-        if hasattr(cls, '_args'):
-            from type_validation.type_hierarchy import _is_subtype
-            if not _is_subtype(inferred_generic_type, cls._inferred_item_type()):
-                raise TypeError(f"Tried applying .of_values method to with a parametrized class but the inferred type {class_name(inferred_generic_type)} isn't a subtype of {class_name(cls._args)}")
-            return cls(values, _skip_validation=True)
-        return cls[inferred_generic_type](values, _skip_validation=True)
+        class_generic_type: type | None = cls._inferred_item_type()
+
+        # Called like MutableList[int].of_values(...) -> values can be empty since the type is given.
+        if class_generic_type is not None:
+            return cls[class_generic_type](values)
+
+        # Called like MutableList.of_values(...) -> values be provided to infer the type.
+        else:
+            if not values:
+                raise TypeError(f"No type could be inferred from the values: {values}")
+            from type_validation.type_inference import _infer_type_contained_in_iterable
+            return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
+
 
     @classmethod
     def of_iterable[C: Collection](cls: type[C], values: Iterable) -> C:
         """
-        Creates a Collection object containing the values of the given iterable, inferring their common type.
-
-        Acts as a type-safe factory method for constructing properly parameterized collections when the type is not
-        known beforehand.
+        Creates a Collection object containing the values of the given iterable, inferring their common type if needed.
 
         :param values: Iterable containing the desired values.
         :type values: Iterable
 
         :return: A new Collection that is an instance of cls containing the values of the iterable, inferring its type.
         :rtype: C
+
+        :raises TypeError: If the values Iterable is empty.
         """
-        from type_validation.type_inference import _infer_type_contained_in_iterable
-        inferred_generic_type = _infer_type_contained_in_iterable(values)
-        if hasattr(cls, '_args'):
-            from type_validation.type_hierarchy import _is_subtype
-            if not _is_subtype(inferred_generic_type, cls._inferred_item_type()):
-                raise TypeError(f"Tried applying .of_values method to with a parametrized class but the inferred type {class_name(inferred_generic_type)} isn't a subtype of {class_name(cls._args)}")
-            return cls(values, _skip_validation=True)
-        return cls[inferred_generic_type](values, _skip_validation=True)
+        class_generic_type: type | None = cls._inferred_item_type()
+
+        # Called like MutableList[int].of_iterable(...) -> values can be empty since the type is given.
+        if class_generic_type is not None:
+            return cls[class_generic_type](values)
+
+        # Called like MutableList.of_iterable(...) -> values mustn't be empty to infer the type.
+        else:
+            if not values:
+                raise TypeError(f"No type could be inferred from the values: {values}")
+            from type_validation.type_inference import _infer_type_contained_in_iterable
+            return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
 
     @classmethod
     def empty[C: Collection](cls: type[C]) -> C:
