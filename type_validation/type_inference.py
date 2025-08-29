@@ -4,6 +4,13 @@ from typing import Mapping, Iterable
 
 from abstract_classes.abstract_dict import AbstractDict
 from abstract_classes.collection import Collection
+from type_validation.type_hierarchy import _is_subtype
+
+from collections import OrderedDict, defaultdict
+
+
+MAPPING_TYPES = (dict, Mapping, OrderedDict, defaultdict, AbstractDict)
+ATOMIC_ITERABLES = (str, bytes, bytearray, memoryview, range)
 
 
 def _infer_type[T](obj: T) -> type[T]:
@@ -16,14 +23,14 @@ def _infer_type[T](obj: T) -> type[T]:
     :return: The type of the object, including its generics.
     :rtype: type
     """
-    if isinstance(obj, (list, set, frozenset)):
-        return _infer_iterable_type(obj)
+    if isinstance(obj, tuple):
+        return _infer_tuple_type(obj)
 
-    elif isinstance(obj, (dict, Mapping)):
+    if isinstance(obj, MAPPING_TYPES):
         return _infer_mapping_type(obj)
 
-    elif isinstance(obj, tuple):
-        return _infer_tuple_type(obj)
+    if isinstance(obj, Iterable) and not isinstance(obj, ATOMIC_ITERABLES):
+        return _infer_iterable_type(obj)
 
     return type(obj)
 
@@ -38,19 +45,22 @@ def _infer_iterable_type[T](iterable: Iterable[T]) -> type[Iterable[T]]:
     :return: The type of the iterable.
     :rtype: type[T]
     """
-    if isinstance(iterable, Collection):
-        if hasattr(type(iterable), '_args'):
+    if callable(getattr(iterable, '_inferred_item_type', None)):
+        item_type = type(iterable)._inferred_item_type()
+        if item_type is not None:
             return type(iterable)
-        return type(iterable)[iterable.item_type]
 
     if not iterable:
         raise ValueError("Cannot infer type from empty iterable")
 
-    inner_type: type[T] = _combine_types({_infer_type(value) for value in iterable})
+    if isinstance(iterable, (str, bytes)):
+        raise ValueError("Iterable is a string or bytes.")
 
-    if isinstance(iterable, (list, set, frozenset)):
+    inner_type: type[T] = _infer_type_contained_in_iterable(iterable)
+
+    try:
         return type(iterable)[inner_type]
-    else:
+    except (TypeError, AttributeError):
         return Iterable[inner_type]
 
 
@@ -68,11 +78,6 @@ def _infer_mapping_type[K, V](mapping: Mapping[K, V]) -> type[Mapping[K, V]]:
         inferred_key, inferred_value = type(mapping)._inferred_key_value_types()
         if inferred_key is not None and inferred_value is not None:
             return type(mapping)
-
-        key_type = getattr(mapping, 'key_type', None)
-        value_type = getattr(mapping, 'value_type', None)
-        if key_type is not None and value_type is not None:
-            return type(mapping)[key_type, value_type]
 
     if not mapping:
         raise ValueError("Cannot infer type from empty mapping")
@@ -98,29 +103,31 @@ def _infer_tuple_type(tpl: tuple) -> type[tuple]:
 
 def _infer_type_contained_in_tuple(tpl: tuple) -> tuple[type, ...]:
     if not tpl:
-        return ()
+        raise ValueError(f"Tuple object {tpl} was empty.")
     return tuple(_infer_type(element) for element in tpl)
 
 
-def _combine_types[T](type_set: set[type[T]]) -> type[T]:
+def _combine_types[T](types: set[type[T]]) -> type[T]:
     """
     Combines all types contained in a set of types into a single one using the union pipe operator |.
 
-    :param type_set: Set of types to combine.
-    :type type_set: set[type[T]]
+    :param types: Set of types to combine.
+    :type types: set[type[T]]
 
     :return: The union of all types found within the set.
     :rtype: type[T]
     """
-    if not type_set:
-        raise ValueError("Cannot combine an empty type set")
-    elif len(type_set) == 1:
-        return next(iter(type_set))
-    else:
-        result_type = None
-        for t in type_set:
+    if not types:
+        raise ValueError("Cannot combine an empty type set.")
+
+    if len(types) == 1:
+        return next(iter(types))
+
+    result_type = None
+    for t in types:
+        if not _is_subtype(t, result_type):
             result_type = t if result_type is None else result_type | t
-        return result_type
+    return result_type
 
 
 def _infer_type_contained_in_iterable[T](iterable: Iterable[T]) -> type[T]:
@@ -139,12 +146,12 @@ def _infer_type_contained_in_iterable[T](iterable: Iterable[T]) -> type[T]:
     attached even if they're empty).
     """
     if iterable is None:
-        raise ValueError("Cannot infer type from None")
+        raise ValueError("Cannot infer type from None.")
 
     if isinstance(iterable, Collection) and hasattr(type(iterable), '_args'):
         return type(iterable)._inferred_item_type()
 
     if not iterable:
-        raise ValueError("Cannot infer type from an empty iterable")
+        raise ValueError("Cannot infer type from an empty iterable.")
 
     return _combine_types({_infer_type(val) for val in iterable})

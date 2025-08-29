@@ -8,6 +8,16 @@ from concrete_classes.set import MutableSet, ImmutableSet
 
 class TestCollection(unittest.TestCase):
 
+    def test_factory_constructors(self):
+        lst = MutableList.of_iterable([0, 1, 2])
+        self.assertEqual(lst, MutableList[int](0, 1, 2))
+
+        lst = MutableList.of_values([0, 1, 2])
+        self.assertEqual(lst, MutableList[list[int]]([0, 1, 2]))
+
+        lst = MutableList.of_values([0], (1, 2), {3})
+        self.assertEqual(lst, MutableList[list[int] | tuple[int, int] | set[int]]([0], (1, 2), {3}))
+
     def test_repr_and_bool(self):
         mul = MutableList[str]('a', 'b')
         self.assertTrue(mul)
@@ -43,7 +53,7 @@ class TestCollection(unittest.TestCase):
         self.assertTrue(1 in mus)
         self.assertFalse(3 in mus)
 
-        mul = MutableList[str]('a', 'b', 'c', 2)
+        mul = MutableList[str]('a', 'b', 'c', 2, _coerce=True)
         self.assertTrue('a' in mul)
         self.assertTrue('2' in mul)
         self.assertFalse(2 in mul)
@@ -151,7 +161,7 @@ class TestCollection(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.assertIsNone(MutableList[int]().min())
 
-        mus = MutableSet[float](-1, 0, 1.25)
+        mus = MutableSet[float](-1, 0, 1.25, _coerce=True)
         self.assertEqual(mus.max(), 1.25)
         self.assertEqual(mus.min(), -1)
         self.assertEqual(mus.min(), -1.0)
@@ -224,7 +234,7 @@ class TestCollection(unittest.TestCase):
         mapped_to_str = mul.map(lambda x : 'a' * x)
         self.assertEqual(mapped_to_str, MutableList[str]('a', 'aa', 'aaa'))
 
-        mapped_to_str_coerced = mul.map(lambda x : 1j + x, str)
+        mapped_to_str_coerced = mul.map(lambda x : 1j + x, str, _coerce=True)
         self.assertEqual(mapped_to_str_coerced, MutableList[str]('(1+1j)', '(2+1j)', '(3+1j)'))
 
     def test_to_dict(self):
@@ -257,14 +267,32 @@ class TestCollection(unittest.TestCase):
         lst = [0, 1, 2]
         mul = MutableList[int](lst, _skip_validation=True)
         mul.append(3)
+        # Adding a new element to the MutableList shouldn't alter the list it got its values from.
         self.assertEqual(lst, [0, 1, 2])
         self.assertNotEqual(lst, [0, 1, 2, 3])
+
+        # Adding a new element to the MutableList shouldn't alter the MutableList it got its values from.
+        mul_2 = MutableList.of_iterable(mul)
+        mul_2.append(4)
+        self.assertEqual(lst, [0, 1, 2])
+        self.assertEqual(mul, MutableList[int](0, 1, 2, 3))
 
         st = {'a', 'b'}
         mus = MutableSet[str](st, _skip_validation=True)
         mus.add('c')
         self.assertEqual(st, {'a', 'b'})
         self.assertNotEqual(st, {'a', 'b', 'c'})
+
+    def test_of_values(self):
+        with self.assertRaises(TypeError):
+            MutableList[str].of_values(0, 1)
+        self.assertEqual(MutableList[int].of_values(0, 1), MutableList[int](0, 1))
+
+        with self.assertRaises(TypeError):
+            MutableList[int].of_values(0, '1')
+        self.assertEqual(MutableList[int | str].of_values(0, '1'), MutableList[int | str](0, '1'))
+        self.assertNotEqual(MutableList[int | str | float].of_values(0, '1'), MutableList.of_values(0, '1'))
+        self.assertEqual(MutableList[int | str | float].of_values(0, '1').item_type, int | str | float)
 
 
 if __name__ == '__main__':

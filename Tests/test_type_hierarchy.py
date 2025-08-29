@@ -112,9 +112,11 @@ class TestGetSupertype(unittest.TestCase):
         self.assertTrue(_is_subtype(int, int | None))
         # None should be subtype of int | None
         self.assertTrue(_is_subtype(None, int | None))
+
+        self.assertEqual(_get_supertype(int, int | None), int | None)
+
         # str is not subtype of int | None
         self.assertFalse(_is_subtype(str, int | None))
-        self.assertEqual(_get_supertype(int, int | None), int | None)
 
         # None shouldn't be subtype of int, nor int of None
         self.assertFalse(_is_subtype(None, int))

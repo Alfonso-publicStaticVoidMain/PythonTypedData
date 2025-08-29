@@ -2,7 +2,6 @@ import unittest
 
 
 from concrete_classes.list import MutableList, ImmutableList
-from concrete_classes.set import ImmutableSet
 
 
 class TestList(unittest.TestCase):
@@ -115,7 +114,25 @@ class TestList(unittest.TestCase):
         self.assertTrue(lst < MutableList[int]([11, 100, 100]))
 
     def test_add_mul(self):
-        self.assertEqual(MutableList[float]([0.1, 2, 0.3]) + MutableList[float]([0.6, 1]), MutableList[float]([0.1, 2, 0.3, 0.6, 1]))
+        mul_a = MutableList[float](0.1)
+        iml_a = ImmutableList[float](0.1)
+
+        mul_b = MutableList[float](1)
+        iml_b = ImmutableList[float](1)
+
+        mul_sum_a_b = MutableList[float]([0.1, 1])
+        iml_sum_a_b = ImmutableList[float]([0.1, 1])
+
+        self.assertEqual(mul_a + mul_b, mul_sum_a_b)
+        self.assertEqual(mul_a + mul_b, iml_sum_a_b)
+        self.assertEqual(mul_a + iml_b, mul_a + mul_b)
+        self.assertEqual(iml_a + mul_b, iml_a + iml_b)
+
+        self.assertTrue(isinstance(mul_a + iml_b, ImmutableList))
+        self.assertTrue(isinstance(iml_a + mul_b, ImmutableList))
+        self.assertTrue(isinstance(iml_a + iml_b, ImmutableList))
+        self.assertTrue(isinstance(mul_a + mul_b, MutableList))
+
         self.assertEqual(MutableList[int]([0, 1]) * 2, MutableList[int]([0, 1, 0, 1]))
 
     def test_contains_iter(self):
@@ -177,7 +194,6 @@ class TestList(unittest.TestCase):
         mul.reverse()
         self.assertEqual(mul, MutableList.of_values('y', 'a', 'b', 'c', 'x'))
 
-
     def test_invalid_set_values(self):
         with self.assertRaises(TypeError):
             MutableList[int]({1, 2, 3})
@@ -199,7 +215,7 @@ class TestList(unittest.TestCase):
         # 0 and 1 will be coerced to str no matter if _coerce is set to True or not.
         str_lst = MutableList[str]()
         str_lst.append(0, _coerce=True)
-        str_lst.append(1, _coerce=False)
+        str_lst.append(1, _coerce=True)
         self.assertEqual(str_lst[0], '0')
         self.assertEqual(str_lst[1], '1')
 
@@ -233,14 +249,14 @@ class TestList(unittest.TestCase):
         mul.filter_inplace(lambda s : s.startswith('a'))
         self.assertEqual(mul, MutableList[str]('a', 'abc'))
 
-        mul.replace('abc', 123)
+        mul.replace('abc', 123, _coerce=True)
         self.assertEqual(mul, MutableList.of_values('a', '123'))
         self.assertNotEqual(mul, MutableList.of_values('a', 123))
 
         mul.map_inplace(lambda s : s[0])
         self.assertEqual(mul, MutableList.of_values('a', '1'))
 
-        mul.replace_many({'a' : 'b', '1' : 2})
+        mul.replace_many({'a' : 'b', '1' : 2}, _coerce=True)
         self.assertEqual(mul, MutableList.of_values('b', '2'))
 
 if __name__ == '__main__':

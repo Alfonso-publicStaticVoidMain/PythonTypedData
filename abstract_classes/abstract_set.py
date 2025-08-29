@@ -6,7 +6,6 @@ from typing import ClassVar, Callable, Iterable, Any, Mapping
 
 from abstract_classes.collection import Collection, MutableCollection
 from abstract_classes.generic_base import forbid_instantiation, _convert_to, class_name
-from abstract_classes.metadata import Metadata
 
 
 @forbid_instantiation
@@ -22,19 +21,35 @@ class AbstractSet[T](Collection[T]):
     This class will be further extended by AbstractMutableSet, adding mutability capabilities to it.
 
     Attributes:
-        _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of Collection's init
-         by its value, setting it to frozenset.
+        item_type (type[T]): The type of elements stored in the set, derived from the generic type.
+
+        values (Iterable[T]): The internal container of stored values, by default a frozenset.
+
+        _finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting them as an
+         attribute on Collection's init.
+
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting
+         them as an attribute on Collection's init when the parameter _skip_validation is True.
+
+        _repr_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on the repr method to show
+         the values contained on the sequence.
+
+        _eq_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on both self and other's
+         values on the eq method to check for equality.
     """
 
+    item_type: type[T]
+    values: frozenset[T]
+
+    # Metadata class attributes
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(frozenset)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = frozenset
     _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
-    _priority: ClassVar[int] = 0
 
     def __lt__(self: AbstractSet, other: AbstractSet) -> bool:
         """
-        Checks whether this set is a proper subset of another AbstractSet, set or frozenset.
+        Checks whether this set is a proper subset of another AbstractSet.
 
         :param other: The set to compare against.
         :type other: AbstractSet
@@ -52,7 +67,7 @@ class AbstractSet[T](Collection[T]):
 
     def __le__(self: AbstractSet, other: AbstractSet) -> bool:
         """
-        Checks whether this set is a subset (or equal to) another AbstractSet, set or frozenset.
+        Checks whether this set is a subset (or equal to) another AbstractSet.
 
         :param other: The set to compare against.
         :type other: AbstractSet
@@ -70,10 +85,10 @@ class AbstractSet[T](Collection[T]):
 
     def __gt__(self: AbstractSet, other: AbstractSet) -> bool:
         """
-        Checks whether this set is a proper superset of another AbstractSet, set or frozenset.
+        Checks whether this set is a proper superset of another AbstractSet.
 
         :param other: The set to compare against.
-        :type other: Any
+        :type other: AbstractSet
 
         :return: True if this set is a proper superset of `other`, False otherwise. When comparing with another
          AbstractSet, their item_type must match exactly.
@@ -88,7 +103,7 @@ class AbstractSet[T](Collection[T]):
 
     def __ge__(self: AbstractSet, other: AbstractSet) -> bool:
         """
-        Checks whether this set is a superset (or equal to) another AbstractSet, set or frozenset.
+        Checks whether this set is a superset (or equal to) another AbstractSet.
 
         :param other: The set to compare against.
         :type other: AbstractSet
@@ -121,15 +136,15 @@ class AbstractSet[T](Collection[T]):
             return NotImplemented
 
         from type_validation.type_hierarchy import _resolve_type_priority
-        set_type = _resolve_type_priority(type(self), type(other))
+        new_set_type = _resolve_type_priority(type(self), type(other))
 
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _get_supertype
-            new_type = _get_supertype(self.item_type, other.item_type)
+            new_item_type = _get_supertype(self.item_type, other.item_type)
         else:
-            new_type = self.item_type
+            new_item_type = self.item_type
 
-        return set_type[new_type](self.values | other.values, _skip_validation=True)
+        return new_set_type[new_item_type](self.values | other.values, _skip_validation=True)
 
     def __and__[S: AbstractSet](self: S, other: S) -> S:
         """
@@ -154,21 +169,6 @@ class AbstractSet[T](Collection[T]):
             new_type = self.item_type
 
         return set_type[new_type](self.values & other.values, _skip_validation=True)
-
-    def __add__[S: AbstractSet](self: S, other: S):
-        """
-        Computes the union of two AbstractSet instances delegating to the __or__ method.
-
-        In order to preserve the commutativity of the operator, the subclass of the return is determined by which of
-        the operands is immutable, and if both or none are, by the _priority class attribute of their type.
-
-        :param other: The set to union with.
-        :type other: S
-
-        :return: A new AbstractSet containing all elements from both self and other.
-        :rtype: S
-        """
-        return self | other
 
     def __sub__[S: AbstractSet](self: S, other: Iterable) -> S:
         """
@@ -343,7 +343,7 @@ class AbstractSet[T](Collection[T]):
         if other.item_type != self.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type):
-                raise ValueError(f"Cannot compare sets of different types: {class_name(self.item_type)} != {class_name(other.item_type)}")
+                raise ValueError(f"Cannot compare sets of incompatible types: {class_name(self.item_type)} != {class_name(other.item_type)}")
         return self.values.issuperset(other.values)
 
     def is_disjoint(
@@ -364,7 +364,7 @@ class AbstractSet[T](Collection[T]):
         if other.item_type != self.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type) and not _is_subtype(self.item_type, other.item_type):
-                raise ValueError(f"Cannot compare sets of different types: {self.item_type.__name__} != {other.item_type.__name__}")
+                raise ValueError(f"Cannot compare sets of incompatible types: {class_name(self.item_type)} != {class_name(other.item_type)}")
         return self.values.isdisjoint(other.values)
 
 
@@ -379,16 +379,26 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     It is still an abstract class, so it must be subclassed to create concrete implementations.
 
     Attributes:
+        item_type (type[T]): The type of elements stored in the set, derived from the generic type.
+
+        values (Iterable[T]): The internal container of stored values, by default a set.
+
         _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of Collection's init
          by its value, setting it to set to ensure mutability of the underlying container.
 
-        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting
+         them as an attribute on Collection's init when the parameter _skip_validation is True.
+
+        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class.
     """
 
+    item_type: type[T]
+    values: set[T]
+
+    # Metadata class attributes
     _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = set
     _mutable: ClassVar[bool] = True
-    _priority: ClassVar[int] = 1
 
     def __ior__[S: AbstractMutableSet](
         self: S,
@@ -396,6 +406,10 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     ) -> S:
         """
         In-place union update with another AbstractSet with the operator |=.
+
+        Contrary to the binary operator |, which, to preserve commutativity chooses the greater subtype of its operands
+        as the item type of its return, |= needs not to preserve commutativity, since the item type of self cannot
+        under any circumstance be altered.
 
         :param other: The set to union with.
         :type other: AbstractSet
@@ -409,7 +423,7 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type):
-                raise TypeError(f"Incompatible types between {type(self).__name__} and {type(other).__name__}.")
+                raise TypeError(f"Incompatible types between {class_name(type(self))} and {class_name(type(other))}.")
 
         self.update(other)
         return self
@@ -420,6 +434,10 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     ) -> S:
         """
         In-place intersection update with another AbstractSet with the operator &=.
+
+        Contrary to the binary operator &, which, to preserve commutativity chooses the lesser subtype of its operands
+        as the item type of its return, &= needs not to preserve commutativity, since the item type of self cannot
+        under any circumstance be altered.
 
         :param other: The set to intersect with.
         :type other: AbstractSet
@@ -471,7 +489,7 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type):
-                raise TypeError(f"Incompatible types between {type(self).__name__} and {type(other).__name__}.")
+                raise TypeError(f"Incompatible types between {class_name(type(self))} and {class_name(type(other))}.")
 
         self.symmetric_difference_update(other)
         return self

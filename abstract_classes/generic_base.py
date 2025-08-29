@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import UnionType
-from typing import TypeVarTuple, Any, get_args, get_origin, Union, ClassVar, Callable, TypeVar
+from typing import Any, get_args, get_origin, Union, ClassVar, Callable, TypeVar
 from weakref import WeakValueDictionary
 
 """
@@ -12,17 +12,17 @@ GenericBase[*Ts]
 ├── Collection[T]
 │    │
 │    ├── MutableCollection[T] 
-│    │    └──────────────────────────────────┐
-│    │                                       │
-│    ├── AbstractSequence[T]                 │
-│    │    ├── ImmutableList[T] (*)           │
-│    │    └── AbstractMutableSequence[T] ────┤
-│    │         └── MutableList[T] (*)        │
-│    │                                       │
-│    └── AbstractSet[T]                      │
-│         ├── ImmutableSet[T] (*)            │
-│         └── AbstractMutableSet[T] ─────────┘
-│              └── MutableSet[T] (*)
+│    │    │
+│    │    │
+│    ├────│── AbstractSequence[T]
+│    │    │    ├── ImmutableList[T] (*)
+│    │    ├────└── AbstractMutableSequence[T]
+│    │    │         └── MutableList[T] (*)
+│    │    │
+│    └────│── AbstractSet[T]
+│         │    ├── ImmutableSet[T] (*)
+│         └────└── AbstractMutableSet[T]
+│                   └── MutableSet[T] (*)
 │
 ├── AbstractDict[K, V]
 │    ├── ImmutableDict[K, V] (*)
@@ -35,28 +35,9 @@ GenericBase[*Ts]
 (*) := Concrete class implementations. Everything else should be impossible to directly instantiate.
 """
 
-Ts = TypeVarTuple("Ts")
-
 
 def base_class[T: GenericBase](obj: T) -> type[T]:
-    return type(obj)._origin if hasattr(type(obj), '_origin') else type(obj)
-
-def forbid_instantiation(cls):
-    """
-    Class decorator that forbids direct instantiation of the decorated class with or without generics.
-
-    :raises TypeError: If the decorated class is instantiated directly, but allows instantiation of its subclasses.
-    """
-
-    def __new__(subcls, *args, **kwargs):
-        if getattr(subcls, "_origin", None) is cls:
-            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated, even with generics.")
-        if subcls is cls:
-            raise TypeError(f"{cls.__name__} is an abstract class and cannot be instantiated directly.")
-        return object.__new__(subcls)
-
-    cls.__new__ = staticmethod(__new__)
-    return cls
+    return getattr(type(obj), '_origin', type(obj))
 
 
 def class_name(cls: type) -> str:
@@ -65,12 +46,8 @@ def class_name(cls: type) -> str:
 
     :param cls: Class whose name will be represented.
     :return: If the type is a Union or UnionType, it's represented using the pipe operator |. If it's a class that
-    extends GenericBase (it has an _args attribute), then it is assumed the class has already been properly formatted
-    within the __class_getitem__ method it inherited from GenericBase.
-
-    Then the methods get_origin and get_args from typing are used to fetch info about the base class and its generics
-    to reconstruct a representation that displays that information. If that wasn't possible, a fallback is present using
-    __name__ and repr.
+     extends GenericBase (it has an _args attribute), then it is assumed the class has already been properly formatted
+     within the __class_getitem__ method it inherited from GenericBase.
     """
 
     # Case 0: Handle Union[...] using | notation
@@ -79,8 +56,8 @@ def class_name(cls: type) -> str:
     if origin in (Union, UnionType):
         return " | ".join(class_name(arg) for arg in args)
 
-    # Case 1: A class extending GenericBase
-    if hasattr(cls, "_args"):
+    # Case 1: A class extending GenericBase already initialized with generics
+    if hasattr(cls, "_args") and issubclass(cls, GenericBase):
         return cls.__name__  # It's already been formatted
 
     # Case 2: Built-in generics list[int], dict[str, int], etc.
@@ -89,12 +66,26 @@ def class_name(cls: type) -> str:
         args_str = ", ".join(class_name(arg) for arg in args)
         return f"{origin_name}[{args_str}]"
 
-    # Case 3: Simple class
-    if hasattr(cls, '__name__'):
-        return cls.__name__
+    # Fallback
+    return getattr(cls, '__name__', repr(cls))
 
-    # Fallback for things like typing.Any
-    return repr(cls)
+
+def forbid_instantiation(cls: type) -> type:
+    """
+    Class decorator that forbids direct instantiation of the decorated class with or without generics.
+
+    :raises TypeError: If the decorated class is instantiated directly, but allows instantiation of its subclasses.
+    """
+
+    def __new__(subcls, *args, **kwargs):
+        if getattr(subcls, "_origin", None) is cls:
+            raise TypeError(f"{class_name(cls)} is an abstract class and cannot be instantiated, even with generics.")
+        if subcls is cls:
+            raise TypeError(f"{class_name(cls)} is an abstract class and cannot be instantiated directly.")
+        return object.__new__(subcls)
+
+    cls.__new__ = staticmethod(__new__)
+    return cls
 
 
 def _convert_to(tp: type) -> Callable[[Any], Any]:
@@ -104,15 +95,15 @@ def _convert_to(tp: type) -> Callable[[Any], Any]:
     :param tp: Type to convert into. Must also be a 1-parameter callable.
     :type tp: type
 
-    :return: A 1-parameter callable that, for its parameter x, if it is of type tp, returns it unmodified. Otherwise,
-     returns tp applied to x.
-    :rtype: Callable[[Any], Any
+    :return: A 1-parameter callable that, when applied to its parameter, if it is of type tp, returns it unmodified.
+     Otherwise, returns tp applied to it.
+    :rtype: Callable[[Any], Any]
     """
     return lambda x : x if isinstance(x, tp) else tp(x)
 
 
 @forbid_instantiation
-class GenericBase[*Ts]:
+class GenericBase:
     """
     Top-most class in the inheritance tree, that encodes the behaviour of the classes storing their generic parameters
     received at their instantiation and storing them as a tuple in an _args attribute, as well as an _origin attribute

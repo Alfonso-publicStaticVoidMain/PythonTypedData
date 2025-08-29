@@ -15,8 +15,8 @@ class TestMaybe(unittest.TestCase):
             mb = Maybe[int]('2', _coerce=False)
 
         self.assertEqual(Maybe[int]('2', _coerce=True).get(), 2)
-        self.assertEqual(Maybe[str](2, _coerce=False).get(), '2')
-        self.assertEqual(Maybe[str](3.14, _coerce=False).get(), '3.14')
+        self.assertEqual(Maybe[str](2, _coerce=True).get(), '2')
+        self.assertEqual(Maybe[str](3.14, _coerce=True).get(), '3.14')
 
     def test_get_present_empty(self):
         with self.assertRaises(ValueError):
@@ -42,7 +42,7 @@ class TestMaybe(unittest.TestCase):
         mb3 = mb1.map(lambda x : f'{x}{x}', int, _coerce=True)
         self.assertEqual(mb3, Maybe[int](11))
 
-        mb4 = mb1.map(lambda x : x + 1, str)
+        mb4 = mb1.map(lambda x : x + 1, str, _coerce=True)
         self.assertEqual(mb4, Maybe[str]('2'))
 
         mb5 = Maybe[int].empty().map_or_else(lambda x : x + 1, 0)

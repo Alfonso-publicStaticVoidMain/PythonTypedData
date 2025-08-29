@@ -5,11 +5,10 @@ from typing import ClassVar, Callable, Any, Mapping, Iterable, TypeVar, Iterator
 from immutabledict import immutabledict
 
 from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation, _convert_to
-from abstract_classes.metadata import Metadata
 
 
 @forbid_instantiation
-class AbstractDict[K, V](GenericBase[K, V], Metadata):
+class AbstractDict[K, V](GenericBase):
     """
     Abstract base class representing a dictionary with type enforced keys and values given by generic types.
 
@@ -19,13 +18,6 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
     The class enforces runtime generic type tracking using a metaclass extension (GenericBase), allowing validation
     and coercion of elements during construction and transformations. It cannot be directly instantiated and must be
     parameterized by two concrete types when the constructor is called (e.g., MutableDict[int, str]).
-
-    Attributes:
-        key_type (type[K]): The type constraint for keys.
-        value_type (type[V]): The type constraint for values.
-        data (dict[K, V]): The underlying dictionary storage.
-        _finisher (ClassVar[Callable[[dict], Any]]): Overrides the _finisher parameter of AbstractDict's init
-         by its value, setting it to immutabledict.
 
     Note:
         Any method that returns a new AbstractDict instance (e.g., filter, map, etc.) constructs the returned
@@ -39,18 +31,34 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         matches the exact type and structure of self, unless otherwise explicitly overridden. Also, calling
         type(self)[new_key_type, new_value_type] correctly creates a new dynamic subclass with the same base class as
         self but with the new generic types.
+
+        Attributes:
+        key_type (type[K]): The type of the keys.
+
+        value_type (type[V]): The type of the values.
+
+        data (dict[K, V]): The underlying dictionary data container.
+
+        _finisher (ClassVar[Callable[[dict], Any]]): It's applied to the data on init before being set as attribute.
+
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It's applied to the data on init before
+         being set as attribute, only if init is called with _skip_validation=True.
+
+        _repr_finisher (ClassVar[Callable[[Mapping], dict]]): It's applied to the data when printing the object on the
+         repr method.
+
+        _eq_finisher (ClassVar[Callable[[Mapping], dict]]): It's applied to the data when comparing two objects.
     """
 
     key_type: type[K]
     value_type: type[V]
-    data: dict[K, V]
+    data: immutabledict[K, V]
 
     # Metadata class attributes
     _finisher: ClassVar[Callable[[dict], immutabledict]] = _convert_to(immutabledict)
     _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = immutabledict
     _repr_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
     _eq_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
-    _priority: ClassVar[int] = 0
 
     def __init__(
         self: AbstractDict[K, V],
@@ -66,7 +74,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         """
         Initialize an AbstractDict with type validation and optional coercion.
 
-        :param keys_values: A dict, mapping, iterable of (key, value) tuples, or another AbstractDict.
+        :param keys_values: A dict, Mapping, iterable of (key, value) tuples, or another AbstractDict.
         :type keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V] | None
 
         :param _keys: Optional keys iterable used in conjunction with `_values`.
@@ -99,12 +107,12 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
             raise TypeError(f"Not all generic types were provided. Key: {key_type} | Value: {value_type}")
 
         if isinstance(key_type, TypeVar) or isinstance(value_type, TypeVar):
-            raise TypeError(f"Generic types must be fully specified for {type(self).__name__}. Use {type(self)._origin.__name__}.of to infer types from iterable.")
+            raise TypeError(f"Generic types must be fully specified for {class_name(type(self))}. Use {class_name(type(self))}.of to infer types from iterable.")
 
         object.__setattr__(self, "key_type", key_type)
         object.__setattr__(self, "value_type", value_type)
 
-        finisher = _finisher or type(self)._get_finisher()
+        finisher = _finisher or getattr(type(self), '_finisher', lambda x : x)
 
         if keys_values is None and (_keys is None or _values is None):
             object.__setattr__(self, "data", finisher({}))
@@ -130,7 +138,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
             _validate_duplicates_and_hash(actual_keys)
 
         if _skip_validation:
-            skip_validation_finisher = type(self)._get_skip_validation_finisher() or finisher
+            skip_validation_finisher = getattr(type(self), '_skip_validation_finisher', None) or finisher
             object.__setattr__(self, "data", skip_validation_finisher(dict(zip(actual_keys, actual_values))))
         else:
             object.__setattr__(self, "data", finisher(dict(zip(actual_keys, actual_values))))
@@ -155,46 +163,52 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         return key_type, value_type
 
     @classmethod
-    def of(
-        cls: type[AbstractDict[K, V]],
-        keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]
-    ) -> AbstractDict[K, V]:
+    def of[D: AbstractDict](
+        cls: type[D],
+        keys_values: dict | Mapping | Iterable[tuple[Any, Any]] | AbstractDict
+    ) -> D:
         """
         Infer key/value types from the input and construct an AbstractDict containing them.
 
         :param keys_values: The data to infer types from and use to initialize the dictionary.
-        :type keys_values: dict[K, V] | Mapping[K, V] | Iterable[tuple[K, V]] | AbstractDict[K, V]
+        :type keys_values: dict | Mapping | Iterable[tuple[Any, Any]] | AbstractDict
 
         :return: A new AbstractDict with inferred generic types and properly validated contents (hashable and not
          duplicated keys).
-        :rtype: AbstractDict[K, V]
+        :rtype: D
         """
         if keys_values is None or not keys_values:
-            raise ValueError(f"Can't create a {cls.__name__} object from empty iterable.")
+            raise ValueError(f"Can't create a {class_name(cls)} object from empty iterable.")
         from type_validation.type_validation import _split_keys_values
         from type_validation.type_inference import _infer_type_contained_in_iterable
         keys, values, _ = _split_keys_values(keys_values)
-        key_type = _infer_type_contained_in_iterable(keys)
-        value_type = _infer_type_contained_in_iterable(values)
-        return cls[key_type, value_type](_keys=keys, _values=values, _skip_validation=True)
+        inferred_key_type = _infer_type_contained_in_iterable(keys)
+        inferred_value_type = _infer_type_contained_in_iterable(values)
+        if hasattr(cls, '_args'):
+            from type_validation.type_hierarchy import _is_subtype
+            key_type, value_type = cls._inferred_key_value_types()
+            if not _is_subtype(inferred_key_type, key_type) or not _is_subtype(inferred_value_type, value_type):
+                raise TypeError(f"Tried applying .of method to with a parametrized class but the inferred types are incompatible.")
+            return cls(_keys=keys, _values=values, _skip_validation=True)
+        return cls[inferred_key_type, inferred_value_type](_keys=keys, _values=values, _skip_validation=True)
 
     @classmethod
-    def of_keys_values(
-        cls: type[AbstractDict[K, V]],
-        keys: Iterable[K],
-        values: Iterable[V]
-    ) -> AbstractDict[K, V]:
+    def of_keys_values[D: AbstractDict](
+        cls: type[D],
+        keys: Iterable,
+        values: Iterable
+    ) -> D:
         """
         Constructs an AbstractDict from separate keys and values iterables, inferring their types.
 
         :param keys: An iterable of keys.
-        :type keys: Iterable[K]
+        :type keys: Iterable
 
         :param values: An iterable of values, matching the length of `keys`.
-        :type values: Iterable[V]
+        :type values: Iterable
 
         :return: A new AbstractDict initialized from the given key-value pairs.
-        :rtype: AbstractDict[K, V]
+        :rtype: D
 
         :raises ValueError: If `keys` and `values` do not have the same length.
         """
@@ -205,49 +219,66 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
             raise ValueError("Keys and iterable must be of the same length when using .of_keys_values")
 
         from type_validation.type_inference import _infer_type_contained_in_iterable
-        key_type = _infer_type_contained_in_iterable(keys)
-        value_type = _infer_type_contained_in_iterable(values)
-        return cls[key_type, value_type](_keys=keys, _values=values, _skip_validation=True)
+        inferred_key_type = _infer_type_contained_in_iterable(keys)
+        inferred_value_type = _infer_type_contained_in_iterable(values)
+        if hasattr(cls, '_args'):
+            from type_validation.type_hierarchy import _is_subtype
+            key_type, value_type = cls._inferred_key_value_types()
+            if not _is_subtype(inferred_key_type, key_type) or not _is_subtype(inferred_value_type, value_type):
+                raise TypeError(f"Tried applying .of method to with a parametrized class but the inferred types are incompatible.")
+            return cls(_keys=keys, _values=values, _skip_validation=True)
+        return cls[inferred_key_type, inferred_value_type](_keys=keys, _values=values, _skip_validation=True)
 
-    def __getitem__(self: AbstractDict[K, V], key: K | slice) -> V | AbstractDict[K, V]:
+    def subdict[D: AbstractDict](self: D, slc: slice) -> D:
+        """
+        Returns a new AbstractDict with the keys contained in the given slice.
+
+        :param slc: Slice to filter the keys by.
+        :type slc: slice
+
+        :return: A new AbstractDict object whose keys fall within the given slice.
+        :rtype: D
+        """
+        if slc.step is not None:
+            raise TypeError("Step is not supported in dict slicing.")
+
+        start, stop = slc.start, slc.stop
+
+        if next(iter(self.data), None) is None:
+            return type(self)({})
+
+        def predicate(k):
+            try:
+                if start is not None and not (start <= k):
+                    return False
+                if stop is not None and not (k <= stop):
+                    return False
+                return True
+            except (TypeError, ValueError):
+                raise TypeError(f"Key {k!r} is not comparable with given bounds" + (f" start={start}" if start is not None else "") + (f" stop={stop}" if stop is not None else ""))
+
+        return self.filter_keys(predicate)
+
+    def __getitem__[D: AbstractDict](self: D, key: K | slice) -> V | D:
         """
         Returns a value for a given key, or a sliced subdictionary for a slice of keys.
 
         - If a single key is passed, returns its associated value.
-        - If a `slice` is passed (e.g., `dict[start:stop]`), returns a new `AbstractDict[K, V]`
-          with all keys within that range. Step is not supported.
+        - If a slice is passed (e.g., [start:stop]), returns a new AbstractDict object with all keys within that
+         range. Step is not supported.
 
         :param key: A key of type K or a slice over the key space.
         :type key: K | slice
 
         :return: The value associated with the key, or a sliced subdictionary.
-        :rtype: V | AbstractDict[K, V]
+        :rtype: V | D
 
         :raises TypeError: If the keys are not orderable for slicing or if the slice step is not None.
         :raises KeyError: If the key is not found.
         """
         if isinstance(key, slice):
             # Subdict slicing
-            if key.step is not None:
-                raise TypeError("Step is not supported in dict slicing.")
-
-            start, stop = key.start, key.stop
-
-            sample_key: K | None = next(iter(self.data), None)
-            if sample_key is None:
-                return type(self)({})
-
-            def predicate(k):
-                try:
-                    if start is not None and not (start <= k):
-                        return False
-                    if stop is not None and not (k <= stop):
-                        return False
-                    return True
-                except (TypeError, ValueError):
-                    raise TypeError(f"Key {k!r} is not comparable with given bounds" + (f" start={start}" if start is not None else "") + (f" stop={stop}" if stop is not None else ""))
-
-            return self.filter_keys(predicate)
+            return self.subdict(key)
         else:
             # Regular key access
             return self.data[key]
@@ -315,8 +346,8 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         :return: True if `other` is an AbstractDict with the same key and values types and contents, False otherwise.
         :rtype: bool
         """
-        eq_finisher: Callable[[Iterable], Iterable] = type(self)._get_eq_finisher()
-        comparable_types: type[AbstractDict] | tuple[type[AbstractDict], ...] = type(self)._get_comparable_types(default=AbstractDict)
+        eq_finisher: Callable[[Iterable], Iterable] = getattr(type(self), '_eq_finisher', lambda x : x)
+        comparable_types: type[AbstractDict] = getattr(type(self), '_comparable_types', AbstractDict)
         return (
             isinstance(other, comparable_types)
             and self.key_type == other.key_type
@@ -331,7 +362,7 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         :return: A string representation of this AbstractDict.
         :rtype: str
         """
-        repr_finisher: Callable[[Iterable], Iterable] = type(self)._get_repr_finisher()
+        repr_finisher: Callable[[Iterable], Iterable] = getattr(type(self), '_repr_finisher', lambda x : x)
         return f"{class_name(type(self))}{repr_finisher(self.data)}"
 
     def __or__[D: AbstractDict](self: D, other: D) -> D:
@@ -339,11 +370,11 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
         Returns the union of this AbstractDict and another mapping.
 
         :param other: The other mapping to merge.
-        :type other: AbstractDict[K, V] | Mapping[K, V]
+        :type other: D
 
         :return: A new AbstractDict of the same dynamic subclass as self containing all key-value pairs from both, with
          `other` overriding duplicate keys.
-        :rtype: AbstractDict[K, V]
+        :rtype: D
         """
         if not isinstance(other, AbstractDict):
             return NotImplemented
@@ -363,15 +394,15 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
 
         return dict_type[new_key_type, new_value_type](self.data | other.data, _skip_validation=True)
 
-    def __and__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
+    def __and__[D: AbstractDict](self: D, other: D) -> D:
         """
         Returns the intersection of this AbstractDict with another mapping.
 
         :param other: The other mapping.
-        :type other: AbstractDict[K, V] | Mapping[K, V]
+        :type other: D
 
         :return: A new AbstractDict of the same dynamic subclass as self with only keys present in both mappings.
-        :rtype: AbstractDict[K, V]
+        :rtype: D
         """
         if not isinstance(other, AbstractDict):
             return NotImplemented
@@ -394,27 +425,27 @@ class AbstractDict[K, V](GenericBase[K, V], Metadata):
             _skip_validation=True
         )
 
-    def __sub__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
+    def __sub__[D: AbstractDict](self: D, other: D) -> D:
         """
         Returns a new dictionary with the keys that are not in `other`.
 
         :param other: The mapping to subtract from this one.
-        :type other: AbstractDict[K, V] | Mapping[K, V]
+        :type other: D
 
         :return: A new AbstractDict of the same dynamic subclass as self without the keys found in `other`.
-        :rtype: AbstractDict[K, V]
+        :rtype: D
         """
         return type(self)({key : value for key, value in self.data.items() if key not in other})
 
-    def __xor__(self: AbstractDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractDict[K, V]:
+    def __xor__[D: AbstractDict](self: D, other: D) -> D:
         """
         Returns the symmetric difference between this AbstractDict and another mapping.
 
         :param other: The other mapping.
-        :type other: AbstractDict[K, V] | Mapping[K, V]
+        :type other: D
 
         :return: A new AbstractDict of the same dynamic subclass as self containing keys only in one of the two mappings.
-        :rtype: AbstractDict[K, V]
+        :rtype: D
         """
         if not isinstance(other, AbstractDict):
             return NotImplemented
@@ -596,16 +627,28 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
     It is still an abstract class, so it must be subclassed to create concrete implementations.
 
     Attributes:
-        _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of AbstractDict's init
-         by its value, setting it to dict to ensure mutability of the underlying container.
+        key_type (type[K]): The type of the keys.
 
-        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class. For now, it's unused.
+        value_type (type[V]): The type of the values.
+
+        data (dict[K, V]): The underlying dictionary data container.
+
+        _finisher (ClassVar[Callable[[dict], Any]]): It's applied to the data on init before being set as attribute.
+
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It's applied to the data on init before
+         being set as attribute, only if init is called with _skip_validation=True.
+
+        _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class.
     """
 
+    key_type: type[K]
+    value_type: type[V]
+    data: dict[K, V]
+
+    # Metadata class attributes
     _finisher: ClassVar[Callable[[dict], Mapping]] = _convert_to(dict)
-    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = immutabledict
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = dict
     _mutable: bool = True
-    _priority: ClassVar[int] = 1
 
     def __setitem__(
         self: AbstractMutableDict[K, V],
@@ -622,6 +665,8 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
 
         :param value: The value to associate with the key.
         :type value: V
+
+        :raises TypeError: If either the key or the value doesn't match their expected type.
         """
         from type_validation.type_validation import _validate_or_coerce_value
         self.data[_validate_or_coerce_value(key, self.key_type)] = _validate_or_coerce_value(value, self.value_type)
@@ -632,6 +677,7 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
 
         :param key: The key to remove.
         :type key: K
+
         :raises KeyError: If the key does not exist.
         """
         del self.data[key]
@@ -661,8 +707,8 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
             return NotImplemented
 
         from type_validation.type_hierarchy import _is_subtype
-        if not _is_subtype(other.key_type, self.key_type) or not _is_subtype(other.value_type, self.value_type):
-            raise TypeError(f"Incompatible key and/or value types between {type(self).__name__} and {type(other).__name__}.")
+        if not _is_subtype(other.key_type, self.key_type) and not _is_subtype(other.value_type, self.value_type):
+            raise TypeError(f"Incompatible key and/or value types between {class_name(type(self))} and {class_name(type(other))}.")
 
         self.update(other)
         return self
@@ -680,17 +726,17 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         if not isinstance(other, AbstractDict):
             return NotImplemented
 
-        keys_to_remove = set(self.data) - set(other)
+        keys_to_remove = set(self.data) - set(other.data)
         for key in keys_to_remove:
             del self.data[key]
         return self
 
-    def __isub__(self: AbstractMutableDict[K, V], other: AbstractDict[K, V] | Mapping[K, V]) -> AbstractMutableDict[K, V]:
+    def __isub__(self: AbstractMutableDict[K, V], other: AbstractDict[K, V]) -> AbstractMutableDict[K, V]:
         """
         In-place difference by removing keys found in `other`.
 
         :param other: The mapping whose keys will be removed.
-        :type other: AbstractDict[K, V] | Mapping[K, V]
+        :type other: AbstractDict[K, V]
 
         :return: The updated AbstractMutableDict.
         :rtype: AbstractMutableDict[K, V]
@@ -714,7 +760,7 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
 
         from type_validation.type_hierarchy import _is_subtype
         if not _is_subtype(other.key_type, self.key_type) or not _is_subtype(other.value_type, self.value_type):
-            raise TypeError(f"Incompatible key and/or value types between {type(self).__name__} and {type(other).__name__}.")
+            raise TypeError(f"Incompatible key and/or value types between {class_name(type(self))} and {class_name(type(other))}.")
 
         for key in other:
             if key in self.data:
@@ -727,8 +773,8 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         self: AbstractMutableDict[K, V],
         other: dict[K, V] | Mapping[K, V] | AbstractDict[K, V],
         *,
-        _coerce_keys: bool = True,
-        _coerce_values: bool = True
+        _coerce_keys: bool = False,
+        _coerce_values: bool = False
     ) -> None:
         """
         Updates this AbstractMutableDict with the contents of another mapping.
@@ -758,8 +804,8 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         key: K,
         fallback: V | None = None,
         *,
-        _coerce_keys: bool = None,
-        _coerce_values: bool = None
+        _coerce_keys: bool = False,
+        _coerce_values: bool = False
     ) -> V:
         """
         Removes and returns the value associated with a key, or a fallback if not found.

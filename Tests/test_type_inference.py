@@ -59,6 +59,20 @@ class TestTypeInference(unittest.TestCase):
         lst = [MutableList[int]([0, 1]), MutableList[int]([2, 3]), MutableList[int]()]
         self.assertEqual(_infer_type(lst), list[MutableList[int]])
 
+    def test_compatibility_with_validate_type(self):
+        test_lst = [
+            1,      # int
+            'a',    # str
+            1+2j,   # complex
+            [1],    # list[int]
+            [{'a'}],    # list[set[str]]
+            MutableList[int](0, 1), # MutableList[int]
+            {'a': 1, 2: 0}, # dict[str | int, int]
+        ]
+        from type_validation.type_validation import _validate_type
+        for item in test_lst:
+            self.assertTrue(_validate_type(item, _infer_type(item)))
+
 
 if __name__ == '__main__':
     unittest.main()

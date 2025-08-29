@@ -1,6 +1,7 @@
 from typing import get_origin, get_args, Union, Any
 from types import UnionType
 
+from abstract_classes.collection import Collection
 from abstract_classes.generic_base import GenericBase, class_name
 
 
@@ -46,8 +47,9 @@ def _is_subtype(tp: type, other: type) -> bool:
     if tp is Any:
         return other is Any
 
-    # If "tp" is a Union
+    # If "tp" is a Union:
     if tp_origin in (Union, UnionType):
+        # If "other" is also a Union:
         if other_origin in (Union, UnionType):
             # Coverage rule: each arg in tp matches at least one arg in other
             return all(
@@ -61,7 +63,7 @@ def _is_subtype(tp: type, other: type) -> bool:
                 for t_arg in tp_args
             )
 
-    # If "other" is a Union
+    # If "other" is a Union but "tp" is not.
     if other_origin in (Union, UnionType):
         return any(
             _is_subtype(tp, o_arg)
@@ -119,7 +121,7 @@ def _get_supertype(t: type, other: type) -> type:
         return other
     if _is_subtype(other, t):
         return t
-    raise TypeError(f"No supertype between {t.__name__} and {other.__name__}")
+    raise TypeError(f"No supertype between {class_name(t)} and {class_name(other)}")
 
 
 def _get_subtype(t: type, other: type) -> type:
@@ -143,7 +145,7 @@ def _get_subtype(t: type, other: type) -> type:
         return t
     if _is_subtype(other, t):
         return other
-    raise TypeError(f"No subtype between {t.__name__} and {other.__name__}")
+    raise TypeError(f"No subtype between {class_name(t)} and {class_name(other)}")
 
 
 def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G]:
@@ -158,7 +160,7 @@ def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G
 
     :return: The origin of the type which isn't mutable (assuming absence of a _mutable attribute as immutability) if
      the other does, or the lowest _priority, if both are mutable or immutable. If only one has a priority
-     assigned, that one's origin is returned. If neither have priorities or they are equal, an error is raised.
+     assigned, that one's origin is returned. If neither have priorities, or if they are equal, an error is raised.
 
     :raises TypeError: If the types don't have a common supertype.
     :raises TypeError: If the priority couldn't be resolved with the mutability check and both types either don't have
@@ -171,20 +173,28 @@ def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G
     if origin_t is origin_other:
         return origin_t
 
-    # Origins must be comparable
+    # Origins must be comparable and have a common superclass that isn't GenericBase or Collection
     if not (
-        any(issubclass(origin_other, t_superclass) for t_superclass in origin_t.__mro__)
-        or any(issubclass(origin_t, other_superclass) for other_superclass in origin_other.__mro__)
+        any(
+            issubclass(origin_other, t_superclass)
+            for t_superclass in origin_t.__mro__
+            if t_superclass not in (GenericBase, Collection)
+        )
+        or any(
+            issubclass(origin_t, other_superclass)
+            for other_superclass in origin_other.__mro__
+            if other_superclass not in (GenericBase, Collection)
+        )
     ):
         raise TypeError(f"Incompatible origins: {class_name(origin_t)} and {class_name(origin_other)}")
 
-    # Mutability check
+    # Mutability check -> Prefer the origin without _mutable or with it set to false
     mutable_t = getattr(t, "_mutable", False)
     mutable_other = getattr(other, "_mutable", False)
     if mutable_t != mutable_other:
-        return origin_other if mutable_t else origin_t  # prefer the one without _mutable
+        return origin_other if not mutable_other else origin_t
 
-    # Priority logic
+    # Priority logic -> Prefer the origin with lowest _priority.
     has_priority_t = hasattr(t, "_priority")
     has_priority_other = hasattr(other, "_priority")
 
@@ -192,14 +202,15 @@ def _resolve_type_priority[G: GenericBase](t: type[G], other: type[G]) -> type[G
         priority_t = t._priority
         priority_other = other._priority
         if priority_t == priority_other:
-            raise TypeError(f"Both {origin_t.__name__} and {origin_other.__name__} have the same priority {priority_t}!")
+            raise TypeError(f"Both {class_name(origin_t)} and {class_name(origin_other)} have the same priority {priority_t}!")
         return origin_t if priority_t < priority_other else origin_other
 
+    # If only one has _priority, return that one.
     if has_priority_t:
         return origin_t
     if has_priority_other:
         return origin_other
 
-    # Neither has _priority
+    # If neither has _priority, raise a TypeError
     raise TypeError(f"Cannot resolve type priority between {origin_t.__name__} and {origin_other.__name__}: no _priority set for either.")
 
