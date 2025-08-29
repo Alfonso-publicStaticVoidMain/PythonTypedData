@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import collections.abc
 from types import UnionType
 from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Literal, Mapping, Sequence, Callable
 
