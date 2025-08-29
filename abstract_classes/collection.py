@@ -151,7 +151,13 @@ class Collection[T](GenericBase):
         :raises ValueError: If no values are provided.
         """
         from type_validation.type_inference import _infer_type_contained_in_iterable
-        return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
+        inferred_generic_type = _infer_type_contained_in_iterable(values)
+        if hasattr(cls, '_args'):
+            from type_validation.type_hierarchy import _is_subtype
+            if not _is_subtype(inferred_generic_type, cls._inferred_item_type()):
+                raise TypeError(f"Tried applying .of_values method to with a parametrized class but the inferred type {class_name(inferred_generic_type)} isn't a subtype of {class_name(cls._args)}")
+            return cls(values, _skip_validation=True)
+        return cls[inferred_generic_type](values, _skip_validation=True)
 
     @classmethod
     def of_iterable[C: Collection](cls: type[C], values: Iterable) -> C:
@@ -168,7 +174,13 @@ class Collection[T](GenericBase):
         :rtype: C
         """
         from type_validation.type_inference import _infer_type_contained_in_iterable
-        return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
+        inferred_generic_type = _infer_type_contained_in_iterable(values)
+        if hasattr(cls, '_args'):
+            from type_validation.type_hierarchy import _is_subtype
+            if not _is_subtype(inferred_generic_type, cls._inferred_item_type()):
+                raise TypeError(f"Tried applying .of_values method to with a parametrized class but the inferred type {class_name(inferred_generic_type)} isn't a subtype of {class_name(cls._args)}")
+            return cls(values, _skip_validation=True)
+        return cls[inferred_generic_type](values, _skip_validation=True)
 
     @classmethod
     def empty[C: Collection](cls: type[C]) -> C:

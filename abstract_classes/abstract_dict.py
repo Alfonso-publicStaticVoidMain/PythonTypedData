@@ -182,9 +182,15 @@ class AbstractDict[K, V](GenericBase):
         from type_validation.type_validation import _split_keys_values
         from type_validation.type_inference import _infer_type_contained_in_iterable
         keys, values, _ = _split_keys_values(keys_values)
-        key_type = _infer_type_contained_in_iterable(keys)
-        value_type = _infer_type_contained_in_iterable(values)
-        return cls[key_type, value_type](_keys=keys, _values=values, _skip_validation=True)
+        inferred_key_type = _infer_type_contained_in_iterable(keys)
+        inferred_value_type = _infer_type_contained_in_iterable(values)
+        if hasattr(cls, '_args'):
+            from type_validation.type_hierarchy import _is_subtype
+            key_type, value_type = cls._inferred_key_value_types()
+            if not _is_subtype(inferred_key_type, key_type) or not _is_subtype(inferred_value_type, value_type):
+                raise TypeError(f"Tried applying .of method to with a parametrized class but the inferred types are incompatible.")
+            return cls(_keys=keys, _values=values, _skip_validation=True)
+        return cls[inferred_key_type, inferred_value_type](_keys=keys, _values=values, _skip_validation=True)
 
     @classmethod
     def of_keys_values[D: AbstractDict](
@@ -213,9 +219,15 @@ class AbstractDict[K, V](GenericBase):
             raise ValueError("Keys and iterable must be of the same length when using .of_keys_values")
 
         from type_validation.type_inference import _infer_type_contained_in_iterable
-        key_type = _infer_type_contained_in_iterable(keys)
-        value_type = _infer_type_contained_in_iterable(values)
-        return cls[key_type, value_type](_keys=keys, _values=values, _skip_validation=True)
+        inferred_key_type = _infer_type_contained_in_iterable(keys)
+        inferred_value_type = _infer_type_contained_in_iterable(values)
+        if hasattr(cls, '_args'):
+            from type_validation.type_hierarchy import _is_subtype
+            key_type, value_type = cls._inferred_key_value_types()
+            if not _is_subtype(inferred_key_type, key_type) or not _is_subtype(inferred_value_type, value_type):
+                raise TypeError(f"Tried applying .of method to with a parametrized class but the inferred types are incompatible.")
+            return cls(_keys=keys, _values=values, _skip_validation=True)
+        return cls[inferred_key_type, inferred_value_type](_keys=keys, _values=values, _skip_validation=True)
 
     def subdict[D: AbstractDict](self: D, slc: slice) -> D:
         """
@@ -232,8 +244,7 @@ class AbstractDict[K, V](GenericBase):
 
         start, stop = slc.start, slc.stop
 
-        sample_key: K | None = next(iter(self.data), None)
-        if sample_key is None:
+        if next(iter(self.data), None) is None:
             return type(self)({})
 
         def predicate(k):
@@ -244,8 +255,7 @@ class AbstractDict[K, V](GenericBase):
                     return False
                 return True
             except (TypeError, ValueError):
-                raise TypeError(f"Key {k!r} is not comparable with given bounds" + (
-                    f" start={start}" if start is not None else "") + (f" stop={stop}" if stop is not None else ""))
+                raise TypeError(f"Key {k!r} is not comparable with given bounds" + (f" start={start}" if start is not None else "") + (f" stop={stop}" if stop is not None else ""))
 
         return self.filter_keys(predicate)
 

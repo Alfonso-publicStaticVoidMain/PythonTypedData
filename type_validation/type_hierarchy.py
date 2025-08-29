@@ -47,8 +47,9 @@ def _is_subtype(tp: type, other: type) -> bool:
     if tp is Any:
         return other is Any
 
-    # If "tp" is a Union
+    # If "tp" is a Union:
     if tp_origin in (Union, UnionType):
+        # If "other" is also a Union:
         if other_origin in (Union, UnionType):
             # Coverage rule: each arg in tp matches at least one arg in other
             return all(
@@ -62,7 +63,7 @@ def _is_subtype(tp: type, other: type) -> bool:
                 for t_arg in tp_args
             )
 
-    # If "other" is a Union
+    # If "other" is a Union but "tp" is not.
     if other_origin in (Union, UnionType):
         return any(
             _is_subtype(tp, o_arg)

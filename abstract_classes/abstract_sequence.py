@@ -390,7 +390,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type):
-                raise TypeError(f"Incompatible types between {type(self).__name__} and {type(other).__name__}.")
+                raise TypeError(f"Incompatible types between {class_name(self)} and {class_name(other)}.")
 
         self.values.extend(other.values)
         return self
@@ -409,6 +409,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         """
         if not isinstance(n, int):
             return NotImplemented
+
         self.values[:] = self.values * n
         return self
 

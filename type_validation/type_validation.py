@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections.abc
 from types import UnionType
 from typing import Iterable, Any, get_origin, get_args, Union, Annotated, Literal, Mapping, Sequence, Callable
 
@@ -103,7 +104,7 @@ def _validate_mapping(obj: Any, mapping_type: type, key_value_types: tuple[type,
         return False
 
     if len(key_value_types) != 2:
-        raise ValueError(f"_validate_mapping_type method called with a tuple argument {key_value_types} of length {len(key_value_types)} != 2.")
+        raise ValueError(f"_validate_mapping method called with a tuple argument {key_value_types} of length {len(key_value_types)} != 2.")
 
     key_type, val_type = key_value_types
     return all(_validate_type(key, key_type) and _validate_type(value, val_type) for key, value in obj.items())

@@ -283,6 +283,17 @@ class TestCollection(unittest.TestCase):
         self.assertEqual(st, {'a', 'b'})
         self.assertNotEqual(st, {'a', 'b', 'c'})
 
+    def test_of_values(self):
+        with self.assertRaises(TypeError):
+            MutableList[str].of_values(0, 1)
+        self.assertEqual(MutableList[int].of_values(0, 1), MutableList[int](0, 1))
+
+        with self.assertRaises(TypeError):
+            MutableList[int].of_values(0, '1')
+        self.assertEqual(MutableList[int | str].of_values(0, '1'), MutableList[int | str](0, '1'))
+        self.assertNotEqual(MutableList[int | str | float].of_values(0, '1'), MutableList.of_values(0, '1'))
+        self.assertEqual(MutableList[int | str | float].of_values(0, '1').item_type, int | str | float)
+
 
 if __name__ == '__main__':
     unittest.main()
