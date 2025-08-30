@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import collections
-import typing
 from typing import ClassVar, Callable, Iterable, Any, Mapping
 
 from abstract_classes.collection import Collection, MutableCollection
@@ -25,16 +23,16 @@ class AbstractSet[T](Collection[T]):
 
         values (Iterable[T]): The internal container of stored values, by default a frozenset.
 
-        _finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting them as an
+        _finisher (ClassVar[Callable[[Iterable], frozenset]]): It is applied to the values before setting them as an
          attribute on Collection's init.
 
-        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting
-         them as an attribute on Collection's init when the parameter _skip_validation is True.
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], frozenset]]): It is applied to the values before
+         setting them as an attribute on Collection's init when the parameter _skip_validation is True.
 
-        _repr_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on the repr method to show
+        _repr_finisher (ClassVar[Callable[[Iterable], set]]): Callable that is applied on the repr method to show
          the values contained on the sequence.
 
-        _eq_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on both self and other's
+        _eq_finisher (ClassVar[Callable[[Iterable], set]]): Callable that is applied on both self and other's
          values on the eq method to check for equality.
     """
 
@@ -42,10 +40,10 @@ class AbstractSet[T](Collection[T]):
     values: frozenset[T]
 
     # Metadata class attributes
-    _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(frozenset)
-    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = frozenset
-    _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
-    _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
+    _finisher: ClassVar[Callable[[Iterable], frozenset]] = _convert_to(frozenset)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], frozenset]] = frozenset
+    _repr_finisher: ClassVar[Callable[[Iterable], set]] = _convert_to(set)
+    _eq_finisher: ClassVar[Callable[[Iterable], set]] = _convert_to(set)
 
     def __lt__(self: AbstractSet, other: AbstractSet) -> bool:
         """
@@ -58,12 +56,13 @@ class AbstractSet[T](Collection[T]):
          AbstractSet, their item_type must match exactly.
         :rtype: bool
         """
-        if isinstance(other, AbstractSet):
-            if self.item_type != other.item_type:
-                from type_validation.type_hierarchy import _is_subtype
-                return _is_subtype(self.item_type, other.item_type) and self.values >= other.values
-            return self.values < other.values
-        return NotImplemented
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
+
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            return _is_subtype(self.item_type, other.item_type) and self.values < other.values
+        return self.values < other.values
 
     def __le__(self: AbstractSet, other: AbstractSet) -> bool:
         """
@@ -76,12 +75,13 @@ class AbstractSet[T](Collection[T]):
          AbstractSet, their item_type must match exactly.
         :rtype: bool
         """
-        if isinstance(other, AbstractSet):
-            if self.item_type != other.item_type:
-                from type_validation.type_hierarchy import _is_subtype
-                return _is_subtype(self.item_type, other.item_type) and self.values >= other.values
-            return self.values <= other.values
-        return NotImplemented
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
+
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            return _is_subtype(self.item_type, other.item_type) and self.values <= other.values
+        return self.values <= other.values
 
     def __gt__(self: AbstractSet, other: AbstractSet) -> bool:
         """
@@ -94,12 +94,13 @@ class AbstractSet[T](Collection[T]):
          AbstractSet, their item_type must match exactly.
         :rtype: bool
         """
-        if isinstance(other, AbstractSet):
-            if self.item_type != other.item_type:
-                from type_validation.type_hierarchy import _is_subtype
-                return _is_subtype(other.item_type, self.item_type) and self.values >= other.values
-            return self.values > other.values
-        return NotImplemented
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
+
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            return _is_subtype(other.item_type, self.item_type) and self.values > other.values
+        return self.values > other.values
 
     def __ge__(self: AbstractSet, other: AbstractSet) -> bool:
         """
@@ -112,12 +113,13 @@ class AbstractSet[T](Collection[T]):
          AbstractSet, their item_type must match exactly.
         :rtype: bool
         """
-        if isinstance(other, AbstractSet):
-            if self.item_type != other.item_type:
-                from type_validation.type_hierarchy import _is_subtype
-                return _is_subtype(other.item_type, self.item_type) and self.values >= other.values
-            return self.values >= other.values
-        return NotImplemented
+        if not isinstance(other, AbstractSet):
+            return NotImplemented
+
+        if self.item_type != other.item_type:
+            from type_validation.type_hierarchy import _is_subtype
+            return _is_subtype(other.item_type, self.item_type) and self.values >= other.values
+        return self.values >= other.values
 
     def __or__[S: AbstractSet](self: S, other: S) -> S:
         """
@@ -129,7 +131,9 @@ class AbstractSet[T](Collection[T]):
         :param other: The set to union with.
         :type other: S
 
-        :return: A new AbstractSet containing all elements from both self and other.
+        :return: A new AbstractSet containing all elements from both self and other. Its set type (MutableSet,
+         ImmutableSet) is determined by the resolve_type_priority method, checking the mutability and priority
+         attributes of the classes. Its item type is the one that is supertype to the other set's item type.
         :rtype: S
         """
         if not isinstance(other, AbstractSet):
@@ -153,22 +157,24 @@ class AbstractSet[T](Collection[T]):
         :param other: The set to intersect with.
         :type other: S
 
-        :return: A new AbstractSet containing all elements present in both sets.
+        :return: A new AbstractSet containing all elements present in both sets. Its set type (MutableSet,
+         ImmutableSet) is determined by the resolve_type_priority method, checking the mutability and priority
+         attributes of the classes. Its item type is the one that is subtype to the other set's item type.
         :rtype: S
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
 
         from type_validation.type_hierarchy import _resolve_type_priority
-        set_type = _resolve_type_priority(type(self), type(other))
+        new_set_type = _resolve_type_priority(type(self), type(other))
 
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _get_subtype
-            new_type = _get_subtype(self.item_type, other.item_type)
+            new_item_type = _get_subtype(self.item_type, other.item_type)
         else:
-            new_type = self.item_type
+            new_item_type = self.item_type
 
-        return set_type[new_type](self.values & other.values, _skip_validation=True)
+        return new_set_type[new_item_type](self.values & other.values, _skip_validation=True)
 
     def __sub__[S: AbstractSet](self: S, other: Iterable) -> S:
         """
@@ -191,22 +197,24 @@ class AbstractSet[T](Collection[T]):
         :param other: The set to symmetric-difference with.
         :type other: Iterable
 
-        :return: A new AbstractSet of the same dynamic subclass as self containing all elements in either set but not both.
+        :return: A new AbstractSet containing all elements in either set but not both. Its set type (MutableSet,
+         ImmutableSet) is determined by the resolve_type_priority method, checking the mutability and priority
+         attributes of the classes. Its item type is the one that is supertype to the other set's item type.
         :rtype: S
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
 
         from type_validation.type_hierarchy import _resolve_type_priority
-        set_type = _resolve_type_priority(type(self), type(other))
+        new_set_type = _resolve_type_priority(type(self), type(other))
 
         if self.item_type != other.item_type:
             from type_validation.type_hierarchy import _get_supertype
-            new_type = _get_supertype(self.item_type, other.item_type)
+            new_item_type = _get_supertype(self.item_type, other.item_type)
         else:
-            new_type = self.item_type
+            new_item_type = self.item_type
 
-        return set_type[new_type](self.values ^ other.values, _skip_validation=True)
+        return new_set_type[new_item_type](self.values ^ other.values, _skip_validation=True)
 
     def union[S: AbstractSet](
         self: S,
@@ -295,7 +303,7 @@ class AbstractSet[T](Collection[T]):
         :type _coerce: bool
 
         :return: A new AbstractSet of the same dynamic subclass as self containing the elements that are present in only
-        one of self or the passed iterables.
+         one of self or the passed iterables.
         :rtype: S
         """
         from type_validation.type_validation import _validate_or_coerce_iterable_of_iterables
@@ -319,10 +327,12 @@ class AbstractSet[T](Collection[T]):
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
+
         if other.item_type != self.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(self.item_type, other.item_type):
                 raise ValueError(f"Cannot compare sets of different types: {class_name(self.item_type)} != {class_name(other.item_type)}")
+
         return self.values.issubset(other.values)
 
     def is_superset(
@@ -340,10 +350,12 @@ class AbstractSet[T](Collection[T]):
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
+
         if other.item_type != self.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type):
                 raise ValueError(f"Cannot compare sets of incompatible types: {class_name(self.item_type)} != {class_name(other.item_type)}")
+
         return self.values.issuperset(other.values)
 
     def is_disjoint(
@@ -361,10 +373,12 @@ class AbstractSet[T](Collection[T]):
         """
         if not isinstance(other, AbstractSet):
             return NotImplemented
+
         if other.item_type != self.item_type:
             from type_validation.type_hierarchy import _is_subtype
             if not _is_subtype(other.item_type, self.item_type) and not _is_subtype(self.item_type, other.item_type):
                 raise ValueError(f"Cannot compare sets of incompatible types: {class_name(self.item_type)} != {class_name(other.item_type)}")
+
         return self.values.isdisjoint(other.values)
 
 
@@ -383,10 +397,10 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
 
         values (Iterable[T]): The internal container of stored values, by default a set.
 
-        _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of Collection's init
+        _finisher (ClassVar[Callable[[Iterable], set]]): Overrides the _finisher parameter of Collection's init
          by its value, setting it to set to ensure mutability of the underlying container.
 
-        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], set]]): It is applied to the values before setting
          them as an attribute on Collection's init when the parameter _skip_validation is True.
 
         _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class.
@@ -396,8 +410,8 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     values: set[T]
 
     # Metadata class attributes
-    _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(set)
-    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = set
+    _finisher: ClassVar[Callable[[Iterable], set]] = _convert_to(set)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], set]] = set
     _mutable: ClassVar[bool] = True
 
     def __ior__[S: AbstractMutableSet](

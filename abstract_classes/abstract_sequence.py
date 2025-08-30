@@ -87,6 +87,7 @@ class AbstractSequence[T](Collection[T]):
         """
         if not isinstance(other, AbstractSequence):
             return NotImplemented
+
         eq_finisher = getattr(type(self), '_eq_finisher', lambda x : x)
         return eq_finisher(self.values) < eq_finisher(other.values)
 
@@ -102,6 +103,7 @@ class AbstractSequence[T](Collection[T]):
         """
         if not isinstance(other, AbstractSequence):
             return NotImplemented
+
         eq_finisher = getattr(type(self), '_eq_finisher', lambda x : x)
         return eq_finisher(self.values) > eq_finisher(other.values)
 
@@ -117,6 +119,7 @@ class AbstractSequence[T](Collection[T]):
         """
         if not isinstance(other, AbstractSequence):
             return NotImplemented
+
         eq_finisher = getattr(type(self), '_eq_finisher', lambda x : x)
         return eq_finisher(self.values) <= eq_finisher(other.values)
 
@@ -132,6 +135,7 @@ class AbstractSequence[T](Collection[T]):
         """
         if not isinstance(other, AbstractSequence):
             return NotImplemented
+
         eq_finisher = getattr(type(self), '_eq_finisher', lambda x : x)
         return eq_finisher(self.values) >= eq_finisher(other.values)
 
@@ -202,6 +206,7 @@ class AbstractSequence[T](Collection[T]):
         """
         if not isinstance(n, int):
             return NotImplemented
+
         return type(self)(self.values * n, _skip_validation=True)
 
     def __reversed__(self: AbstractSequence[T]) -> Iterator[T]:

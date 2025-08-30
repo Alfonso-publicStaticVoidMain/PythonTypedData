@@ -165,7 +165,8 @@ def _validate_or_coerce_value[T](
     Validates or coerces an object to match a given type, then returns it.
 
     Always performs the following type coercions:
-        - int -> float, complex: If abs(obj) < MAX_EXACT_INT_FLOAT, the upper bound for which that conversion is fine.
+        - bool -> int
+        - int, bool -> float, complex: If abs(obj) < MAX_EXACT_INT_FLOAT, the upper bound for which that conversion is fine.
         - float -> complex
 
     If _coerce=True:
@@ -190,6 +191,9 @@ def _validate_or_coerce_value[T](
         return obj
 
     # *********** Safe coercions ***********
+    if expected_type is int and isinstance(obj, bool):
+        return int(obj)  # bool -> int
+
     if expected_type in (float, complex) and isinstance(obj, (int, bool)):
         if abs(obj) > MAX_EXACT_INT_FLOAT:
             raise TypeError(f"Number {obj} exceeded the bound of valid int -> float conversions.")
