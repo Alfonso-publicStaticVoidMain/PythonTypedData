@@ -544,13 +544,11 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
         :type _coerce: bool
         """
         from type_validation.type_validation import _validate_or_coerce_value
-        value_to_remove = value
-        if _coerce:
-            try:
-                value_to_remove = _validate_or_coerce_value(value, self.item_type)
-            except (TypeError, ValueError):
-                pass
-        self.values.discard(value_to_remove)
+        try:
+            value = _validate_or_coerce_value(value, self.item_type, _coerce=_coerce)
+        except (TypeError, ValueError):
+            pass
+        self.values.discard(value)
 
     def pop(self: AbstractMutableSet[T]) -> T:
         """

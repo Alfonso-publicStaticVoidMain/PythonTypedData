@@ -39,9 +39,9 @@ class AbstractDict[K, V](GenericBase):
 
         data (dict[K, V]): The underlying dictionary data container.
 
-        _finisher (ClassVar[Callable[[dict], Any]]): It's applied to the data on init before being set as attribute.
+        _finisher (ClassVar[Callable[[dict], immutabledict]]): It's applied to the data on init before being set as attribute.
 
-        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It's applied to the data on init before
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], immutabledict]]): It's applied to the data on init before
          being set as attribute, only if init is called with _skip_validation=True.
 
         _repr_finisher (ClassVar[Callable[[Mapping], dict]]): It's applied to the data when printing the object on the
@@ -56,7 +56,7 @@ class AbstractDict[K, V](GenericBase):
 
     # Metadata class attributes
     _finisher: ClassVar[Callable[[dict], immutabledict]] = _convert_to(immutabledict)
-    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = immutabledict
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], immutabledict]] = immutabledict
     _repr_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
     _eq_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
 
@@ -372,7 +372,7 @@ class AbstractDict[K, V](GenericBase):
         :return: A string representation of this AbstractDict.
         :rtype: str
         """
-        repr_finisher: Callable[[Iterable], Iterable] = getattr(type(self), '_repr_finisher', lambda x : x)
+        repr_finisher: Callable[[Mapping], Mapping] = getattr(type(self), '_repr_finisher', lambda x : x)
         return f"{class_name(type(self))}{repr_finisher(self.data)}"
 
     def __or__[D: AbstractDict](self: D, other: D) -> D:
@@ -382,8 +382,9 @@ class AbstractDict[K, V](GenericBase):
         :param other: The other mapping to merge.
         :type other: D
 
-        :return: A new AbstractDict of the same dynamic subclass as self containing all key-value pairs from both, with
-         `other` overriding duplicate keys.
+        :return: A new AbstractDict containing all key-value pairs from both, with other overriding duplicate keys. Its
+         dict type is determined by the _resolve_type_priority method, taking into account the _mutable and _priority
+         attributes of the classes. Its key and value types are the ones that are supertypes to their respective others.
         :rtype: D
         """
         if not isinstance(other, AbstractDict):
@@ -411,7 +412,9 @@ class AbstractDict[K, V](GenericBase):
         :param other: The other mapping.
         :type other: D
 
-        :return: A new AbstractDict of the same dynamic subclass as self with only keys present in both mappings.
+        :return: A new AbstractDict with only keys present in both mappings. Its dict type is determined by the
+         _resolve_type_priority method, taking into account the _mutable and _priority attributes of the classes. Its
+         key and value types are the ones that are subtypes to their respective others.
         :rtype: D
         """
         if not isinstance(other, AbstractDict):
@@ -643,9 +646,9 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
 
         data (dict[K, V]): The underlying dictionary data container.
 
-        _finisher (ClassVar[Callable[[dict], Any]]): It's applied to the data on init before being set as attribute.
+        _finisher (ClassVar[Callable[[dict], dict]]): It's applied to the data on init before being set as attribute.
 
-        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It's applied to the data on init before
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], dict]]): It's applied to the data on init before
          being set as attribute, only if init is called with _skip_validation=True.
 
         _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class.
@@ -656,8 +659,8 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
     data: dict[K, V]
 
     # Metadata class attributes
-    _finisher: ClassVar[Callable[[dict], Mapping]] = _convert_to(dict)
-    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = dict
+    _finisher: ClassVar[Callable[[dict], dict]] = _convert_to(dict)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], dict]] = dict
     _mutable: bool = True
 
     def __setitem__(
