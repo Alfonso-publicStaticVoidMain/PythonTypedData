@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import collections
 from functools import reduce
-from typing import Iterable, Any, Callable, TypeVar, ClassVar, Iterator
+from typing import Iterable, Any, Callable, TypeVar, Iterator, Sized
 from collections import defaultdict
 
 from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation, _convert_to
@@ -44,18 +45,19 @@ class Collection[T](GenericBase):
     Attributes:
         item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
 
-        values (Iterable[T]): The internal container of stored values, usually of one of Python's built-in Iterables.
+        values (collections.abc.Collection[T]): The internal container of stored values, usually of one of Python's
+         built-in Iterables. It's expected that it implements __len__, __contains__ and __iter__.
     """
 
     item_type: type[T]
-    values: Iterable[T]
+    values: collections.abc.Collection[T]
 
     def __init__(
         self: Collection[T],
         *values: T | Iterable[T],
         _coerce: bool = False,
         _forbidden_iterable_types: tuple[type, ...] = (),
-        _finisher: Callable[[Iterable[T]], Any] = None,
+        _finisher: Callable[[Iterable[T]], collections.abc.Collection[T]] = None,
         _skip_validation: bool = False
     ) -> None:
         """
@@ -75,7 +77,7 @@ class Collection[T](GenericBase):
 
         :param _finisher: Callable to be applied to the values before storing them on the values attribute of the object.
          Defaults to None, and in that case is later assigned to the identity mapping.
-        :type _finisher: Callable[[Iterable[T]], Any]
+        :type _finisher: Callable[[Iterable[T]], collections.abc.Collection[T]]
 
         :param _skip_validation: State parameter to skip type validation of the values. Only use it in cases where it's
          known that the values received will match the generic type.
@@ -150,18 +152,7 @@ class Collection[T](GenericBase):
 
         :raises TypeError: If no values are provided.
         """
-        class_generic_type: type | None = cls._inferred_item_type()
-
-        # Called like MutableList[int].of_values(...) -> values can be empty since the type is given.
-        if class_generic_type is not None:
-            return cls[class_generic_type](values)
-
-        # Called like MutableList.of_values(...) -> values be provided to infer the type.
-        else:
-            if not values:
-                raise TypeError(f"No type could be inferred from the values: {values}")
-            from type_validation.type_inference import _infer_type_contained_in_iterable
-            return cls[_infer_type_contained_in_iterable(values)](values, _skip_validation=True)
+        return cls.of_iterable(values)
 
 
     @classmethod
@@ -181,10 +172,12 @@ class Collection[T](GenericBase):
 
         # Called like MutableList[int].of_iterable(...) -> values can be empty since the type is given.
         if class_generic_type is not None:
-            return cls[class_generic_type](values)
+            return cls(values)
 
         # Called like MutableList.of_iterable(...) -> values mustn't be empty to infer the type.
         else:
+            if not isinstance(values, Sized):
+                values = list(values)
             if not values:
                 raise TypeError(f"No type could be inferred from the values: {values}")
             from type_validation.type_inference import _infer_type_contained_in_iterable
@@ -825,11 +818,13 @@ class MutableCollection[T](Collection):
     Attributes:
         item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
 
-        values (Iterable[T]): The internal container of stored values, usually of one of Python's built-in Iterables.
+        values (collections.abc.Collection[T]): The internal container of stored values, usually of one of Python's
+         built-in Iterables. It's expected that it implements __len__, __contains__ and __iter__, as well as remove and
+         clear.
     """
 
     item_type: type[T]
-    values: Iterable[T]
+    values: collections.abc.Collection[T]
 
     def remove(
         self: MutableCollection[T],

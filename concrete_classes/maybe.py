@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Any, Iterator
 
-from abstract_classes.generic_base import GenericBase, class_name
+from abstract_classes.generic_base import GenericBase
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -130,7 +130,7 @@ class Maybe[T](GenericBase):
         # Called like Maybe.of_nullable(...) -> Type will be inferred from the value, which mustn't be None.
         else:
             if value is None:
-                raise TypeError(f"You must use a parametrized Maybe to construct an empty Maybe with of_nullable")
+                raise TypeError("You must use a parametrized Maybe to construct an empty Maybe with of_nullable")
             from type_validation.type_inference import _infer_type
             from type_validation.type_validation import _validate_or_coerce_value
             inferred_item_type: type = _infer_type(value)
@@ -180,6 +180,8 @@ class Maybe[T](GenericBase):
     def __hash__(self: Maybe[T]) -> int:
         """
         Hashes the Maybe object by trying to hash the tuple of its item_type and value.
+
+        Might raise a TypeError if the value is not hashable.
         """
         return hash((self.item_type, self.value))
 
@@ -229,6 +231,7 @@ class Maybe[T](GenericBase):
         """
         if self.value is None:
             raise ValueError(f"Cannot access an index of {self}")
+
         try:
             return self.value[key]
         except TypeError:
@@ -253,7 +256,8 @@ class Maybe[T](GenericBase):
         try:
             return len(self.value)
         except TypeError:
-            raise TypeError(f"Value of type {type(self.value).__name__} has no len()")
+            from abstract_classes.generic_base import class_name
+            raise TypeError(f"Value of type {class_name(self.value)} has no len()")
 
     def __iter__(self) -> Iterator:
         """
@@ -270,7 +274,8 @@ class Maybe[T](GenericBase):
         try:
             return iter(self.value)
         except TypeError:
-            raise TypeError(f"Value of type {type(self.value).__name__} is not iterable")
+            from abstract_classes.generic_base import class_name
+            raise TypeError(f"Value of type {class_name(self.value)} is not iterable")
 
     def __contains__(self, item: Any) -> bool:
         """
@@ -290,7 +295,8 @@ class Maybe[T](GenericBase):
         try:
             return item in self.value
         except TypeError:
-            raise TypeError(f"Value of type {type(self.value).__name__} does not support 'in'")
+            from abstract_classes.generic_base import class_name
+            raise TypeError(f"Value of type {class_name(self.value)} does not support 'in'")
 
     def is_present(self: Maybe[T]) -> bool:
         """
@@ -473,7 +479,9 @@ class Maybe[T](GenericBase):
         :param _coerce: State parameter that, if True, attempts to coerce the result value to the expected result_type.
         :type _coerce: bool
 
-        :return: The
+        :return: A new Maybe instance holding the mapped and flattened value, or an empty Maybe of the expected result
+         type if self was empty.
+        :rtype: Maybe[U]
         """
         if self.is_empty() and result_type is not None:
             return Maybe[result_type].empty()
@@ -483,7 +491,7 @@ class Maybe[T](GenericBase):
         if result.is_empty():
             raise ValueError("flatmap mapper returned an empty obj.")
         if result_type is not None:
-            return Maybe[result_type](result.get(), _coerce=_coerce)
+            return Maybe[result_type](result.value, _coerce=_coerce)
         return result
 
     def filter(

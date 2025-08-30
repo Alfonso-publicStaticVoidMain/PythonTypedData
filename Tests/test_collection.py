@@ -294,6 +294,22 @@ class TestCollection(unittest.TestCase):
         self.assertNotEqual(MutableList[int | str | float].of_values(0, '1'), MutableList.of_values(0, '1'))
         self.assertEqual(MutableList[int | str | float].of_values(0, '1').item_type, int | str | float)
 
+    def test_generators(self):
+        gen = (x for x in [0, 1, 2])
+        lst = MutableList.of_iterable(gen)
+        self.assertEqual(lst, MutableList[int](0, 1, 2))
+
+        gen = (x for x in [-2, -1, 0])
+        lst = MutableList[int](gen)
+        self.assertEqual(lst, MutableList[int](-2, -1, 0))
+
+        empty_gen = (x for x in [])
+        with self.assertRaises(TypeError):
+            MutableList.of_iterable(empty_gen)
+
+        empty_gen = (x for x in [])
+        lst = MutableList[int].of_iterable(empty_gen)
+        self.assertEqual(lst, MutableList[int]())
 
 if __name__ == '__main__':
     unittest.main()

@@ -28,17 +28,17 @@ class AbstractSequence[T](Collection[T]):
 
         values (Iterable[T]): The internal container of stored values, by default a tuple.
 
-        _finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting them as an
+        _finisher (ClassVar[Callable[[Iterable], tuple]]): It is applied to the values before setting them as an
          attribute on Collection's init.
 
-        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], tuple]]): It is applied to the values before setting
          them as an attribute on Collection's init when the parameter _skip_validation is True.
 
-        _repr_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on the repr method to show
+        _repr_finisher (ClassVar[Callable[[Iterable], list]]): Callable that is applied on the repr method to show
          the values contained on the sequence.
 
-        _eq_finisher (ClassVar[Callable[[Iterable], Iterable]]): Callable that is applied on both self and other's
-         values on the eq method to check for equality.
+        _eq_finisher (ClassVar[Callable[[Iterable], tuple]]): Callable that is applied on both self and other's
+         values on the eq method to check for equality. Its return type should be comparable and implement __eq__.
 
         _forbidden_iterable_types (ClassVar[tuple[type, ...]]): Overrides the _forbidden_iterable_types parameter of
          Collection's init, setting it to (set, frozenset, AbstractSet, typing.AbstractSet).
@@ -48,10 +48,10 @@ class AbstractSequence[T](Collection[T]):
     values: tuple[T, ...]
 
     # Metadata class attributes
-    _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
-    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = tuple
-    _repr_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
-    _eq_finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(tuple)
+    _finisher: ClassVar[Callable[[Iterable], tuple]] = _convert_to(tuple)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], tuple]] = tuple
+    _repr_finisher: ClassVar[Callable[[Iterable], list]] = _convert_to(list)
+    _eq_finisher: ClassVar[Callable[[Iterable], tuple]] = _convert_to(tuple)
     _forbidden_iterable_types: ClassVar[tuple[type, ...]] = (set, frozenset, AbstractSet, typing.AbstractSet)
 
     def __getitem__(self: AbstractSequence[T], index: int | slice) -> T | AbstractSequence[T]:
@@ -72,6 +72,8 @@ class AbstractSequence[T](Collection[T]):
 
         if isinstance(index, int):
             return self.values[index]
+
+        return NotImplemented
 
     def __lt__(self: AbstractSequence[T], other: AbstractSequence[T]) -> bool:
         """
@@ -290,10 +292,10 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
 
         values (Iterable[T]): The internal container of stored values, usually of one of Python's built-in Iterables.
 
-        _finisher (ClassVar[Callable[[Iterable], Iterable]]): Overrides the _finisher parameter of Collection's init
+        _finisher (ClassVar[Callable[[Iterable], list]]): Overrides the _finisher parameter of Collection's init
          by its value, setting it to list to ensure mutability of the underlying container.
 
-        _skip_validation_finisher (ClassVar[Callable[[Iterable], Iterable]]): It is applied to the values before setting
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], list]]): It is applied to the values before setting
          them as an attribute on Collection's init when the parameter _skip_validation is True.
 
         _allowed_ordered_types (ClassVar[tuple[type, ...]]): Tuple of types accepted on this class's setitem method.
@@ -305,8 +307,8 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
     values: list[T]
 
     # Metadata class attributes
-    _finisher: ClassVar[Callable[[Iterable], Iterable]] = _convert_to(list)
-    _skip_validation_finisher: ClassVar[Callable[[Iterable], Iterable]] = list
+    _finisher: ClassVar[Callable[[Iterable], list]] = _convert_to(list)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], list]] = list
     _allowed_ordered_types: ClassVar[tuple[type, ...]] = (list, tuple, AbstractSequence, range, deque, Sequence)
     _mutable: ClassVar[bool] = True
 

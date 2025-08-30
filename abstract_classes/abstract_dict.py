@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import ClassVar, Callable, Any, Mapping, Iterable, TypeVar, Iterator
+from typing import ClassVar, Callable, Any, Mapping, Iterable, TypeVar, Iterator, Sized
 
 from immutabledict import immutabledict
 
@@ -183,7 +183,7 @@ class AbstractDict[K, V](GenericBase):
 
         # Called like MutableDict[int, str].of(...) -> keys_values can be empty since the generic types are given.
         if generic_key_type is not None and generic_value_type is not None:
-            return cls[generic_key_type, generic_value_type](keys_values)
+            return cls(keys_values)
 
         # Called like MutableDict.of(...) -> keys_values mustn't be empty for the type to be inferred.
         else:
@@ -224,19 +224,20 @@ class AbstractDict[K, V](GenericBase):
 
         generic_key_type, generic_value_type = cls._inferred_key_value_types()
 
-        # Called like MutableDict[int, str].of(...) -> keys_values can be empty since the generic types are given.
+        # Called like MutableDict[int, str].of_keys_values(...) -> keys_values can be empty since the types are given.
         if generic_key_type is not None and generic_value_type is not None:
             return cls[generic_key_type, generic_value_type](_keys=keys, _values=values)
 
-        # Called like MutableDict.of(...) -> both keys and values must be provided to infer the generic types.
+        # Called like MutableDict.of_keys_values(...) -> both keys and values must be provided to infer the types.
         else:
-            from type_validation.type_validation import _split_keys_values
-            from type_validation.type_inference import _infer_type_contained_in_iterable
             if not keys or not values:
                 raise TypeError(f"The keys or values were empty, thus unfit to infer a type from them.")
-            inferred_key_type = _infer_type_contained_in_iterable(keys)
-            inferred_value_type = _infer_type_contained_in_iterable(values)
-            return cls[inferred_key_type, inferred_value_type](_keys=keys, _values=values, _skip_validation=True)
+
+            from type_validation.type_inference import _infer_type_contained_in_iterable
+            return cls[
+                _infer_type_contained_in_iterable(keys),
+                _infer_type_contained_in_iterable(values)
+            ](_keys=keys, _values=values, _skip_validation=True)
 
     def subdict[D: AbstractDict](self: D, slc: slice) -> D:
         """
