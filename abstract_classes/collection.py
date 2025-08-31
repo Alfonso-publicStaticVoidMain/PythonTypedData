@@ -46,7 +46,7 @@ class Collection[T](GenericBase):
         item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
 
         values (CollectionProtocol[T]): The internal container of stored values, usually of one of Python's
-         built-in Iterables. It's expected that it implements __len__, __contains__ and __iter__.
+         built-in Iterables. It's expected that it implements __len__, __contains__, __iter__ and __eq__.
     """
 
     item_type: type[T]
@@ -63,8 +63,10 @@ class Collection[T](GenericBase):
         """
         Basic constructor for the Collection abstract class, to be invoked by all subclasses.
 
-        The attribute item_type is inferred from the generic the class was called upon, which was stored on the
-        _args attribute of the class returned by __class_getitem__ and then fetched by _inferred_item_type.
+        The item_type attribute is inferred from the generic the class was called upon, which was stored on the
+        _args attribute of the class returned by __class_getitem__ and then fetched by _inferred_item_type. If a class
+        without an _args attribute is used, like MutableList instead of MutableList[int], _inferred_item_type will
+        return None, and an error will be raised. In order to infer the type, use .of_iterable or .of_values.
 
         :param values: Values to store in the Collection, received as an iterable or one by one.
         :type values: T | Iterable[T]
