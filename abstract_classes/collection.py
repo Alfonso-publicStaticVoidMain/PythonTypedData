@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import collections
 from functools import reduce
 from typing import Iterable, Any, Callable, TypeVar, Iterator, Sized
 from collections import defaultdict
 
+from abstract_classes.protocols import CollectionProtocol, MutableCollectionProtocol
 from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation, _convert_to
 
 _MISSING = object()
@@ -45,19 +45,19 @@ class Collection[T](GenericBase):
     Attributes:
         item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
 
-        values (collections.abc.Collection[T]): The internal container of stored values, usually of one of Python's
+        values (CollectionProtocol[T]): The internal container of stored values, usually of one of Python's
          built-in Iterables. It's expected that it implements __len__, __contains__ and __iter__.
     """
 
     item_type: type[T]
-    values: collections.abc.Collection[T]
+    values: CollectionProtocol[T]
 
     def __init__(
         self: Collection[T],
         *values: T | Iterable[T],
         _coerce: bool = False,
         _forbidden_iterable_types: tuple[type, ...] = (),
-        _finisher: Callable[[Iterable[T]], collections.abc.Collection[T]] = None,
+        _finisher: Callable[[Iterable[T]], CollectionProtocol[T]] = None,
         _skip_validation: bool = False
     ) -> None:
         """
@@ -112,8 +112,8 @@ class Collection[T](GenericBase):
 
         object.__setattr__(self, 'item_type', generic_item_type)
 
-        finisher = _finisher or getattr(type(self), '_finisher', lambda x : x)
-        skip_validation_finisher = getattr(type(self), '_skip_validation_finisher', None) or finisher
+        finisher: Callable[[Iterable[T]], CollectionProtocol[T]] = _finisher or getattr(type(self), '_finisher', lambda x : x)
+        skip_validation_finisher: Callable[[Iterable[T]], CollectionProtocol[T]] = getattr(type(self), '_skip_validation_finisher', None) or finisher
 
         final_values = skip_validation_finisher(values) if _skip_validation else _validate_or_coerce_iterable(values, self.item_type, _coerce=_coerce, _finisher=finisher)
 
@@ -235,13 +235,17 @@ class Collection[T](GenericBase):
          after applying the class's _eq_finisher callable attribute to them.
         :rtype: bool
         """
-        eq_finisher: Callable[[Iterable], Iterable] = getattr(type(self), '_eq_finisher', lambda x : x)
-        comparable_types: type[Collection] | tuple[type[Collection], ...] = getattr(type(self), '_comparable_types', Collection)
-        return (
-            isinstance(other, comparable_types)
-            and self.item_type == other.item_type
-            and eq_finisher(self.values) == eq_finisher(other.values)
-        )
+        if (
+            self.item_type != other.item_type
+            or not isinstance(other, getattr(type(self), '_comparable_types', Collection))
+            or not isinstance(self, getattr(type(other), '_comparable_types', Collection))
+        ):
+            return False
+
+        from type_validation.type_hierarchy import _resolve_type_priority
+        winner_cls = _resolve_type_priority(type(self), type(other))
+        eq_finisher: Callable[[Iterable], CollectionProtocol] = getattr(winner_cls, '_eq_finisher', lambda x : x)
+        return eq_finisher(self.values) == eq_finisher(other.values)
 
     def __repr__(self) -> str:
         """
@@ -818,13 +822,13 @@ class MutableCollection[T](Collection):
     Attributes:
         item_type (type[T]): The type of elements stored in the collection, derived from the generic type.
 
-        values (collections.abc.Collection[T]): The internal container of stored values, usually of one of Python's
+        values (CollectionProtocol[T]): The internal container of stored values, usually of one of Python's
          built-in Iterables. It's expected that it implements __len__, __contains__ and __iter__, as well as remove and
          clear.
     """
 
     item_type: type[T]
-    values: collections.abc.Collection[T]
+    values: MutableCollectionProtocol[T]
 
     def remove(
         self: MutableCollection[T],
@@ -904,7 +908,7 @@ class MutableCollection[T](Collection):
         if callable(replace_many):
             replace_many({x : f(x) for x in self.values}, _coerce=_coerce)
         else:
-            raise AttributeError(f"{class_name(type(self))} doesn't implement replace_many!")
+            raise AttributeError(f"{class_name(type(self))} doesn't implement the replace_many method!")
 
     def remove_all(self: MutableCollection[T], items: Iterable[T]) -> None:
         """

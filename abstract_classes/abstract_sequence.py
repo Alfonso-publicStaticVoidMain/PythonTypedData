@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import sys
 import typing
 from collections import deque
 from collections.abc import Sequence
-from typing import ClassVar, Callable, Iterable, Any, Iterator
+from typing import ClassVar, Callable, Iterable, Any, Iterator, SupportsIndex
 
 from abstract_classes.abstract_set import AbstractSet
 from abstract_classes.collection import Collection, MutableCollection
 from abstract_classes.generic_base import forbid_instantiation, _convert_to, class_name
+from abstract_classes.protocols import SequenceProtocol, MutableSequenceProtocol
 
 
 @forbid_instantiation
@@ -39,13 +41,14 @@ class AbstractSequence[T](Collection[T]):
 
         _eq_finisher (ClassVar[Callable[[Iterable], tuple]]): Callable that is applied on both self and other's
          values on the eq method to check for equality. Its return type should be comparable and implement __eq__.
+         Subclasses shouldn't override this attribute to preserve commutativity of equality and comparison operators.
 
         _forbidden_iterable_types (ClassVar[tuple[type, ...]]): Overrides the _forbidden_iterable_types parameter of
          Collection's init, setting it to (set, frozenset, AbstractSet, typing.AbstractSet).
     """
 
     item_type: type[T]
-    values: tuple[T, ...]
+    values: SequenceProtocol[T]
 
     # Metadata class attributes
     _finisher: ClassVar[Callable[[Iterable], tuple]] = _convert_to(tuple)
@@ -228,21 +231,40 @@ class AbstractSequence[T](Collection[T]):
         """
         return type(self)(reversed(self.values), _skip_validation=True)
 
-    def index(self: AbstractSequence[T], value: T) -> int:
+    def index(
+        self: AbstractSequence[T],
+        value: T,
+        *,
+        _start: SupportsIndex = 0,
+        _stop: SupportsIndex = sys.maxsize
+    ) -> int:
         """
         Returns the index of the first occurrence of a value.
 
         :param value: The value to search for.
         :type value: T
 
+        :param _start: Index to start looking for the value.
+        :type _start: SupportsIndex
+
+        :param _stop: Index to stop looking for the value.
+        :type _stop: SupportsIndex
+
         :return: Index of the first appearance of the value.
         :rtype: int
 
         :raises ValueError: If the value is not found.
         """
-        return self.values.index(value)
+        return self.values.index(value, _start, _stop)
 
-    def get_index(self: AbstractSequence[T], value: T, fallback: int = -1) -> int:
+    def get_index(
+        self: AbstractSequence[T],
+        value: T,
+        fallback: int = -1,
+        *,
+        _start: SupportsIndex = 0,
+        _stop: SupportsIndex = sys.maxsize
+    ) -> int:
         """
         Returns the index of the first occurrence of a value, or a fallback defaulted to -1 if it isn't found.
 
@@ -252,13 +274,40 @@ class AbstractSequence[T](Collection[T]):
         :param fallback: Number to return if the value isn't found. Defaulted to -1.
         :type fallback: int
 
+        :param _start: Index to start looking for the value.
+        :type _start: SupportsIndex
+
+        :param _stop: Index to stop looking for the value.
+        :type _stop: SupportsIndex
+
         :return: Index of the first appearance of the value, or fallback if it isn't found.
         :rtype: int
         """
         try:
-            return self.values.index(value)
+            return self.values.index(value, _start, _stop)
         except ValueError:
             return fallback
+
+    def __sorted__[S: AbstractSequence](
+        self: S,
+        *,
+        key: Callable[[T], Any] | None = None,
+        reverse: bool = False
+    ) -> S:
+        """
+        Returns a new AbstractSequence with its elements sorted by an optional key.
+
+        :param key: Optional function to extract the comparison key from.
+        :type key: Callable[[T], Any] | None
+
+        :param reverse: Whether to sort in descending order.
+        :type reverse: bool
+
+        :return: A new AbstractSequence of the same dynamic subclass as self with the same elements but sorted
+         according to the key and reverse parameters.
+        :rtype: S
+        """
+        return type(self)(sorted(self.values, key=key, reverse=reverse), _skip_validation=True)
 
     def sorted[S: AbstractSequence](
         self: S,
@@ -279,7 +328,7 @@ class AbstractSequence[T](Collection[T]):
          according to the key and reverse parameters.
         :rtype: S
         """
-        return type(self)(sorted(self.values, key=key, reverse=reverse), _skip_validation=True)
+        return type(self)(sorted(self, key=key, reverse=reverse), _skip_validation=True)
 
 
 @forbid_instantiation
@@ -309,7 +358,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
     """
 
     item_type: type[T]
-    values: list[T]
+    values: MutableSequenceProtocol[T]
 
     # Metadata class attributes
     _finisher: ClassVar[Callable[[Iterable], list]] = _convert_to(list)
@@ -444,7 +493,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
 
     def insert(
         self: AbstractMutableSequence[T],
-        index: int,
+        index: SupportsIndex,
         value: T,
         *,
         _coerce: bool = False
@@ -453,7 +502,7 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         Inserts a value at the specified index delegating on the underlying container's insert method.
 
         :param index: The index at which to insert.
-        :type index: int
+        :type index: SupportsIndex
 
         :param value: The value to insert.
         :type value: T
@@ -482,12 +531,12 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         from type_validation.type_validation import _validate_or_coerce_iterable
         self.values.extend(_validate_or_coerce_iterable(other, self.item_type, _coerce=_coerce))
 
-    def pop(self: AbstractMutableSequence[T], index: int = -1) -> T:
+    def pop(self: AbstractMutableSequence[T], index: SupportsIndex = -1) -> T:
         """
         Removes and returns the item at the given position (default at the last position).
 
         :param index: Index of the element to remove. Defaults to -1 (last element).
-        :type index: int
+        :type index: SupportsIndex
 
         :return: The removed element, as returned by the underlying container's pop method.
         :rtype: T
@@ -504,7 +553,8 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         :param predicate: Function to the booleans to filter the sequence by.
         :type predicate: Callable[[T], bool]
         """
-        self.values[:] = [item for item in self.values if predicate(item)]
+        finisher = getattr(type(self), '_finisher', lambda x : x)
+        self.values[:] = finisher(item for item in self.values if predicate(item))
 
     def replace(
         self: AbstractMutableSequence[T],
@@ -527,7 +577,8 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         """
         from type_validation.type_validation import _validate_or_coerce_value
         new = _validate_or_coerce_value(new, self.item_type, _coerce=_coerce)
-        self.values[:] = [new if item == old else item for item in self.values]
+        finisher = getattr(type(self), '_finisher', lambda x : x)
+        self.values[:] = finisher(new if item == old else item for item in self.values)
 
     def replace_many(
         self: AbstractMutableSequence[T],
@@ -546,4 +597,5 @@ class AbstractMutableSequence[T](AbstractSequence[T], MutableCollection[T]):
         """
         from type_validation.type_validation import _validate_or_coerce_value
         validated_replacements = {old : _validate_or_coerce_value(new, self.item_type, _coerce=_coerce) for old, new in replacements.items()}
-        self.values[:] = [validated_replacements.get(item, item) for item in self.values]
+        finisher = getattr(type(self), '_finisher', lambda x : x)
+        self.values[:] = finisher(validated_replacements.get(item, item) for item in self.values)

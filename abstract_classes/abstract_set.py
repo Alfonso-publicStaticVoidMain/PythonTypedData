@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import ClassVar, Callable, Iterable, Any, Mapping
+from typing import ClassVar, Callable, Iterable, Mapping
 
 from abstract_classes.collection import Collection, MutableCollection
 from abstract_classes.generic_base import forbid_instantiation, _convert_to, class_name
+from abstract_classes.protocols import SetProtocol, MutableSetProtocol
 
 
 @forbid_instantiation
@@ -21,13 +22,15 @@ class AbstractSet[T](Collection[T]):
     Attributes:
         item_type (type[T]): The type of elements stored in the set, derived from the generic type.
 
-        values (Iterable[T]): The internal container of stored values, by default a frozenset.
+        values (Iterable[T]): The internal container of stored values, by default a frozenset. It should ideally be of a
+         class that implements the following methods: union, intersection, difference, symmetric_difference, issubset,
+         issuperset, isdisjoint, as well as those expected from Collection.
 
-        _finisher (ClassVar[Callable[[Iterable], frozenset]]): It is applied to the values before setting them as an
-         attribute on Collection's init.
+        _finisher (ClassVar[Callable[[Iterable], frozenset]]): Callable that is applied to the values before setting
+         them as an attribute on Collection's init. Its return type should be that of the values attribute.
 
-        _skip_validation_finisher (ClassVar[Callable[[Iterable], frozenset]]): It is applied to the values before
-         setting them as an attribute on Collection's init when the parameter _skip_validation is True.
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], frozenset]]): Callable that is applied to the values
+         before setting them as an attribute on Collection's init when the parameter _skip_validation is True.
 
         _repr_finisher (ClassVar[Callable[[Iterable], set]]): Callable that is applied on the repr method to show
          the values contained on the sequence.
@@ -37,7 +40,7 @@ class AbstractSet[T](Collection[T]):
     """
 
     item_type: type[T]
-    values: frozenset[T]
+    values: SetProtocol[T]
 
     # Metadata class attributes
     _finisher: ClassVar[Callable[[Iterable], frozenset]] = _convert_to(frozenset)
@@ -395,19 +398,21 @@ class AbstractMutableSet[T](AbstractSet[T], MutableCollection[T]):
     Attributes:
         item_type (type[T]): The type of elements stored in the set, derived from the generic type.
 
-        values (Iterable[T]): The internal container of stored values, by default a set.
+        values (Iterable[T]): The internal container of stored values, by default a set. It should ideally be of a class
+         that implements the following methods: add, discard, pop, update, difference_update, intersection_update,
+         symmetric_difference_update, as well as those expected from Collection and AbstractSet.
 
-        _finisher (ClassVar[Callable[[Iterable], set]]): Overrides the _finisher parameter of Collection's init
-         by its value, setting it to set to ensure mutability of the underlying container.
+        _finisher (ClassVar[Callable[[Iterable], set]]): Callable that is applied to the values before setting them as
+         an attribute on Collection's init. Its return type should be that of the values attribute.
 
-        _skip_validation_finisher (ClassVar[Callable[[Iterable], set]]): It is applied to the values before setting
-         them as an attribute on Collection's init when the parameter _skip_validation is True.
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], set]]): Callable that is applied to the values before
+         setting them as an attribute on Collection's init when the parameter _skip_validation is True.
 
         _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class.
     """
 
     item_type: type[T]
-    values: set[T]
+    values: MutableSetProtocol[T]
 
     # Metadata class attributes
     _finisher: ClassVar[Callable[[Iterable], set]] = _convert_to(set)

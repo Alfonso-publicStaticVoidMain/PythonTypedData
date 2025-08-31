@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import ClassVar, Callable, Any, Mapping, Iterable, TypeVar, Iterator, Sized
+from typing import ClassVar, Callable, Any, Mapping, Iterable, TypeVar, Iterator
 
 from immutabledict import immutabledict
 
 from abstract_classes.generic_base import GenericBase, class_name, forbid_instantiation, _convert_to
+from abstract_classes.protocols import DictProtocol, MutableDictProtocol
 
 
 @forbid_instantiation
@@ -37,11 +38,11 @@ class AbstractDict[K, V](GenericBase):
 
         value_type (type[V]): The type of the values.
 
-        data (dict[K, V]): The underlying dictionary data container.
+        data (DictProtocol[K, V]): The underlying dictionary data container.
 
-        _finisher (ClassVar[Callable[[dict], immutabledict]]): It's applied to the data on init before being set as attribute.
+        _finisher (ClassVar[Callable[[dict], DictProtocol]]): It's applied to the data on init before being set as attribute.
 
-        _skip_validation_finisher (ClassVar[Callable[[Iterable], immutabledict]]): It's applied to the data on init before
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], DictProtocol]]): It's applied to the data on init before
          being set as attribute, only if init is called with _skip_validation=True.
 
         _repr_finisher (ClassVar[Callable[[Mapping], dict]]): It's applied to the data when printing the object on the
@@ -52,11 +53,11 @@ class AbstractDict[K, V](GenericBase):
 
     key_type: type[K]
     value_type: type[V]
-    data: immutabledict[K, V]
+    data: DictProtocol[K, V]
 
     # Metadata class attributes
-    _finisher: ClassVar[Callable[[dict], immutabledict]] = _convert_to(immutabledict)
-    _skip_validation_finisher: ClassVar[Callable[[Iterable], immutabledict]] = immutabledict
+    _finisher: ClassVar[Callable[[dict], DictProtocol]] = _convert_to(immutabledict)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], DictProtocol]] = immutabledict
     _repr_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
     _eq_finisher: ClassVar[Callable[[Mapping], dict]] = _convert_to(dict)
 
@@ -356,14 +357,18 @@ class AbstractDict[K, V](GenericBase):
         :return: True if `other` is an AbstractDict with the same key and values types and contents, False otherwise.
         :rtype: bool
         """
-        eq_finisher: Callable[[Iterable], Iterable] = getattr(type(self), '_eq_finisher', lambda x : x)
-        comparable_types: type[AbstractDict] = getattr(type(self), '_comparable_types', AbstractDict)
-        return (
-            isinstance(other, comparable_types)
-            and self.key_type == other.key_type
-            and self.value_type == other.value_type
-            and eq_finisher(self.data) == eq_finisher(other.data)
-        )
+        if (
+            self.key_type != other.key_type
+            or self.value_type != other.value_type
+            or not isinstance(other, getattr(type(self), '_comparable_types', AbstractDict))
+            or not isinstance(self, getattr(type(other), '_comparable_types', AbstractDict))
+        ):
+            return False
+
+        from type_validation.type_hierarchy import _resolve_type_priority
+        winner_cls = _resolve_type_priority(type(self), type(other))
+        eq_finisher: Callable[[Iterable], DictProtocol] = getattr(winner_cls, '_eq_finisher', lambda x : x)
+        return eq_finisher(self.data) == eq_finisher(other.data)
 
     def __repr__(self: AbstractDict[K, V]) -> str:
         """
@@ -644,11 +649,11 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
 
         value_type (type[V]): The type of the values.
 
-        data (dict[K, V]): The underlying dictionary data container.
+        data (MutableDictProtocol[K, V]): The underlying dictionary data container.
 
-        _finisher (ClassVar[Callable[[dict], dict]]): It's applied to the data on init before being set as attribute.
+        _finisher (ClassVar[Callable[[dict], MutableDictProtocol]]): It's applied to the data on init before being set as attribute.
 
-        _skip_validation_finisher (ClassVar[Callable[[Iterable], dict]]): It's applied to the data on init before
+        _skip_validation_finisher (ClassVar[Callable[[Iterable], MutableDictProtocol]]): It's applied to the data on init before
          being set as attribute, only if init is called with _skip_validation=True.
 
         _mutable (ClassVar[bool]): Metadata attribute describing the mutability of this class.
@@ -656,11 +661,11 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
 
     key_type: type[K]
     value_type: type[V]
-    data: dict[K, V]
+    data: MutableDictProtocol[K, V]
 
     # Metadata class attributes
-    _finisher: ClassVar[Callable[[dict], dict]] = _convert_to(dict)
-    _skip_validation_finisher: ClassVar[Callable[[Iterable], dict]] = dict
+    _finisher: ClassVar[Callable[[dict], MutableDictProtocol]] = _convert_to(dict)
+    _skip_validation_finisher: ClassVar[Callable[[Iterable], MutableDictProtocol]] = dict
     _mutable: bool = True
 
     def __setitem__(
@@ -739,8 +744,7 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         if not isinstance(other, AbstractDict):
             return NotImplemented
 
-        keys_to_remove = set(self.data) - set(other.data)
-        for key in keys_to_remove:
+        for key in set(self.data) - set(other.data):
             del self.data[key]
         return self
 
@@ -754,7 +758,10 @@ class AbstractMutableDict[K, V](AbstractDict[K, V]):
         :return: The updated AbstractMutableDict.
         :rtype: AbstractMutableDict[K, V]
         """
-        for key in other:
+        if not isinstance(other, AbstractDict):
+            return NotImplemented
+
+        for key in other.data:
             self.data.pop(key, None)
         return self
 
