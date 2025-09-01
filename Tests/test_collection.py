@@ -295,6 +295,8 @@ class TestCollection(unittest.TestCase):
         self.assertEqual(MutableList[int | str | float].of_values(0, '1').item_type, int | str | float)
 
     def test_generators(self):
+        # Using a generator to create a Collection, having to infer its type from it, doesn't consume the generator
+        # on type inference and lets the collection be created normally.
         gen = (x for x in [0, 1, 2])
         lst = MutableList.of_iterable(gen)
         self.assertEqual(lst, MutableList[int](0, 1, 2))

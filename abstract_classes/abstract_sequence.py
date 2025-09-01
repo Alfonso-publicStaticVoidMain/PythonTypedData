@@ -147,13 +147,25 @@ class AbstractSequence[T](Collection[T]):
         other: S,
     ) -> S:
         """
-        Returns a new AbstractSequence concatenating the values of another AbstractSequence, list or tuple.
+        Creates and returns a new AbstractSequence concatenating the values of another AbstractSequence.
+
+        The returned sequence type is determined by _resolve_type_priority, to ensure commutativity of the operator, and
+        prioritizing the class that is immutable, or which has lesser priority. For example::
+
+            MutableList[int] + ImmutableList[int] = ImmutableList[int]
+
+        The returned item type will be the one that is supertype to the other between self and other's item types, as
+        determined by the _is_subtype method, for example::
+
+            MutableList[int] + MutableList[int | str] = MutableList[int | str]
 
         :param other: The sequence to concatenate.
         :type other: S
 
-        :return: A new AbstractSequence of the same dynamic subclass as self containing the elements from `other` added
-         right after the ones from self, as done by the __add__ method of the underlying container.
+        :return: A new AbstractSequence containing the elements from `other` added right after the ones from self, as
+         done by the __add__ method of the underlying container. The type of the returned sequence is determined by the
+         _resolve_type_priority method, taking into account the _mutable and _priority attributes of the classes, and
+         the item type is the type from among self's and other's that is supertype to the other.
         :rtype: S
 
         :raises TypeError: If `other` has incompatible types.
@@ -165,8 +177,8 @@ class AbstractSequence[T](Collection[T]):
         new_sequence_type = _resolve_type_priority(type(self), type(other))
 
         if self.item_type != other.item_type:
-            from type_validation.type_hierarchy import _get_subtype
-            new_item_type = _get_subtype(self.item_type, other.item_type)
+            from type_validation.type_hierarchy import _get_supertype
+            new_item_type = _get_supertype(self.item_type, other.item_type)
         else:
             new_item_type = self.item_type
 

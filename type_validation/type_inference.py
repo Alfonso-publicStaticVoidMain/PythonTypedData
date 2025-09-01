@@ -136,6 +136,8 @@ def _infer_type_contained_in_iterable[T](iterable: Iterable[T]) -> type[T]:
 
     Supports nested containers and recursively infers their generic types too.
 
+    If this method receives a generator as its iterable argument, it will consume it in order to infer its type.
+
     :param iterable: Iterable object to infer its contained type.
     :type iterable: Iterable[T]
 
@@ -143,7 +145,7 @@ def _infer_type_contained_in_iterable[T](iterable: Iterable[T]) -> type[T]:
     :rtype: type[T]
 
     :raises ValueError: If the iterable is None or if it's empty but isn't a Collection (which still has an item_type
-    attached even if they're empty).
+     attached even if they're empty).
     """
     if iterable is None:
         raise ValueError("Cannot infer type from None.")

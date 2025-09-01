@@ -19,6 +19,9 @@ class TestList(unittest.TestCase):
         iml = ImmutableList.of_values('a', 2, 0.1)
         self.assertEqual(class_name(type(iml)), "ImmutableList[int | str | float]")
 
+        mul = MutableList[ImmutableList[float]](ImmutableList[float](0.1))
+        self.assertEqual(class_name(type(mul)), 'MutableList[ImmutableList[float]]')
+
     def test_init_and_access(self):
         iml = ImmutableList[int](['1', 2], _coerce=True)
         self.assertEqual(iml.values, (1, 2))

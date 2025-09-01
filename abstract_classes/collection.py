@@ -156,7 +156,6 @@ class Collection[T](GenericBase):
         """
         return cls.of_iterable(values)
 
-
     @classmethod
     def of_iterable[C: Collection](cls: type[C], values: Iterable) -> C:
         """
@@ -178,7 +177,8 @@ class Collection[T](GenericBase):
 
         # Called like MutableList.of_iterable(...) -> values mustn't be empty to infer the type.
         else:
-            if not isinstance(values, Sized):
+            if isinstance(values, Iterator):
+                # Iterators are materialized into a list to avoid consuming them when inferring their type
                 values = list(values)
             if not values:
                 raise TypeError(f"No type could be inferred from the values: {values}")
